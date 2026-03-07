@@ -22,6 +22,8 @@ const musicalWorkSchema = new mongoose.Schema(
     writers: { type: String, default: '' },
     status: { type: String, default: 'Draft', enum: ['Draft', 'Pending Review', 'Registered'] },
     spoc: { type: String, default: '' },
+    assignedDate: { type: Date, default: null },
+    deadline: { type: Date, default: null },
     subTasks: [subTaskSchema],
   },
   { timestamps: true, collection: 'musical_works' }

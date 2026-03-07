@@ -76,6 +76,8 @@ const onboardingEntrySchema = new mongoose.Schema(
     },
 
     spoc: { type: String, default: '' },
+    assignedDate: { type: Date, default: null },
+    deadline: { type: Date, default: null },
     previousStage: { type: String, default: '' },
     notes: { type: String, default: '' },
     priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },

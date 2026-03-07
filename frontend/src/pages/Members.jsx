@@ -3,6 +3,25 @@ import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
+const fmtDateISO = (d) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+const getDeadlineStatus = (deadline) => {
+  if (!deadline) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
+  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return 'red';
+  if (diffDays <= 2) return 'yellow';
+  return 'green';
+};
+const DEADLINE_COLORS = {
+  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
+  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
+  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+};
+
 const statusColors = {
   Active: { bg: '#065f46', text: '#34d399' },
   Onboarding: { bg: '#713f12', text: '#fbbf24' },
@@ -67,10 +86,11 @@ const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
 
 const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
   const isEdit = !!initialData;
-  const [form, setForm] = useState(initialData || {
-    name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '',
-    panCard: '', aadhaar: '', dateOfFirstContact: '', spoc: '',
-  });
+  const [form, setForm] = useState(
+    initialData
+      ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
+      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', spoc: '', deadline: '' },
+  );
 
   const h = (f, v) => setForm((p) => ({ ...p, [f]: v }));
 
@@ -85,8 +105,8 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
   const sectionStyle = { fontSize: '13px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px', marginTop: '8px' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '560px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#1e2235', borderRadius: '16px', width: '560px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>{isEdit ? 'Edit Member' : 'Add New Member'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
@@ -145,12 +165,18 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
 
         {/* Assignment */}
         <div style={{ ...sectionStyle, marginTop: '24px' }}>Assignment</div>
-        <div>
-          <label style={labelStyle}>Assign SPOC</label>
-          <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => h('spoc', e.target.value)}>
-            <option value="">Select a team member...</option>
-            {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label style={labelStyle}>Assign SPOC</label>
+            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => h('spoc', e.target.value)}>
+              <option value="">Select a team member...</option>
+              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Deadline</label>
+            <input type="date" style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} value={form.deadline} onChange={(e) => h('deadline', e.target.value)} />
+          </div>
         </div>
 
         {/* Buttons */}
@@ -215,7 +241,27 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
             <span style={{ color: '#fff', fontWeight: 500 }}>{spocMember.name}</span>
           </span>
         ) : <span style={{ color: '#555', fontSize: '13px' }}>Not assigned</span>}
+        {member.assignedDate && (
+          <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '8px' }}>
+            on {new Date(member.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+        )}
       </div>
+
+      {/* Deadline */}
+      {member.deadline && (() => {
+        const dlStatus = getDeadlineStatus(member.deadline);
+        const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1e2540', marginBottom: '16px' }}>
+            <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deadline</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: '#fff', fontSize: '13px' }}>{new Date(member.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              {dlColor && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>{dlColor.label}</span>}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Sub-Tasks header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -290,8 +336,8 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
   );
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '600px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#1e2235', borderRadius: '16px', width: '600px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

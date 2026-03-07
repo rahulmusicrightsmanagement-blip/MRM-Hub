@@ -7,6 +7,7 @@ import SalesPipeline from './pages/SalesPipeline';
 import Onboarding from './pages/Onboarding';
 import SocietyReg from './pages/SocietyReg';
 // import MusicalWorks from './pages/MusicalWorks';
+import Royalty from './pages/Royalty';
 import Members from './pages/Members';
 import Tracker from './pages/Tracker';
 import Analytics from './pages/Analytics';
@@ -34,6 +35,7 @@ const ProtectedRoutes = () => {
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/society-reg" element={<SocietyReg />} />
         {/* <Route path="/musical-works" element={<MusicalWorks />} /> */}
+        <Route path="/royalty" element={<Royalty />} />
         <Route path="/members" element={<Members />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/analytics" element={<Analytics />} />

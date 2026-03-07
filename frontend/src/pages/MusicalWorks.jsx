@@ -4,6 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from '../components/SearchableSelect';
 
+const fmtDateISO = (d) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+const getDeadlineStatus = (deadline) => {
+  if (!deadline) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
+  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return 'red';
+  if (diffDays <= 2) return 'yellow';
+  return 'green';
+};
+const DEADLINE_COLORS = {
+  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
+  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
+  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+};
+
 const statusColors = {
   Registered: { bg: '#065f46', text: '#34d399' },
   'Pending Review': { bg: '#713f12', text: '#fbbf24' },
@@ -24,7 +43,7 @@ const AddWorkModal = ({ onClose, onAdd, teamMembers, members }) => {
   const [form, setForm] = useState({
     title: '', artist: '', album: '', genre: '', isrc: '', iswc: '',
     language: 'Hindi', duration: '', status: 'Draft', publisher: '',
-    territories: 'Worldwide', writers: '', spoc: '',
+    territories: 'Worldwide', writers: '', spoc: '', deadline: '',
   });
 
   const handleChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
@@ -39,8 +58,8 @@ const AddWorkModal = ({ onClose, onAdd, teamMembers, members }) => {
   const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '640px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#1e2235', borderRadius: '16px', width: '640px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>Add Musical Work</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
@@ -114,12 +133,18 @@ const AddWorkModal = ({ onClose, onAdd, teamMembers, members }) => {
           <input style={inputStyle} placeholder="e.g. Prateek Kuhad, Amit Trivedi" value={form.writers} onChange={(e) => handleChange('writers', e.target.value)} />
         </div>
 
-        <div style={{ marginTop: '16px' }}>
-          <label style={labelStyle}>Assign SPOC</label>
-          <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => handleChange('spoc', e.target.value)}>
-            <option value="">Select a team member...</option>
-            {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+          <div>
+            <label style={labelStyle}>Assign SPOC</label>
+            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => handleChange('spoc', e.target.value)}>
+              <option value="">Select a team member...</option>
+              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Deadline</label>
+            <input type="date" style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} value={form.deadline} onChange={(e) => handleChange('deadline', e.target.value)} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
@@ -141,6 +166,7 @@ const EditWorkModal = ({ work, onClose, onSave, teamMembers, members }) => {
     language: work.language || 'Hindi', duration: work.duration || '',
     status: work.status || 'Draft', publisher: work.publisher || '',
     territories: work.territories || '', writers: work.writers || '', spoc: work.spoc || '',
+    deadline: work.deadline ? fmtDateISO(new Date(work.deadline)) : '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -158,7 +184,7 @@ const EditWorkModal = ({ work, onClose, onSave, teamMembers, members }) => {
   const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
       <div style={{ background: '#1e2235', borderRadius: '16px', width: '640px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>Edit Musical Work</h2>
@@ -225,12 +251,18 @@ const EditWorkModal = ({ work, onClose, onSave, teamMembers, members }) => {
           <input style={inputStyle} value={form.writers} onChange={(e) => handleChange('writers', e.target.value)} />
         </div>
 
-        <div style={{ marginTop: '16px' }}>
-          <label style={labelStyle}>Assign SPOC</label>
-          <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => handleChange('spoc', e.target.value)}>
-            <option value="">Select a team member...</option>
-            {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+          <div>
+            <label style={labelStyle}>Assign SPOC</label>
+            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => handleChange('spoc', e.target.value)}>
+              <option value="">Select a team member...</option>
+              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Deadline</label>
+            <input type="date" style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} value={form.deadline} onChange={(e) => handleChange('deadline', e.target.value)} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
@@ -274,8 +306,8 @@ const WorkDetailModal = ({ work, onClose, onUpdateStatus, onAddTask, onToggleTas
   const infoValueStyle = { color: '#fff', fontSize: '14px', fontWeight: 500 };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '640px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#1e2235', borderRadius: '16px', width: '640px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
         {/* Header with Edit/Delete */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>Musical Work Details</h2>
@@ -327,7 +359,27 @@ const WorkDetailModal = ({ work, onClose, onUpdateStatus, onAddTask, onToggleTas
               <span style={{ color: '#fff', fontWeight: 500 }}>{spocMember.name}</span>
             </span>
           ) : <span style={{ color: '#555', fontSize: '13px' }}>Not assigned</span>}
+          {work.assignedDate && (
+            <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '8px' }}>
+              on {new Date(work.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+          )}
         </div>
+
+        {/* Deadline */}
+        {work.deadline && (() => {
+          const ds = getDeadlineStatus(work.deadline);
+          const dc = ds ? DEADLINE_COLORS[ds] : null;
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid #1e2540', marginBottom: '16px' }}>
+              <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deadline</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: '#fff', fontSize: '13px' }}>{new Date(work.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                {dc && <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '9999px', background: dc.bg, color: dc.color, border: `1px solid ${dc.border}` }}>{dc.label}</span>}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Sub-Tasks */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>

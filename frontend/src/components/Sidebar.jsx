@@ -18,7 +18,7 @@ const navItems = [
   { name: 'Sales Pipeline', path: '/sales-pipeline', icon: TrendingUp },
   { name: 'Onboarding', path: '/onboarding', icon: UserPlus },
   { name: 'Society Reg.', path: '/society-reg', icon: Globe },
-  // { name: 'Musical Works', path: '/musical-works', icon: Music },
+  { name: 'Music Works', path: '/royalty', icon: Music },
   { name: 'Members', path: '/members', icon: Users },
   { name: 'Tracker', path: '/tracker', icon: ClipboardList },
   { name: 'Analytics', path: '/analytics', icon: BarChart3 },

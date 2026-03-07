@@ -10,6 +10,25 @@ const stageDotColors = { 'Document Submission': '#3b82f6', 'KYC Verification': '
 const ROLE_OPTIONS = ['Singer-Songwriter', 'Music Composer', 'Lyricist', 'Producer', 'Publisher', 'Artist Manager'];
 const contractTypes = ['Retailer', 'Royalty', 'Work-Based'];
 
+const fmtDateISO = (d) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+const getDeadlineStatus = (deadline) => {
+  if (!deadline) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
+  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return 'red';
+  if (diffDays <= 2) return 'yellow';
+  return 'green';
+};
+const DEADLINE_COLORS = {
+  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
+  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
+  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+};
+
 /* ─── Shared styles ─── */
 const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box' };
 const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' };
@@ -366,8 +385,9 @@ const SOCIETIES = [
 const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfirm }) => {
   const [spoc, setSpoc] = useState('');
   const [notes, setNotes] = useState('');
+  const [deadline, setDeadline] = useState('');
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
       <div style={{ background: '#1e2235', borderRadius: '14px', padding: '28px', width: '420px', border: '1px solid #2d3348' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#fff', marginBottom: '4px' }}>Assign Society Registration</h3>
         <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '20px' }}>
@@ -381,6 +401,11 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
             {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
           </select>
         </div>
+        <div style={{ marginBottom: '14px' }}>
+          <label style={labelStyle}>Deadline</label>
+          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+            style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} />
+        </div>
         <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>Notes (optional)</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
@@ -389,7 +414,7 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #2d3348', paddingTop: '18px', marginTop: '4px' }}>
           <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onConfirm({ spoc, notes })}
+          <button onClick={() => onConfirm({ spoc, notes, deadline })}
             style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <CheckCircle style={{ width: '15px', height: '15px' }} /> Assign & Register
           </button>
@@ -467,7 +492,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   };
 
   /* Confirm assign → save society selection + create society registration */
-  const handleAssignConfirm = async ({ spoc, notes }) => {
+  const handleAssignConfirm = async ({ spoc, notes, deadline }) => {
     const soc = assignModalSociety;
     setAssignModalSociety(null);
     try {
@@ -485,6 +510,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
           society: soc.key,
           spoc: spoc || entry.spoc || '',
           notes: notes || '',
+          deadline: deadline || '',
         }),
       });
       if (regRes.ok) addToast(`${soc.key} registration created for ${entry.name}`);
@@ -977,7 +1003,11 @@ const StageContent = ({ entry, onUpdate, teamMembers }) => {
    ═══════════════════════════════════════════════════════ */
 const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData }) => {
   const isEdit = !!initialData;
-  const [form, setForm] = useState(initialData || { name: '', role: [], email: '', phone: '', contractType: 'Retailer', spoc: '', notes: '', priority: 'medium' });
+  const [form, setForm] = useState(
+    initialData
+      ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
+      : { name: '', role: [], email: '', phone: '', contractType: 'Retailer', spoc: '', notes: '', priority: 'medium', deadline: '' },
+  );
 
   const handleMemberSelect = (memberName) => {
     if (!memberName) { setForm({ ...form, name: '', role: [], email: '', phone: '' }); return; }
@@ -992,8 +1022,8 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={onClose}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{isEdit ? 'Edit Onboarding' : 'Start New Onboarding'}</h2>
           <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
@@ -1022,6 +1052,9 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
             {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
           </select>
         </div>
+        <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Deadline</label>
+          <input style={inputStyle} type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
+        </div>
         <div style={{ marginBottom: '28px' }}><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: '90px', resize: 'vertical' }} placeholder="Add any initial onboarding notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #2d3348', paddingTop: '20px', marginTop: '4px' }}>
@@ -1044,6 +1077,8 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMoveStage, setShowMoveStage] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [showNotQualifiedConfirm, setShowNotQualifiedConfirm] = useState(false);
+  const [notQualifiedReason, setNotQualifiedReason] = useState('');
   const currentStageIdx = STAGES.indexOf(member.stage);
   const isCompleted = member.stage === 'Completed';
   const canAdvance = currentStageIdx >= 0 && currentStageIdx < STAGES.length - 2 && !isCompleted;
@@ -1075,8 +1110,8 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={onClose}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: 0, width: '600px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: 0, width: '600px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
 
         {/* Header */}
         <div style={{ padding: '24px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1132,8 +1167,29 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#e5e7eb' }}>Current Stage: {member.stage}</span>
           </div>
           {member.spoc && (
-            <span style={{ marginLeft: '12px', fontSize: '12px', color: '#9ca3af' }}>SPOC: <strong style={{ color: '#e5e7eb' }}>{member.spoc}</strong></span>
+            <span style={{ marginLeft: '12px', fontSize: '12px', color: '#9ca3af' }}>
+              SPOC: <strong style={{ color: '#e5e7eb' }}>{member.spoc}</strong>
+              {member.assignedDate && (
+                <span style={{ marginLeft: '6px', color: '#6b7280' }}>
+                  (assigned {new Date(member.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })})
+                </span>
+              )}
+            </span>
           )}
+          {member.deadline && (() => {
+            const dlStatus = getDeadlineStatus(member.deadline);
+            const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
+            return (
+              <span style={{ marginLeft: '12px', fontSize: '12px', color: '#9ca3af' }}>
+                Deadline: <strong style={{ color: '#e5e7eb' }}>{new Date(member.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                {dlColor && (
+                  <span style={{ marginLeft: '6px', fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>
+                    {dlColor.label}
+                  </span>
+                )}
+              </span>
+            );
+          })()}
         </div>
 
         {/* Stage-specific content */}
@@ -1153,7 +1209,39 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
 
         {/* Footer actions */}
         <div style={{ padding: '16px 28px', borderTop: '1px solid #2d3348', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Row 1 — secondary: Move to Stage + Not Qualified */}
+
+          {/* Not Qualified confirmation panel */}
+          {showNotQualifiedConfirm && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid #991b1b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 600, margin: 0 }}>
+                ⚠ Confirm: Mark as Not Qualified
+              </p>
+              <p style={{ color: '#9ca3af', fontSize: '12px', margin: 0, lineHeight: '1.5' }}>
+                This will remove the onboarding entry and move the lead to "Not Qualified" in the Sales Pipeline.
+              </p>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>Reason (optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Budget constraints, not a good fit..."
+                  value={notQualifiedReason}
+                  onChange={(e) => setNotQualifiedReason(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', background: '#1a1f2e', border: '1px solid #991b1b', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button onClick={() => { setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                <button
+                  onClick={() => { onNotQualified(member._id, notQualifiedReason); setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <XCircle style={{ width: '14px', height: '14px' }} /> Confirm Not Qualified
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Row 1 — secondary: Move to Stage + Not Qualified */}}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowMoveStage(!showMoveStage)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1173,7 +1261,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
               )}
             </div>
             {!isCompleted && (
-              <button onClick={() => onNotQualified(member._id)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #991b1b', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => setShowNotQualifiedConfirm(true)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #991b1b', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <XCircle style={{ width: '15px', height: '15px' }} /> Not Qualified
               </button>
             )}
@@ -1221,13 +1309,18 @@ const MemberCard = ({ member, onClick }) => {
     : member.stage === 'Completed'
     ? '✓ Completed'
     : 'Review all steps';
+  const dlStatus = member.stage !== 'Completed' ? getDeadlineStatus(member.deadline) : null;
+  const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
 
   return (
-    <div onClick={() => onClick(member)} style={{ backgroundColor: '#161b2e', border: '1px solid #1e2540', borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
-      onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#3a3f60')} onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#1e2540')}>
+    <div onClick={() => onClick(member)} style={{ backgroundColor: '#161b2e', border: `1px solid ${dlColor ? dlColor.border : '#1e2540'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#3a3f60')} onMouseLeave={(e) => (e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#1e2540')}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
         <p style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: 0 }}>{member.name}</p>
-        <PriorityBadge priority={member.priority} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {dlColor && <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>{dlColor.label}</span>}
+          <PriorityBadge priority={member.priority} />
+        </div>
       </div>
       <p style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '8px' }}>{progress}</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -1317,9 +1410,12 @@ const Onboarding = () => {
     } catch (err) { console.error('Failed to move stage:', err); addToast('Failed to move stage', 'error'); }
   };
 
-  const handleNotQualified = async (entryId) => {
+  const handleNotQualified = async (entryId, reason) => {
     try {
-      const res = await authFetch(`/api/onboarding/${entryId}/not-qualified`, { method: 'POST' });
+      const res = await authFetch(`/api/onboarding/${entryId}/not-qualified`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || '' }),
+      });
       if (res.ok) {
         setEntries((p) => p.filter((e) => e._id !== entryId));
         setSelectedMember(null);

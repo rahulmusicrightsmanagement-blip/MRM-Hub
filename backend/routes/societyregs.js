@@ -28,7 +28,7 @@ router.get('/', auth, async (req, res) => {
 // POST /api/societyregs — start a new registration for a member+society
 router.post('/', auth, async (req, res) => {
   try {
-    const { member, society, ipi, spoc, notes } = req.body;
+    const { member, society, ipi, spoc, notes, deadline } = req.body;
     if (!member || !society) return res.status(400).json({ message: 'Member and society are required' });
 
     let reg = await SocietyRegistration.findOne({ name: member });
@@ -58,6 +58,8 @@ router.post('/', auth, async (req, res) => {
         category: 'Registration',
         priority: 'Medium',
         spoc: spoc || '',
+        assignedDate: spoc ? new Date() : null,
+        deadline: deadline ? new Date(deadline) : null,
         sourceType: 'societyreg',
         sourceId: reg._id,
         createdBy: req.user?.id,

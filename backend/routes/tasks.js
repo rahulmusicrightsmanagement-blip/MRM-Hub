@@ -64,7 +64,7 @@ router.get('/stats', auth, async (req, res) => {
 // POST /api/tasks — create a new task
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, date, startTime, duration, category, priority, spoc, spocColor, notes, sourceType, sourceId } = req.body;
+    const { title, date, startTime, duration, category, priority, spoc, spocColor, notes, sourceType, sourceId, deadline } = req.body;
     if (!title || !date || !startTime) {
       return res.status(400).json({ message: 'Title, date, and start time are required' });
     }
@@ -78,9 +78,11 @@ router.post('/', auth, async (req, res) => {
       priority: priority || 'Medium',
       spoc: spoc || '',
       spocColor: spocColor || '#6366f1',
+      assignedDate: spoc ? new Date() : null,
       notes: notes || '',
       sourceType: sourceType || '',
       sourceId: sourceId || '',
+      deadline: deadline ? new Date(deadline) : null,
       createdBy: req.user._id,
     });
 
@@ -98,11 +100,17 @@ router.put('/:id', auth, async (req, res) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
 
-    const fields = ['title', 'date', 'startTime', 'duration', 'category', 'priority', 'spoc', 'spocColor', 'completed', 'notes'];
+    // Auto-set assignedDate when spoc changes
+    if (req.body.spoc !== undefined && req.body.spoc !== task.spoc) {
+      task.assignedDate = req.body.spoc ? new Date() : null;
+    }
+
+    const fields = ['title', 'date', 'startTime', 'duration', 'category', 'priority', 'spoc', 'spocColor', 'completed', 'notes', 'deadline'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) task[f] = req.body[f];
     });
     if (req.body.date) task.date = new Date(req.body.date);
+    if (req.body.deadline) task.deadline = new Date(req.body.deadline);
 
     await task.save();
     res.json({ task });

@@ -18,6 +18,8 @@ const taskSchema = new mongoose.Schema(
     },
     spoc: { type: String, default: '' },
     spocColor: { type: String, default: '#6366f1' },
+    assignedDate: { type: Date, default: null },
+    deadline: { type: Date, default: null },
     completed: { type: Boolean, default: false },
     notes: { type: String, default: '' },
     // Optional link to source entity

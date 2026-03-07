@@ -31,6 +31,8 @@ const memberSchema = new mongoose.Schema(
     joinDate: { type: String, default: '' },
     dateOfFirstContact: { type: String, default: '' },
     spoc: { type: String, default: '' },
+    assignedDate: { type: Date, default: null },
+    deadline: { type: Date, default: null },
     subTasks: [subTaskSchema],
   },
   { timestamps: true, collection: 'members' }

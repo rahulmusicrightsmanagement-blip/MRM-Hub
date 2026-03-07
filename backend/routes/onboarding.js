@@ -40,7 +40,7 @@ router.get('/', auth, async (req, res) => {
 /* ─── POST create entry ─── */
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, role, email, phone, contractType, spoc, notes, priority } = req.body;
+    const { name, role, email, phone, contractType, spoc, notes, priority, deadline } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
 
     const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
@@ -54,6 +54,8 @@ router.post('/', auth, async (req, res) => {
       phone: phone || '',
       contractType: contractType || 'Retailer',
       spoc: spoc || '',
+      assignedDate: spoc ? new Date() : null,
+      deadline: deadline ? new Date(deadline) : null,
       notes: notes || '',
       priority: priority || 'medium',
     });
@@ -70,6 +72,8 @@ router.post('/', auth, async (req, res) => {
         category: 'Onboarding',
         priority: (entry.priority || 'medium').charAt(0).toUpperCase() + (entry.priority || 'medium').slice(1),
         spoc: entry.spoc || '',
+        assignedDate: entry.spoc ? new Date() : null,
+        deadline: entry.deadline || null,
         sourceType: 'onboarding',
         sourceId: entry._id,
         createdBy: req.user?.id,
@@ -91,8 +95,13 @@ router.put('/:id', auth, async (req, res) => {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
 
+    // Auto-set assignedDate when spoc changes
+    if (req.body.spoc !== undefined && req.body.spoc !== entry.spoc) {
+      entry.assignedDate = req.body.spoc ? new Date() : null;
+    }
+
     const fields = [
-      'name', 'role', 'email', 'phone', 'contractType', 'stage', 'spoc', 'notes', 'priority',
+      'name', 'role', 'email', 'phone', 'contractType', 'stage', 'spoc', 'notes', 'priority', 'deadline',
       'contractSent', 'contractReceived', 'contractFileUrl', 'contractFileName', 'contractStartDate', 'contractRenewalDate', 'selectedSocieties',
       'addedToWhatsApp', 'whatsAppGroupName', 'emailCreated', 'createdEmailAddress', 'createdEmailPassword',
       'previousStage',
@@ -100,6 +109,7 @@ router.put('/:id', auth, async (req, res) => {
     fields.forEach((f) => {
       if (req.body[f] !== undefined) entry[f] = req.body[f];
     });
+    if (req.body.deadline) entry.deadline = new Date(req.body.deadline);
 
     // Handle checklist updates (legacy)
     if (req.body.checklist) {
@@ -138,11 +148,14 @@ router.post('/:id/not-qualified', auth, async (req, res) => {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
 
+    const { reason } = req.body;
+
     // Find the lead by email match
     const lead = await Lead.findOne({ email: entry.email.toLowerCase() });
     if (lead) {
       lead.previousStage = lead.stage;
       lead.stage = 'Not Qualified';
+      lead.notQualifiedReason = reason || '';
       await lead.save();
     }
 
@@ -155,6 +168,63 @@ router.post('/:id/not-qualified', auth, async (req, res) => {
     res.json({ message: 'Moved to Sales Not Qualified', lead: lead || null });
   } catch (err) {
     console.error('Not-qualified error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/onboarding/restart/:leadId — restart onboarding from Sales Not Qualified
+router.post('/restart/:leadId', auth, async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.leadId);
+    if (!lead) return res.status(404).json({ message: 'Lead not found' });
+
+    const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+
+    const entry = new OnboardingEntry({
+      name: lead.name,
+      email: lead.email,
+      color,
+      phone: lead.phone || '',
+      contractType: lead.onboardingContractType || 'Retailer',
+      spoc: lead.onboardingSpoc || '',
+      assignedDate: lead.onboardingSpoc ? new Date() : null,
+      notes: lead.notes || '',
+      priority: lead.priority || 'medium',
+    });
+    await entry.save();
+
+    // Auto-create Tracker task
+    const nowHHmm = () => {
+      const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+    await Task.create({
+      title: `Onboarding — ${entry.name}`,
+      date: new Date(),
+      startTime: nowHHmm(),
+      duration: 60,
+      category: 'Onboarding',
+      priority: (entry.priority || 'medium').charAt(0).toUpperCase() + (entry.priority || 'medium').slice(1),
+      spoc: entry.spoc || '',
+      assignedDate: entry.spoc ? new Date() : null,
+      deadline: entry.deadline || null,
+      sourceType: 'onboarding',
+      sourceId: entry._id,
+      createdBy: req.user?.id,
+    });
+
+    // Update lead: mark re-onboarded, reset not-qualified state
+    lead.movedToOnboarding = true;
+    lead.onboardedAt = new Date();
+    lead.stage = lead.previousStage || 'Qualified Lead';
+    lead.previousStage = '';
+    lead.notQualifiedReason = '';
+    await lead.save();
+
+    res.json({ entry, lead });
+  } catch (err) {
+    console.error('Restart onboarding error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -306,6 +376,8 @@ router.post('/:id/subtasks', auth, async (req, res) => {
         category: 'Onboarding',
         priority: 'Medium',
         spoc: req.body.assignee || entry.spoc || '',
+        assignedDate: (req.body.assignee || entry.spoc) ? new Date() : null,
+        deadline: entry.deadline || null,
         sourceType: 'onboarding',
         sourceId: entry._id,
         createdBy: req.user?.id,

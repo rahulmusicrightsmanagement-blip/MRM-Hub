@@ -37,6 +37,30 @@ const SMALL_LABEL = {
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 
+const fmtDateISO = (d) => {
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
+
+const getDeadlineStatus = (deadline) => {
+  if (!deadline) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
+  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return 'red';
+  if (diffDays <= 2) return 'yellow';
+  return 'green';
+};
+
+const DEADLINE_COLORS = {
+  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
+  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
+  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+};
+
 /* ──────── Priority Badge ──────── */
 const PriorityBadge = ({ priority }) => {
   const map = {
@@ -58,7 +82,9 @@ const PriorityBadge = ({ priority }) => {
 const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData }) => {
   const isEdit = !!initialData;
   const [form, setForm] = useState(
-    initialData || { name: '', genre: '', email: '', phone: '', source: 'Website Form', priority: 'medium', spoc: '', notes: '' },
+    initialData
+      ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
+      : { name: '', genre: '', email: '', phone: '', source: 'Website Form', priority: 'medium', spoc: '', notes: '', deadline: '' },
   );
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -77,7 +103,6 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
   return (
     <div
       style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-      onClick={onClose}
     >
       <div
         style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '520px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}
@@ -125,6 +150,11 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
             <option value="">Select a team member..</option>
             {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
           </select>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <label style={LABEL}>Deadline</label>
+          <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
         </div>
 
         <div style={{ marginBottom: '28px' }}>
@@ -236,11 +266,11 @@ const ViewDetailsToggle = ({ title, children }) => {
 const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
   const [spoc, setSpoc] = useState(lead.spoc || '');
   const [contractType, setContractType] = useState('Retailer');
+  const [deadline, setDeadline] = useState('');
 
   return (
     <div
       style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}
-      onClick={onClose}
     >
       <div
         style={{ backgroundColor: '#1e2235', borderRadius: '14px', padding: '28px', width: '400px', border: '1px solid #2d3348' }}
@@ -270,24 +300,34 @@ const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
           </select>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <label style={LABEL}>Contract Type</label>
           <select
             style={{ ...INPUT, cursor: 'pointer' }}
             value={contractType}
             onChange={(e) => setContractType(e.target.value)}
           >
-            {['Retailer', 'Publisher', 'Label', 'Distributor', 'Other'].map((t) => (
+            {['Retailer', 'Royalty', 'Work-Based'].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+        </div>
+
+        <div style={{ marginBottom: '24px' }}>
+          <label style={LABEL}>Deadline</label>
+          <input
+            type="date"
+            style={{ ...INPUT, cursor: 'pointer', colorScheme: 'dark' }}
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+          />
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           <button type="button" onClick={onClose} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
           <button
             type="button"
-            onClick={() => onConfirm({ spoc, contractType })}
+            onClick={() => onConfirm({ spoc, contractType, deadline })}
             style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <UserPlus style={{ width: '14px', height: '14px' }} /> Confirm & Move
@@ -341,7 +381,7 @@ const SubTaskRow = ({ task, leadId, onToggleSubtask }) => {
 const LeadDetailModal = ({
   lead, onClose, onMoveNext, onUpdateLead,
   onDeleteLead, onEditLead, onToggleSubtask,
-  onAddSubtask, teamMembers, onMoveToOnboarding, onMarkNotQualified, onRevertLead,
+  onAddSubtask, teamMembers, onMoveToOnboarding, onMarkNotQualified, onRevertLead, onRestartOnboarding,
 }) => {
   const { addToast } = useToast();
   const [showAddTask, setShowAddTask] = useState(false);
@@ -350,6 +390,8 @@ const LeadDetailModal = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showNotQualifiedConfirm, setShowNotQualifiedConfirm] = useState(false);
+  const [notQualifiedReason, setNotQualifiedReason] = useState('');
 
   // editable text fields — save on blur
   const [inquiryNotes, setInquiryNotes] = useState(lead.inquiryNotes || '');
@@ -537,9 +579,15 @@ const LeadDetailModal = ({
           <div style={{ ...FIELD_BOX, padding: '16px' }}>
             <p style={SECTION_TITLE}>Lead Summary</p>
             {lead.previousStage && (
-              <p style={{ fontSize: '12px', color: '#f87171', marginBottom: '12px' }}>
+              <p style={{ fontSize: '12px', color: '#f87171', marginBottom: '8px' }}>
                 Moved from <span style={{ fontWeight: 700, color: '#fca5a5' }}>{lead.previousStage}</span>
               </p>
+            )}
+            {lead.notQualifiedReason && (
+              <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(239,68,68,0.07)', border: '1px solid #991b1b', borderRadius: '8px' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Reason</p>
+                <p style={{ fontSize: '13px', color: '#fca5a5', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{lead.notQualifiedReason}</p>
+              </div>
             )}
 
             {/* Inquiry Summary */}
@@ -606,7 +654,7 @@ const LeadDetailModal = ({
             {lead.previousStage && (
               <button
                 type="button"
-                onClick={() => { onRevertLead(lead._id); onClose(); }}
+                onClick={() => { lead.movedToOnboarding ? onRestartOnboarding(lead._id) : onRevertLead(lead._id); onClose(); }}
                 style={{
                   marginTop: '16px', width: '100%', padding: '10px 16px', borderRadius: '8px',
                   border: '1px solid #6366f1', background: 'rgba(99,102,241,0.1)',
@@ -615,7 +663,7 @@ const LeadDetailModal = ({
                 }}
               >
                 <ArrowRight style={{ width: '14px', height: '14px', transform: 'rotate(180deg)' }} />
-                Revert to {lead.previousStage}
+                {lead.movedToOnboarding ? 'Re-start Onboarding' : `Revert to ${lead.previousStage}`}
               </button>
             )}
           </div>
@@ -629,7 +677,6 @@ const LeadDetailModal = ({
   return (
     <div
       style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-      onClick={onClose}
     >
       <div
         style={{ backgroundColor: '#1e2235', borderRadius: '16px', width: '540px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}
@@ -697,9 +744,35 @@ const LeadDetailModal = ({
         <div style={{ padding: '0 28px', marginBottom: '16px' }}>
           <div style={{ ...FIELD_BOX, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Assigned SPOC</p>
-            {lead.spoc ? <span style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.spoc}</span> : <span style={{ fontSize: '13px', color: '#6b7280' }}>Unassigned</span>}
+            <div style={{ textAlign: 'right' }}>
+              {lead.spoc ? <span style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.spoc}</span> : <span style={{ fontSize: '13px', color: '#6b7280' }}>Unassigned</span>}
+              {lead.assignedDate && (
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
+                  Assigned on {new Date(lead.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        {lead.deadline && (() => {
+          const dlStatus = getDeadlineStatus(lead.deadline);
+          const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
+          return (
+            <div style={{ padding: '0 28px', marginBottom: '16px' }}>
+              <div style={{ ...FIELD_BOX, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Deadline</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{fmtDate(lead.deadline)}</span>
+                  {dlColor && (
+                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>
+                      {dlColor.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* stage tasks */}
         {renderStageTasks()}
@@ -771,15 +844,38 @@ const LeadDetailModal = ({
 
           {/* Not Qualified — available for any stage except already Not Qualified or already onboarded */}
           {lead.stage !== 'Not Qualified' && !lead.movedToOnboarding && (
-            <button type="button" onClick={() => { onMarkNotQualified(lead._id); onClose(); }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button type="button" onClick={() => setShowNotQualifiedConfirm(true)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <XCircle style={{ width: '16px', height: '16px' }} /> Not Qualified
             </button>
           )}
 
+          {/* Not Qualified confirmation panel */}
+          {showNotQualifiedConfirm && (
+            <div style={{ width: '100%', background: 'rgba(239,68,68,0.08)', border: '1px solid #991b1b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
+              <p style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 600, margin: 0 }}>⚠ Confirm: Mark as Not Qualified</p>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>Reason (optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Budget constraints, not a good fit..."
+                  value={notQualifiedReason}
+                  onChange={(e) => setNotQualifiedReason(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', background: '#1a1f2e', border: '1px solid #991b1b', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => { setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                <button type="button" onClick={() => { onMarkNotQualified(lead._id, notQualifiedReason); setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); onClose(); }} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <XCircle style={{ width: '14px', height: '14px' }} /> Confirm Not Qualified
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Revert — only for Not Qualified with a previous stage */}
           {lead.stage === 'Not Qualified' && lead.previousStage && (
-            <button type="button" onClick={() => { onRevertLead(lead._id); onClose(); }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowRight style={{ width: '16px', height: '16px', transform: 'rotate(180deg)' }} /> Revert to {lead.previousStage}
+            <button type="button" onClick={() => { lead.movedToOnboarding ? onRestartOnboarding(lead._id) : onRevertLead(lead._id); onClose(); }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ArrowRight style={{ width: '16px', height: '16px', transform: 'rotate(180deg)' }} /> {lead.movedToOnboarding ? 'Re-start Onboarding' : `Revert to ${lead.previousStage}`}
             </button>
           )}
 
@@ -825,17 +921,26 @@ const LeadCard = ({ lead, onClick }) => {
     'Direct Outreach': <Phone style={{ width: '13px', height: '13px' }} />,
   };
   const date = fmtDate(lead.createdAt);
+  const dlStatus = getDeadlineStatus(lead.deadline);
+  const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
 
   return (
     <div
       onClick={() => onClick(lead)}
-      style={{ backgroundColor: '#161b2e', border: '1px solid #1e2540', borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3a3f60'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1e2540'; }}
+      style={{ backgroundColor: '#161b2e', border: `1px solid ${dlColor ? dlColor.border : '#1e2540'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#3a3f60'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#1e2540'; }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
         <p style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{lead.name}</p>
-        <PriorityBadge priority={lead.priority} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {dlColor && (
+            <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>
+              {dlColor.label}
+            </span>
+          )}
+          <PriorityBadge priority={lead.priority} />
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
         <span style={{ color: '#6b7280' }}>{sourceIcon[lead.source] || <Mail style={{ width: '13px', height: '13px' }} />}</span>
@@ -985,6 +1090,7 @@ const SalesPipeline = () => {
           spoc: opts.spoc || lead.spoc || '',
           notes: lead.notes || '',
           priority: lead.priority || 'medium',
+          deadline: opts.deadline || '',
         }),
       });
       if (res.ok) {
@@ -1007,13 +1113,13 @@ const SalesPipeline = () => {
     } catch (err) { console.error('Move to onboarding error:', err); addToast('Failed to move to onboarding', 'error'); }
   };
 
-  const handleMarkNotQualified = async (leadId) => {
+  const handleMarkNotQualified = async (leadId, reason) => {
     const lead = leads.find((l) => l._id === leadId);
     if (!lead) return;
     try {
       const res = await authFetch(`/api/leads/${leadId}`, {
         method: 'PUT',
-        body: JSON.stringify({ stage: 'Not Qualified', previousStage: lead.stage }),
+        body: JSON.stringify({ stage: 'Not Qualified', previousStage: lead.stage, notQualifiedReason: reason || '' }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -1037,6 +1143,20 @@ const SalesPipeline = () => {
         addToast(`Lead reverted to ${lead.previousStage}`);
       } else addToast('Failed to revert lead', 'error');
     } catch (err) { console.error('Revert lead error:', err); addToast('Failed to revert lead', 'error'); }
+  };
+
+  const handleRestartOnboarding = async (leadId) => {
+    const lead = leads.find((l) => l._id === leadId);
+    if (!lead) return;
+    try {
+      const res = await authFetch(`/api/onboarding/restart/${leadId}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        // Update lead in state (now back to qualified/onboarded)
+        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
+        addToast(`${lead.name} re-added to Onboarding`);
+      } else addToast('Failed to restart onboarding', 'error');
+    } catch (err) { console.error('Restart onboarding error:', err); addToast('Failed to restart onboarding', 'error'); }
   };
 
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading pipeline...</div>;
@@ -1094,6 +1214,7 @@ const SalesPipeline = () => {
           onMoveToOnboarding={handleMoveToOnboarding}
           onMarkNotQualified={handleMarkNotQualified}
           onRevertLead={handleRevertLead}
+          onRestartOnboarding={handleRestartOnboarding}
         />
       )}
     </div>

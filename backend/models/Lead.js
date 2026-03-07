@@ -18,6 +18,8 @@ const leadSchema = new mongoose.Schema(
     priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },
     stage: { type: String, default: 'New Enquiry', enum: ['New Enquiry', 'Meeting Set', 'Qualified Lead', 'Not Qualified'] },
     spoc: { type: String, default: '' },
+    assignedDate: { type: Date, default: null },
+    deadline: { type: Date, default: null },
     notes: { type: String, default: '' },
     subTasks: [subTaskSchema],
     // Stage 1: New Enquiry fields
@@ -38,6 +40,7 @@ const leadSchema = new mongoose.Schema(
     onboardedAt: { type: Date },
     // Not Qualified tracking
     previousStage: { type: String, default: '' },
+    notQualifiedReason: { type: String, default: '' },
   },
   { timestamps: true, collection: 'leads' }
 );

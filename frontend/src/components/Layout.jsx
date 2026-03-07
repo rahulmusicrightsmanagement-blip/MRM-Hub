@@ -7,7 +7,7 @@ const pageTitles = {
   '/sales-pipeline': 'Sales Pipeline',
   '/onboarding': 'Onboarding',
   '/society-reg': 'Society Reg.',
-  '/musical-works': 'Musical Works',
+  '/royalty': 'Music Works',
   '/members': 'Members',
   '/tracker': 'Tracker',
   '/analytics': 'Analytics',

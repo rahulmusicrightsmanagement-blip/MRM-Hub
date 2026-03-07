@@ -285,8 +285,8 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={onClose}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>Start Society Registration</h2>
           <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
@@ -385,8 +385,8 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={onClose}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '0', width: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '0', width: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
         <div style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #2d3348', position: 'sticky', top: 0, backgroundColor: '#1e2235', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
             {isEditing ? (

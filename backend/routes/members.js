@@ -17,7 +17,7 @@ router.get('/', auth, async (req, res) => {
 // POST /api/members
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact } = req.body;
+    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
 
     const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
@@ -33,6 +33,8 @@ router.post('/', auth, async (req, res) => {
       languages: languages || '',
       bio: bio || '',
       spoc: spoc || '',
+      assignedDate: spoc ? new Date() : null,
+      deadline: deadline ? new Date(deadline) : null,
       panCard: panCard || '',
       aadhaar: aadhaar || '',
       dateOfFirstContact: dateOfFirstContact || '',
@@ -53,10 +55,16 @@ router.put('/:id', auth, async (req, res) => {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });
 
-    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'works', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc'];
+    // Auto-set assignedDate when spoc changes
+    if (req.body.spoc !== undefined && req.body.spoc !== member.spoc) {
+      member.assignedDate = req.body.spoc ? new Date() : null;
+    }
+
+    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'works', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) member[f] = req.body[f];
     });
+    if (req.body.deadline) member.deadline = new Date(req.body.deadline);
 
     await member.save();
     res.json({ member });

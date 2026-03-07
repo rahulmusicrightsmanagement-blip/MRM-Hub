@@ -82,6 +82,36 @@ const getInitials = (name) => {
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 };
 
+// Returns 'green' (new/far from deadline), 'yellow' (half time passed), 'red' (overdue)
+const getDeadlineStatus = (deadline, assignedDate) => {
+  if (!deadline) return 'green';
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const dl = new Date(deadline);
+  dl.setHours(0, 0, 0, 0);
+  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return 'red';
+  // If we have an assignedDate, use half the total time as the threshold
+  if (assignedDate) {
+    const ad = new Date(assignedDate);
+    ad.setHours(0, 0, 0, 0);
+    const totalDays = (dl - ad) / (1000 * 60 * 60 * 24);
+    const halfDays = totalDays / 2;
+    const elapsed = (now - ad) / (1000 * 60 * 60 * 24);
+    if (totalDays > 0 && elapsed >= halfDays) return 'yellow';
+  } else {
+    // Fallback: within 2 days of deadline
+    if (diffDays <= 2) return 'yellow';
+  }
+  return 'green';
+};
+
+const DEADLINE_COLORS = {
+  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track', cardBg: 'rgba(34,197,94,0.18)', cardText: '#86efac' },
+  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline', cardBg: 'rgba(245,158,11,0.18)', cardText: '#fcd34d' },
+  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue', cardBg: 'rgba(239,68,68,0.18)', cardText: '#fca5a5' },
+};
+
 /* ═══════════════════════════════════════════
    SHARED STYLES
    ═══════════════════════════════════════════ */
@@ -171,32 +201,49 @@ const FilterDropdown = ({ value, options, onChange, width = 170 }) => {
 const TaskCard = ({ task, onClick }) => {
   const cat = CATEGORY_COLORS[task.category] || CATEGORY_COLORS.Pipeline;
   const pri = PRIORITY_COLORS[task.priority];
+  const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
+  const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
+  const cardBg = task.completed ? 'rgba(100,100,100,0.15)' : (dlColor ? dlColor.cardBg : cat.bg);
+  const cardBorder = task.completed ? '#4b5563' : (dlColor ? dlColor.border : cat.border);
+  const cardTextColor = task.completed ? '#6b7280' : (dlColor ? dlColor.cardText : cat.text);
 
   return (
     <div
       onClick={() => onClick(task)}
       style={{
-        backgroundColor: cat.bg, borderLeft: `3px solid ${cat.border}`,
+        backgroundColor: cardBg,
+        borderLeft: `3px solid ${cardBorder}`,
         borderRadius: '8px', padding: '6px 10px', cursor: 'pointer',
         overflow: 'hidden', boxSizing: 'border-box',
         transition: 'transform 0.15s, box-shadow 0.15s',
         position: 'relative', minHeight: '42px',
+        opacity: task.completed ? 0.6 : 1,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.3)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; }}
     >
-      <div style={{ fontSize: '12px', fontWeight: 600, color: cat.text, lineHeight: '1.3', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, color: cardTextColor, lineHeight: '1.3', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
         {task.title}
       </div>
-      <div style={{ fontSize: '11px', color: '#9ca3af' }}>{to12h(task.startTime)}</div>
-      {task.priority === 'High' && (
-        <div style={{
-          fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px',
-          backgroundColor: pri.bg, color: pri.color, display: 'inline-block', marginTop: '3px',
-        }}>
-          {pri.label}
-        </div>
-      )}
+      <div style={{ fontSize: '11px', color: task.completed ? '#6b7280' : '#9ca3af', textDecoration: task.completed ? 'line-through' : 'none' }}>{to12h(task.startTime)}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
+        {task.priority === 'High' && (
+          <div style={{
+            fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px',
+            backgroundColor: pri.bg, color: pri.color, display: 'inline-block',
+          }}>
+            {pri.label}
+          </div>
+        )}
+        {dlColor && (
+          <div style={{
+            fontSize: '9px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px',
+            backgroundColor: dlColor.bg, color: dlColor.color, display: 'inline-block',
+          }}>
+            {dlColor.label}
+          </div>
+        )}
+      </div>
       {task.spoc && (
         <div style={{
           position: 'absolute', top: '8px', right: '8px', width: '22px', height: '22px',
@@ -231,6 +278,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           category: initialData.category,
           priority: initialData.priority,
           spoc: initialData.spoc,
+          deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '',
         }
       : {
           title: '',
@@ -240,6 +288,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           category: 'Pipeline',
           priority: 'Medium',
           spoc: '',
+          deadline: '',
         },
   );
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -250,6 +299,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
     onSubmit({
       ...form,
       date: form.day,
+      deadline: form.deadline || null,
       spocColor: spocObj?.color || '#6366f1',
       ...(isEdit && initialData?._id ? { _id: initialData._id } : {}),
     });
@@ -334,6 +384,17 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           </div>
         </div>
 
+        {/* Deadline */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={LABEL}>Deadline</label>
+          <input
+            style={INPUT}
+            type="date"
+            value={form.deadline}
+            onChange={(e) => set('deadline', e.target.value)}
+          />
+        </div>
+
         {/* SPOC */}
         <div style={{ marginBottom: '24px' }}>
           <label style={LABEL}>Assign SPOC</label>
@@ -383,6 +444,8 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
   if (!task) return null;
   const cat = CATEGORY_COLORS[task.category] || CATEGORY_COLORS.Pipeline;
   const pri = PRIORITY_COLORS[task.priority];
+  const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
+  const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
 
   return (
     <div
@@ -435,8 +498,37 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
             <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Assigned To</div>
             <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{task.spoc || 'Unassigned'}</div>
+            {task.assignedDate && (
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+                on {new Date(task.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            )}
           </div>
         </div>
+
+        {task.deadline && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Deadline</div>
+              <div style={{ fontSize: '13px', color: '#e5e7eb' }}>
+                {new Date(task.deadline).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            </div>
+            <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Status</div>
+              {dlColor ? (
+                <span style={{
+                  fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px',
+                  backgroundColor: dlColor.bg, color: dlColor.color,
+                }}>
+                  {dlColor.label}
+                </span>
+              ) : (
+                <span style={{ fontSize: '13px', color: '#22c55e' }}>Completed</span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
           <span style={{ fontSize: '13px', color: task.completed ? '#22c55e' : '#9ca3af' }}>
@@ -521,23 +613,35 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                 {dayTasks.map((t) => {
                   const cat = CATEGORY_COLORS[t.category] || CATEGORY_COLORS.Pipeline;
                   const pri = PRIORITY_COLORS[t.priority];
+                  const tdlStatus = t.completed ? null : getDeadlineStatus(t.deadline, t.assignedDate);
+                  const tdlColor = tdlStatus ? DEADLINE_COLORS[tdlStatus] : null;
                   return (
                     <div
                       key={t._id}
                       onClick={() => onTaskClick(t)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
-                        backgroundColor: '#161b2e', borderRadius: '10px', borderLeft: `3px solid ${cat.border}`,
+                        backgroundColor: t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#161b2e'),
+                        borderRadius: '10px', borderLeft: `3px solid ${t.completed ? '#4b5563' : (tdlColor ? tdlColor.border : cat.border)}`,
                         cursor: 'pointer', transition: 'background-color 0.15s',
+                        opacity: t.completed ? 0.6 : 1,
                       }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1e2235'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#161b2e'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#161b2e'); }}
                     >
-                      <div style={{ width: '60px', fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>{to12h(t.startTime)}</div>
+                      <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#6b7280' : '#9ca3af', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#e5e7eb', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>{t.category} · {t.duration} min</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#6b7280' : (tdlColor ? tdlColor.cardText : '#e5e7eb'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
+                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category} · {t.duration} min</div>
                       </div>
+                      {tdlColor && (
+                        <span style={{
+                          fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',
+                          backgroundColor: tdlColor.bg, color: tdlColor.color,
+                        }}>
+                          {tdlColor.label}
+                        </span>
+                      )}
                       {t.priority === 'High' && (
                         <span style={{
                           fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',

@@ -17,7 +17,7 @@ router.get('/', auth, async (req, res) => {
 // POST /api/musicalworks
 router.post('/', auth, async (req, res) => {
   try {
-    const { title, artist, album, genre, isrc, iswc, language, duration, releaseDate, publisher, territories, writers, status, spoc } = req.body;
+    const { title, artist, album, genre, isrc, iswc, language, duration, releaseDate, publisher, territories, writers, status, spoc, deadline } = req.body;
     if (!title || !artist) return res.status(400).json({ message: 'Title and artist are required' });
 
     const work = new MusicalWork({
@@ -35,6 +35,8 @@ router.post('/', auth, async (req, res) => {
       writers: writers || '',
       status: status || 'Draft',
       spoc: spoc || '',
+      assignedDate: spoc ? new Date() : null,
+      deadline: deadline ? new Date(deadline) : null,
     });
 
     await work.save();
@@ -51,10 +53,16 @@ router.put('/:id', auth, async (req, res) => {
     const work = await MusicalWork.findById(req.params.id);
     if (!work) return res.status(404).json({ message: 'Work not found' });
 
-    const fields = ['title', 'artist', 'album', 'genre', 'isrc', 'iswc', 'language', 'duration', 'releaseDate', 'publisher', 'territories', 'writers', 'status', 'spoc'];
+    // Auto-set assignedDate when spoc changes
+    if (req.body.spoc !== undefined && req.body.spoc !== work.spoc) {
+      work.assignedDate = req.body.spoc ? new Date() : null;
+    }
+
+    const fields = ['title', 'artist', 'album', 'genre', 'isrc', 'iswc', 'language', 'duration', 'releaseDate', 'publisher', 'territories', 'writers', 'status', 'spoc', 'deadline'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) work[f] = req.body[f];
     });
+    if (req.body.deadline) work.deadline = new Date(req.body.deadline);
 
     await work.save();
     res.json({ work });
