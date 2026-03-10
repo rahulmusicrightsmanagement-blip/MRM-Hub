@@ -479,16 +479,9 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
 
   /* Toggle a society in the checklist — if ticking ON, open the assign modal */
   const handleSocietyToggle = (soc) => {
-    if (selectedSocieties.includes(soc.key)) {
-      // Unticking — just remove from array
-      const updated = selectedSocieties.filter((s) => s !== soc.key);
-      authFetch(`/api/onboarding/${entry._id}`, { method: 'PUT', body: JSON.stringify({ selectedSocieties: updated }) })
-        .then((r) => r.json())
-        .then((data) => { if (data.entry) onUpdate(data.entry); });
-    } else {
-      // Ticking ON — open assign modal
-      setAssignModalSociety(soc);
-    }
+    if (selectedSocieties.includes(soc.key)) return; // Already assigned — locked
+    // Ticking ON — open assign modal
+    setAssignModalSociety(soc);
   };
 
   /* Confirm assign → save society selection + create society registration */
@@ -590,12 +583,14 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
             return (
               <div
                 key={soc.key}
-                onClick={() => handleSocietyToggle(soc)}
+                onClick={() => !checked && handleSocietyToggle(soc)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
-                  background: checked ? 'rgba(99,102,241,0.10)' : '#1a1e2e',
-                  border: checked ? '1px solid #6366f1' : '1px solid #2d3348',
+                  padding: '10px 14px', borderRadius: '8px',
+                  cursor: checked ? 'default' : 'pointer',
+                  background: checked ? 'rgba(16,185,129,0.06)' : '#1a1e2e',
+                  border: checked ? '1px solid #10b981' : '1px solid #2d3348',
+                  opacity: checked ? 0.85 : 1,
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => { if (!checked) e.currentTarget.style.borderColor = '#3a3f60'; }}

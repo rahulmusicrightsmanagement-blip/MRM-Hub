@@ -5,7 +5,6 @@ import {
   Users,
   TrendingUp,
   UserPlus,
-  Music,
   Globe,
   ArrowRight,
   CheckCircle2,
@@ -98,7 +97,6 @@ const Dashboard = () => {
     { title: 'TOTAL MEMBERS', value: stats.totalMembers, icon: Users, iconBg: '#1e3a5f', iconColor: '#60a5fa', route: '/members' },
     { title: 'PIPELINE LEADS', value: stats.totalLeads, icon: TrendingUp, iconBg: '#2d1f5e', iconColor: '#a78bfa', route: '/sales-pipeline' },
     { title: 'ONBOARDING', value: stats.onboardingCount, icon: UserPlus, iconBg: '#3d2f1a', iconColor: '#fbbf24', route: '/onboarding' },
-    // { title: 'MUSICAL WORKS', value: stats.totalWorks, icon: Music, iconBg: '#3d1f35', iconColor: '#f472b6', route: '/musical-works' },
     { title: 'REGISTERED', value: stats.registeredCount, icon: Globe, iconBg: '#1a3d2f', iconColor: '#34d399', route: '/society-reg' },
   ];
 

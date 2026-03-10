@@ -408,7 +408,6 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
               <div style={infoBox}><div style={infoLabel}>Genre</div><div style={infoVal}>{member.genre || '—'}</div></div>
               <div style={infoBox}><div style={infoLabel}>Languages</div><div style={infoVal}>{member.languages || '—'}</div></div>
               <div style={infoBox}><div style={infoLabel}>Territories</div><div style={infoVal}>{member.territories || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Musical Works</div><div style={infoVal}>{member.works}</div></div>
               <div style={infoBox}><div style={infoLabel}>Society Registrations</div><div style={infoVal}>{member.registrations}</div></div>
             </div>
             {renderSpocAndTasks()}
@@ -638,7 +637,6 @@ const Members = () => {
               </div>
               {/* Stats */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '13px', color: '#8892b0' }}>
-                <span>Works: <strong style={{ color: '#fff' }}>{m.works}</strong></span>
                 <span>Registrations: <strong style={{ color: '#fff' }}>{m.registrations}</strong></span>
               </div>
               {/* Tags */}

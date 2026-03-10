@@ -51,14 +51,9 @@ const stageColors = {
 const regStatusColors = {
   Registered: { bg: '#065f46', text: '#34d399' },
   'In Progress': { bg: '#713f12', text: '#fbbf24' },
+  Overdue: { bg: '#7f1d1d', text: '#f87171' },
   'Not Started': { bg: '#374151', text: '#9ca3af' },
   'N/A': { bg: '#1f2937', text: '#6b7280' },
-};
-
-const workStatusColors = {
-  Draft: { bg: '#374151', text: '#9ca3af' },
-  'Pending Review': { bg: '#713f12', text: '#fbbf24' },
-  Registered: { bg: '#065f46', text: '#34d399' },
 };
 
 /* ─── Reusable card styles ─── */
@@ -74,7 +69,6 @@ const TABS = [
   { key: 'sales', label: 'Sales Pipeline' },
   { key: 'onboarding', label: 'Onboarding' },
   { key: 'society', label: 'Society Reg.' },
-  { key: 'works', label: 'Musical Works' },
   { key: 'royalty', label: 'Royalty' },
 ];
 
@@ -90,7 +84,6 @@ const MemberProfile = () => {
   const [leads, setLeads] = useState([]);
   const [onboarding, setOnboarding] = useState([]);
   const [societyRegs, setSocietyRegs] = useState([]);
-  const [musicalWorks, setMusicalWorks] = useState([]);
   const [royalties, setRoyalties] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [copiedField, setCopiedField] = useState('');
@@ -105,7 +98,6 @@ const MemberProfile = () => {
         setLeads(data.leads || []);
         setOnboarding(data.onboarding || []);
         setSocietyRegs(data.societyRegs || []);
-        setMusicalWorks(data.musicalWorks || []);
         setRoyalties(data.royalties || []);
       } catch (err) {
         console.error(err);
@@ -130,7 +122,6 @@ const MemberProfile = () => {
     sales: leads.length,
     onboarding: onboarding.length,
     society: societyRegs.length,
-    works: musicalWorks.length,
     royalty: royalties.length,
   };
 
@@ -231,16 +222,24 @@ const MemberProfile = () => {
                 steps.membershipConfirmation, steps.loginDetails, steps.thirdPartyAuthorization, steps.bankMandateUpdate,
               ];
               const completedSteps = stepEntries.filter((v) => v === 'Yes').length;
+              const isOverdue = data.status === 'In Progress' && data.deadline && new Date(data.deadline) < new Date(new Date().toDateString());
+              const displayStatus = isOverdue ? 'Overdue' : (data.status || 'N/A');
+              const deadlineStr = data.deadline ? new Date(data.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
               return (
-                <div key={society} style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px' }}>
+                <div key={society} style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', border: isOverdue ? '1px solid rgba(239,68,68,0.3)' : '1px solid transparent' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{society}</div>
-                    <Badge label={data.status || 'N/A'} colorMap={regStatusColors} />
+                    <Badge label={displayStatus} colorMap={regStatusColors} />
                   </div>
                   <div style={{ fontSize: '11px', color: '#8892b0', marginBottom: '6px' }}>{completedSteps}/10 steps</div>
                   <div style={{ height: '3px', background: '#1e2540', borderRadius: '3px', marginBottom: '8px' }}>
-                    <div style={{ height: '100%', width: `${(completedSteps / 10) * 100}%`, background: '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
+                    <div style={{ height: '100%', width: `${(completedSteps / 10) * 100}%`, background: isOverdue ? '#ef4444' : '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
                   </div>
+                  {deadlineStr && (
+                    <div style={{ fontSize: '11px', color: isOverdue ? '#f87171' : '#8892b0', marginBottom: '4px' }}>
+                      📅 {deadlineStr}{isOverdue ? ' — Overdue' : ''}
+                    </div>
+                  )}
                   {(steps.caeNumber || steps.commissionRate) && (
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                       {steps.caeNumber && (
@@ -602,34 +601,6 @@ const MemberProfile = () => {
     </div>
   );
 
-  const renderWorks = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {musicalWorks.length === 0 ? (
-        <div style={{ ...card, ...emptyState }}>No musical works found for this member.</div>
-      ) : (
-        <>
-          {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: '8px', padding: '10px 16px', fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            <span>Title</span><span>Album</span><span>ISRC</span><span>ISWC</span><span>Language</span><span>Status</span>
-          </div>
-          {musicalWorks.map((work) => (
-            <div key={work._id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr', gap: '8px', alignItems: 'center', padding: '14px 16px', background: '#141720', border: '1px solid #1e2540', borderRadius: '10px' }}>
-              <div>
-                <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{work.title}</div>
-                <div style={{ color: '#8892b0', fontSize: '11px', marginTop: '2px' }}>{work.genre || '—'} · {work.duration || '—'}</div>
-              </div>
-              <div style={{ color: '#fff', fontSize: '13px' }}>{work.album || '—'}</div>
-              <div style={{ color: '#8892b0', fontSize: '12px', fontFamily: 'monospace' }}>{work.isrc || '—'}</div>
-              <div style={{ color: '#8892b0', fontSize: '12px', fontFamily: 'monospace' }}>{work.iswc || '—'}</div>
-              <div style={{ color: '#fff', fontSize: '13px' }}>{work.language || '—'}</div>
-              <Badge label={work.status} colorMap={workStatusColors} />
-            </div>
-          ))}
-        </>
-      )}
-    </div>
-  );
-
   const renderRoyalty = () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {royalties.length === 0 ? (
@@ -723,7 +694,6 @@ const MemberProfile = () => {
       {activeTab === 'sales' && renderSales()}
       {activeTab === 'onboarding' && renderOnboarding()}
       {activeTab === 'society' && renderSociety()}
-      {activeTab === 'works' && renderWorks()}
       {activeTab === 'royalty' && renderRoyalty()}
     </div>
   );

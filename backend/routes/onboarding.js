@@ -2,9 +2,43 @@ const express = require('express');
 const multer = require('multer');
 const OnboardingEntry = require('../models/OnboardingEntry');
 const Lead = require('../models/Lead');
+const Member = require('../models/Member');
 const Task = require('../models/Task');
 const { auth } = require('../middleware/auth');
 const { uploadFile, deleteFile } = require('../utils/gdrive');
+
+// Helper: sync KYC status from onboarding entry to linked Member
+const syncKycToMember = async (entry) => {
+  try {
+    const member = await Member.findOne({ email: entry.email.toLowerCase() });
+    if (!member) return;
+
+    const STAGES_PAST_KYC = ['Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
+    const allDocsReceived = entry.documents.length > 0 && entry.documents.every(d => d.received);
+
+    if (STAGES_PAST_KYC.includes(entry.stage) || allDocsReceived) {
+      if (member.kycStatus !== 'Verified') {
+        member.kycStatus = 'Verified';
+
+        // Also sync individual doc verification flags
+        const aadhaarDoc = entry.documents.find(d => d.docType === 'aadhaar');
+        const panDoc = entry.documents.find(d => d.docType === 'pan');
+        if (aadhaarDoc && aadhaarDoc.received) {
+          member.aadhaarVerified = true;
+          if (aadhaarDoc.docNumber && !member.aadhaar) member.aadhaar = aadhaarDoc.docNumber;
+        }
+        if (panDoc && panDoc.received) {
+          member.panVerified = true;
+          if (panDoc.docNumber && !member.panCard) member.panCard = panDoc.docNumber;
+        }
+
+        await member.save();
+      }
+    }
+  } catch (err) {
+    console.error('syncKycToMember error:', err);
+  }
+};
 
 const router = express.Router();
 
@@ -30,6 +64,12 @@ router.get('/', auth, async (req, res) => {
     );
 
     const entries = await OnboardingEntry.find().sort({ createdAt: -1 });
+
+    // One-time sync: update Member kycStatus for entries past KYC stage
+    for (const entry of entries) {
+      await syncKycToMember(entry);
+    }
+
     res.json({ entries });
   } catch (err) {
     console.error('GET onboarding error:', err);
@@ -120,6 +160,10 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     await entry.save();
+
+    // Sync KYC status to Member when stage advances
+    await syncKycToMember(entry);
+
     res.json({ entry });
   } catch (err) {
     console.error('Update onboarding error:', err);
@@ -268,6 +312,10 @@ router.put('/:id/documents/:docId', auth, async (req, res) => {
     if (req.body.fileName !== undefined) doc.fileName = req.body.fileName;
 
     await entry.save();
+
+    // Sync KYC status when documents are updated
+    await syncKycToMember(entry);
+
     res.json({ entry });
   } catch (err) {
     console.error('Update document error:', err);
@@ -316,6 +364,10 @@ router.post('/:id/documents/:docId/upload', auth, upload.single('file'), async (
     doc.gdriveFileId = gfile.fileId;
     doc.received = true;
     await entry.save();
+
+    // Sync KYC status when document is uploaded (marked received)
+    await syncKycToMember(entry);
+
     res.json({ entry });
   } catch (err) {
     console.error('Upload document error:', err);

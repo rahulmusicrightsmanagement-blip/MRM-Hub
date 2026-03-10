@@ -2,7 +2,6 @@ const express = require('express');
 const Member = require('../models/Member');
 const Lead = require('../models/Lead');
 const OnboardingEntry = require('../models/OnboardingEntry');
-// const MusicalWork = require('../models/MusicalWork');
 const SocietyRegistration = require('../models/SocietyRegistration');
 const { auth } = require('../middleware/auth');
 
@@ -19,11 +18,10 @@ const SOCIETIES = [
 // GET /api/dashboard/stats
 router.get('/stats', auth, async (req, res) => {
   try {
-    const [members, leads, onboarding, /* works, */ registrations] = await Promise.all([
+    const [members, leads, onboarding, registrations] = await Promise.all([
       Member.find(),
       Lead.find(),
       OnboardingEntry.find(),
-      // MusicalWork.find(),
       SocietyRegistration.find(),
     ]);
 
@@ -31,7 +29,6 @@ router.get('/stats', auth, async (req, res) => {
     const activeMembers = members.filter((m) => m.status === 'Active').length;
     const totalLeads = leads.length;
     const onboardingCount = onboarding.filter((e) => e.stage !== 'Active Member' && e.stage !== 'Completed').length;
-    // const totalWorks = works.length;
 
     let registeredCount = 0;
     let inProgressCount = 0;
@@ -96,7 +93,6 @@ router.get('/stats', auth, async (req, res) => {
         activeMembers,
         totalLeads,
         onboardingCount,
-        // totalWorks,
         registeredCount,
         inProgressCount,
         totalMembers: members.length,

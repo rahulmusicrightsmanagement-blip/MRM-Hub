@@ -9,7 +9,7 @@ const taskSchema = new mongoose.Schema(
     category: {
       type: String,
       default: 'Pipeline',
-      enum: ['Pipeline', 'Onboarding', 'Registration', 'Works', 'Internal', 'Members'],
+      enum: ['Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'],
     },
     priority: {
       type: String,

@@ -1,13 +1,11 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const memberRoutes = require('./routes/members');
-// const musicalWorkRoutes = require('./routes/musicalworks');
 const royaltyRoutes = require('./routes/royalty');
 const societyRegRoutes = require('./routes/societyregs');
 const leadRoutes = require('./routes/leads');
@@ -21,13 +19,11 @@ const app = express();
 // Middleware
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/members', memberRoutes);
-// app.use('/api/musicalworks', musicalWorkRoutes);
 app.use('/api/royalty', royaltyRoutes);
 app.use('/api/societyregs', societyRegRoutes);
 app.use('/api/leads', leadRoutes);

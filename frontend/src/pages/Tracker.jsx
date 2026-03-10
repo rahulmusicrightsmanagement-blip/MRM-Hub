@@ -10,8 +10,8 @@ import { useToast } from '../context/ToastContext';
    CONSTANTS & HELPERS
    ═══════════════════════════════════════════ */
 const API = '/api';
-const CATEGORIES = ['All Categories', 'Pipeline', 'Onboarding', 'Registration', 'Works', 'Internal', 'Members'];
-const TASK_CATEGORIES = ['Pipeline', 'Onboarding', 'Registration', 'Works', 'Internal', 'Members'];
+const CATEGORIES = ['All Categories', 'Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'];
+const TASK_CATEGORIES = ['Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
@@ -20,7 +20,6 @@ const CATEGORY_COLORS = {
   Pipeline: { bg: 'rgba(99,102,241,0.18)', border: '#6366f1', text: '#a5b4fc' },
   Onboarding: { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b', text: '#fcd34d' },
   Registration: { bg: 'rgba(236,72,153,0.18)', border: '#ec4899', text: '#f9a8d4' },
-  Works: { bg: 'rgba(34,197,94,0.18)', border: '#22c55e', text: '#86efac' },
   Internal: { bg: 'rgba(168,85,247,0.18)', border: '#a855f7', text: '#d8b4fe' },
   Members: { bg: 'rgba(251,146,60,0.18)', border: '#fb923c', text: '#fdba74' },
 };

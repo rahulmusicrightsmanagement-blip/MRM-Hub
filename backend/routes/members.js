@@ -3,7 +3,6 @@ const Member = require('../models/Member');
 const Lead = require('../models/Lead');
 const OnboardingEntry = require('../models/OnboardingEntry');
 const SocietyRegistration = require('../models/SocietyRegistration');
-const MusicalWork = require('../models/MusicalWork');
 const Royalty = require('../models/Royalty');
 const { auth } = require('../middleware/auth');
 
@@ -18,10 +17,7 @@ router.get('/', auth, async (req, res) => {
     const enriched = await Promise.all(
       members.map(async (m) => {
         const nameRegex = new RegExp(`^${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-        const [worksCount, regDocs] = await Promise.all([
-          MusicalWork.countDocuments({ artist: nameRegex }),
-          SocietyRegistration.find({ name: nameRegex }).lean(),
-        ]);
+        const regDocs = await SocietyRegistration.find({ name: nameRegex }).lean();
         // Count societies with status 'Registered'
         let regCount = 0;
         regDocs.forEach((doc) => {
@@ -32,7 +28,7 @@ router.get('/', auth, async (req, res) => {
             }
           }
         });
-        return { ...m, works: worksCount, registrations: regCount };
+        return { ...m, registrations: regCount };
       })
     );
 
@@ -88,15 +84,14 @@ router.get('/:id/profile', auth, async (req, res) => {
 
     const nameRegex = new RegExp(`^${member.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
-    const [leads, onboarding, societyRegs, musicalWorks, royalties] = await Promise.all([
+    const [leads, onboarding, societyRegs, royalties] = await Promise.all([
       Lead.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }),
       OnboardingEntry.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }),
       SocietyRegistration.find({ name: nameRegex }).sort({ createdAt: -1 }),
-      MusicalWork.find({ artist: nameRegex }).sort({ createdAt: -1 }),
       Royalty.find({ $or: [{ clientName: nameRegex }, { clientEmail: member.email }] }).sort({ createdAt: -1 }),
     ]);
 
-    res.json({ member, leads, onboarding, societyRegs, musicalWorks, royalties });
+    res.json({ member, leads, onboarding, societyRegs, royalties });
   } catch (err) {
     console.error('Member profile error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -114,7 +109,7 @@ router.put('/:id', auth, async (req, res) => {
       member.assignedDate = req.body.spoc ? new Date() : null;
     }
 
-    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'works', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline'];
+    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) member[f] = req.body[f];
     });

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3 } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from '../components/SearchableSelect';
@@ -47,10 +47,11 @@ const STATUS = {
   'In Progress': { bg: '#1e3a5f', color: '#7dd3fc', text: 'In Progress' },
   'Not Started': { bg: '#27272a', color: '#a1a1aa', text: 'Not Started' },
   'N/A': { bg: '#1c1c1e', color: '#52525b', text: 'N/A' },
+  Overdue: { bg: '#991b1b', color: '#fca5a5', text: 'Overdue' },
 };
 
-const StatusBadge = ({ status }) => {
-  const s = STATUS[status] || STATUS['N/A'];
+const StatusBadge = ({ status, isOverdue }) => {
+  const s = (isOverdue && status === 'In Progress') ? STATUS.Overdue : (STATUS[status] || STATUS['N/A']);
   return <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: s.bg, color: s.color, whiteSpace: 'nowrap' }}>{s.text}</span>;
 };
 
@@ -385,6 +386,26 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   const [editName, setEditName] = useState(member.name || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [assignForm, setAssignForm] = useState({ spoc: '', deadline: '' });
+  const [editingDeadline, setEditingDeadline] = useState(null); // socKey being edited
+
+  const fmtDateISO = (d) => {
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  };
+
+  const handleUpdateDeadline = async (socKey, deadline) => {
+    try {
+      const res = await authFetch(`/api/societyregs/${member._id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ society: socKey, deadline: deadline || null }),
+      });
+      const data = await res.json();
+      if (res.ok) onUpdated(data.registration);
+    } catch (err) { console.error(err); }
+    setEditingDeadline(null);
+  };
 
   const getSocietyEntry = (socKey) => {
     if (member.societies instanceof Map) return member.societies.get(socKey) || null;
@@ -404,10 +425,13 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
     return null;
   };
 
-  const handleAssign = async (socKey, tm) => {
+  const handleAssign = async (socKey) => {
+    const tm = teamMembers.find((m) => m.name === assignForm.spoc);
+    if (!tm) return;
     setActionLoading(socKey);
-    await onAssignAndStart(member._id || member.name, socKey, tm);
+    await onAssignAndStart(member._id || member.name, socKey, tm, assignForm.deadline || null);
     setAssigningKey(null);
+    setAssignForm({ spoc: '', deadline: '' });
     setActionLoading(null);
   };
 
@@ -483,17 +507,60 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
               const isExpanded = expandedKey === soc.key;
               const isConfirmingDone = confirmDone === soc.key;
               const isLoading = actionLoading === soc.key;
+              const entryDeadline = socEntry?.deadline;
+
+              const fmtDeadline = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+              const getDeadlineColor = (d) => {
+                if (!d) return null;
+                const now = new Date(); now.setHours(0,0,0,0);
+                const dl = new Date(d); dl.setHours(0,0,0,0);
+                const diff = (dl - now) / (1000*60*60*24);
+                if (diff < 0) return { bg: '#991b1b', color: '#fca5a5', label: 'Overdue' };
+                if (diff <= 2) return { bg: '#854d0e', color: '#fde047', label: 'Near Deadline' };
+                return { bg: '#166534', color: '#86efac', label: 'On Track' };
+              };
+              const dlColor = getDeadlineColor(entryDeadline);
 
               return (
-                <div key={soc.key} style={{ backgroundColor: cardBg, border: cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
+                <div key={soc.key} style={{ backgroundColor: cardBg, border: dlColor && dlColor.label === 'Overdue' ? '1px solid #991b1b' : cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
                   {/* Main row */}
                   <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: '20px', flexShrink: 0 }}>{soc.flag}</span>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{soc.key}</p>
                         <p style={{ fontSize: '11px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soc.name}</p>
                       </div>
+                      {/* Inline deadline display for In Progress */}
+                      {status === 'In Progress' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginRight: '8px' }}>
+                          {editingDeadline === soc.key ? (
+                            <input
+                              type="date"
+                              autoFocus
+                              defaultValue={fmtDateISO(entryDeadline)}
+                              onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
+                              style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #6366f1', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '12px', outline: 'none' }}
+                            />
+                          ) : entryDeadline ? (
+                            <span
+                              onClick={(e) => { e.stopPropagation(); setEditingDeadline(soc.key); }}
+                              style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#1e2540', color: dlColor?.color || '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              title={`Deadline: ${fmtDeadline(entryDeadline)} — ${dlColor?.label || ''} (click to edit)`}
+                            >
+                              📅 {fmtDeadline(entryDeadline)} — {dlColor?.label}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditingDeadline(soc.key); }}
+                              style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', background: 'rgba(99,102,241,0.06)', border: '1px dashed #2d3348', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >
+                              + Set Deadline
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                       {assignee && assignee.name && (
@@ -501,7 +568,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                           {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
                         </div>
                       )}
-                      <StatusBadge status={status} />
+                      <StatusBadge status={status} isOverdue={status === 'In Progress' && dlColor && dlColor.label === 'Overdue'} />
 
                       {(status === 'Not Started' || status === 'N/A') && (
                         <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
@@ -538,14 +605,25 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                   {/* Assign dropdown */}
                   {isAssigning && (
                     <div style={{ padding: '0 18px 14px', borderTop: '1px solid #1e2540' }}>
-                      <p style={{ fontSize: '12px', color: '#9ca3af', margin: '12px 0 8px', fontWeight: 500 }}>Select team member to assign & start:</p>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <select autoFocus defaultValue="" onChange={(e) => { const tm = teamMembers.find((m) => m.name === e.target.value); if (tm) handleAssign(soc.key, tm); }}
+                      <p style={{ fontSize: '12px', color: '#9ca3af', margin: '12px 0 8px', fontWeight: 500 }}>Assign team member & set deadline:</p>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                        <select autoFocus value={assignForm.spoc} onChange={(e) => setAssignForm((p) => ({ ...p, spoc: e.target.value }))}
                           style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', cursor: 'pointer' }}>
                           <option value="">Select team member...</option>
                           {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
                         </select>
-                        <button onClick={() => setAssigningKey(null)} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
+                          <input type="date" value={assignForm.deadline} onChange={(e) => setAssignForm((p) => ({ ...p, deadline: e.target.value }))}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+                        </div>
+                        <button disabled={!assignForm.spoc || isLoading} onClick={() => handleAssign(soc.key)}
+                          style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: assignForm.spoc ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#2d3348', color: assignForm.spoc ? 'white' : '#6b7280', fontSize: '12px', fontWeight: 600, cursor: assignForm.spoc ? 'pointer' : 'not-allowed', marginTop: '18px' }}>
+                          {isLoading ? 'Assigning...' : 'Assign & Start'}
+                        </button>
+                        <button onClick={() => { setAssigningKey(null); setAssignForm({ spoc: '', deadline: '' }); }} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer', marginTop: '18px' }}>Cancel</button>
                       </div>
                     </div>
                   )}
@@ -602,6 +680,8 @@ const SocietyReg = () => {
   const [allMembers, setAllMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({}); // { 'IPRS': 'In Progress', 'PRS': 'Registered', ... }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -639,6 +719,31 @@ const SocietyReg = () => {
     return typeof entry === 'string' ? entry : entry.status || 'N/A';
   };
 
+  const getSocDeadline = (member, socKey) => {
+    const entry = member.societies?.[socKey];
+    if (!entry || typeof entry === 'string') return null;
+    return entry.deadline || null;
+  };
+
+  const getDeadlineInfo = (d) => {
+    if (!d) return null;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const dl = new Date(d); dl.setHours(0, 0, 0, 0);
+    const diff = (dl - now) / (1000 * 60 * 60 * 24);
+    const fmt = dl.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    if (diff < 0) return { bg: '#991b1b', color: '#fca5a5', label: 'Overdue', text: fmt };
+    if (diff <= 2) return { bg: '#854d0e', color: '#fde047', label: 'Near Deadline', text: fmt };
+    return { bg: '#166534', color: '#86efac', label: 'On Track', text: fmt };
+  };
+
+  const isSocOverdue = (member, socKey) => {
+    const dl = getSocDeadline(member, socKey);
+    if (!dl) return false;
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const d = new Date(dl); d.setHours(0, 0, 0, 0);
+    return d < now && getSocStatus(member, socKey) === 'In Progress';
+  };
+
   const allStatuses = members.flatMap((m) =>
     SOCIETIES.map((s) => getSocStatus(m, s.key)).filter((s) => s !== 'N/A')
   );
@@ -652,7 +757,7 @@ const SocietyReg = () => {
     setSelectedMember((prev) => (prev && prev._id === norm._id ? norm : prev));
   };
 
-  const handleAssignAndStart = async (memberId, societyKey, teamMember) => {
+  const handleAssignAndStart = async (memberId, societyKey, teamMember, deadline) => {
     try {
       const reg = members.find((m) => m._id === memberId || m.name === memberId);
       if (!reg) return;
@@ -661,7 +766,7 @@ const SocietyReg = () => {
         initials: teamMember.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
         color: '#6366f1',
       };
-      const res = await authFetch(`/api/societyregs/${reg._id}`, { method: 'PUT', body: JSON.stringify({ society: societyKey, status: 'In Progress', assignee }) });
+      const res = await authFetch(`/api/societyregs/${reg._id}`, { method: 'PUT', body: JSON.stringify({ society: societyKey, status: 'In Progress', assignee, deadline: deadline || null }) });
       const data = await res.json();
       if (res.ok) { refreshReg(data.registration); addToast(`Assigned to ${teamMember.name}`); }
       else addToast('Failed to assign registration', 'error');
@@ -702,6 +807,30 @@ const SocietyReg = () => {
   const statCardStyle = { backgroundColor: cardBg, border: cardBorder, borderRadius: '12px', padding: '20px 24px', minWidth: '140px' };
   const cellStyle = { padding: '14px 6px', textAlign: 'center', borderBottom: '1px solid #1e2540', fontSize: '11px' };
 
+  const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'All').length;
+
+  const filteredMembers = useMemo(() => {
+    const activeFilters = Object.entries(filters).filter(([, v]) => v && v !== 'All');
+    if (activeFilters.length === 0) return members;
+    return members.filter((m) =>
+      activeFilters.every(([socKey, filterVal]) => {
+        if (filterVal === 'Overdue') return isSocOverdue(m, socKey);
+        return getSocStatus(m, socKey) === filterVal;
+      })
+    );
+  }, [members, filters]);
+
+  const setFilter = (socKey, value) => {
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (!value || value === 'All') delete next[socKey];
+      else next[socKey] = value;
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => setFilters({});
+
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading registrations...</div>;
 
   return (
@@ -728,10 +857,62 @@ const SocietyReg = () => {
         </div>
       </div>
 
+      {/* Filter Bar */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: showFilters ? '14px' : '0' }}>
+          <button
+            onClick={() => setShowFilters((p) => !p)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px',
+              border: activeFilterCount > 0 ? '1px solid #6366f1' : '1px solid #2d3348',
+              backgroundColor: activeFilterCount > 0 ? 'rgba(99,102,241,0.1)' : 'transparent',
+              color: activeFilterCount > 0 ? '#a5b4fc' : '#9ca3af', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Filter style={{ width: '14px', height: '14px' }} />
+            Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+            <ChevronDown style={{ width: '14px', height: '14px', transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </button>
+          {activeFilterCount > 0 && (
+            <button onClick={clearAllFilters} style={{ fontSize: '12px', fontWeight: 500, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {showFilters && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '16px 18px', backgroundColor: cardBg, border: cardBorder, borderRadius: '12px' }}>
+            {SOCIETIES.map((soc) => (
+              <div key={soc.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '120px' }}>
+                <label style={{ fontSize: '10px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {soc.flag} {soc.key}
+                </label>
+                <select
+                  value={filters[soc.key] || 'All'}
+                  onChange={(e) => setFilter(soc.key, e.target.value)}
+                  style={{
+                    padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', outline: 'none',
+                    border: filters[soc.key] ? '1px solid #6366f1' : '1px solid #2d3348',
+                    backgroundColor: filters[soc.key] ? 'rgba(99,102,241,0.08)' : '#1a1e2e',
+                    color: filters[soc.key] ? '#c7d2fe' : '#9ca3af',
+                  }}
+                >
+                  <option value="All">All</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Registered">Registered</option>
+                  <option value="Overdue">Overdue</option>
+                  <option value="N/A">N/A</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
-        {members.length === 0 ? (
+        {filteredMembers.length === 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-            <p style={{ fontSize: '14px', color: '#6b7280' }}>No registrations yet. Click "+ Start Registration" to begin.</p>
+            <p style={{ fontSize: '14px', color: '#6b7280' }}>{members.length === 0 ? 'No registrations yet. Click "+ Start Registration" to begin.' : 'No members match the selected filters.'}</p>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
@@ -749,7 +930,7 @@ const SocietyReg = () => {
               </tr>
             </thead>
             <tbody>
-              {members.map((member) => (
+              {filteredMembers.map((member) => (
                 <tr key={member._id || member.name} style={{ cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#161b2e'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -757,11 +938,24 @@ const SocietyReg = () => {
                   <td style={{ padding: '14px 18px', fontSize: '14px', fontWeight: 600, color: 'white', borderBottom: '1px solid #1e2540', position: 'sticky', left: 0, backgroundColor: '#111525', zIndex: 1 }}>
                     {member.name}
                   </td>
-                  {SOCIETIES.map((soc) => (
-                    <td key={soc.key} style={cellStyle}>
-                      <StatusBadge status={getSocStatus(member, soc.key)} />
-                    </td>
-                  ))}
+                  {SOCIETIES.map((soc) => {
+                    const status = getSocStatus(member, soc.key);
+                    const dl = getSocDeadline(member, soc.key);
+                    const dlInfo = getDeadlineInfo(dl);
+                    const overdue = isSocOverdue(member, soc.key);
+                    return (
+                      <td key={soc.key} style={cellStyle}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                          <StatusBadge status={status} isOverdue={overdue} />
+                          {dlInfo && (status === 'In Progress') && (
+                            <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: dlInfo.bg, color: dlInfo.color, whiteSpace: 'nowrap' }} title={dlInfo.label}>
+                              {dlInfo.text}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

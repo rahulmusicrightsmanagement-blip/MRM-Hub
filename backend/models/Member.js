@@ -28,7 +28,6 @@ const memberSchema = new mongoose.Schema(
     territories: { type: String, default: '' },
     leadSource: { type: String, default: '' },
     priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },
-    works: { type: Number, default: 0 },
     registrations: { type: Number, default: 0 },
     joinDate: { type: String, default: '' },
     dateOfFirstContact: { type: String, default: '' },

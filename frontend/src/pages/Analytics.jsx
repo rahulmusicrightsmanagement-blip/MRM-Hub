@@ -154,24 +154,6 @@ const Analytics = () => {
             )}
           </div>
 
-          {/* Musical Works by Status (commented out — Musical Works disabled)
-          <div style={cardStyle}>
-            <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 32px' }}>Musical Works by Status</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-              {worksStatusData.length === 0 && !loading ? (
-                <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', padding: '20px 0' }}>No works data yet</p>
-              ) : (
-                worksStatusData.map((d) => (
-                  <div key={d.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                    <RingChart value={d.value} color={d.ring} />
-                    <span style={{ color: '#8892b0', fontSize: '13px' }}>{d.label}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-          */}
-
           {/* Monthly Onboarding Trend */}
           <div style={cardStyle}>
             <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 24px' }}>Monthly Onboarding Trend</h3>

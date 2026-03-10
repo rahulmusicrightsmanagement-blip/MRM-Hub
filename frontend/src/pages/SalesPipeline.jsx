@@ -89,9 +89,9 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const handleMemberSelect = (memberName) => {
-    if (!memberName) { setForm((p) => ({ ...p, name: '', genre: '', email: '', phone: '' })); return; }
+    if (!memberName) { setForm((p) => ({ ...p, name: '', genre: '', email: '', phone: '', source: '' })); return; }
     const m = members.find((x) => x.name === memberName);
-    if (m) setForm((p) => ({ ...p, name: m.name, genre: m.genre || '', email: m.email || '', phone: m.phone || '' }));
+    if (m) setForm((p) => ({ ...p, name: m.name, genre: m.genre || '', email: m.email || '', phone: m.phone || '', source: m.leadSource || '' }));
   };
 
   const handleSubmit = () => {
@@ -164,12 +164,21 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
               <SearchableSelect label="Select Member" required options={members} value={form.name} onChange={handleMemberSelect} placeholder="Search member..." emptyMessage="No members found. Add members first." />
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={LABEL}>Assign SPOC</label>
-              <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
-                <option value="">Select a team member..</option>
-                {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={LABEL}>Lead Source</label>
+                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
+                  <option value="">Select source...</option>
+                  {SOURCE_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={LABEL}>Assign SPOC</label>
+                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
+                  <option value="">Select a team member..</option>
+                  {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+                </select>
+              </div>
             </div>
 
             <div style={{ marginBottom: '28px' }}>

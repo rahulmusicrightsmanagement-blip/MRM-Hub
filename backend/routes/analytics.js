@@ -1,8 +1,6 @@
 const express = require('express');
-const Member = require('../models/Member');
 const Lead = require('../models/Lead');
 const OnboardingEntry = require('../models/OnboardingEntry');
-// const MusicalWork = require('../models/MusicalWork');
 const SocietyRegistration = require('../models/SocietyRegistration');
 const { auth } = require('../middleware/auth');
 
@@ -11,9 +9,8 @@ const router = express.Router();
 // GET /api/analytics
 router.get('/', auth, async (req, res) => {
   try {
-    const [leads, /* works, */ registrations, onboarding] = await Promise.all([
+    const [leads, registrations, onboarding] = await Promise.all([
       Lead.find(),
-      // MusicalWork.find(),
       SocietyRegistration.find(),
       OnboardingEntry.find(),
     ]);
@@ -21,9 +18,9 @@ router.get('/', auth, async (req, res) => {
     // Pipeline data
     const pipelineData = [
       { label: 'Enquiry', value: leads.filter((l) => l.stage === 'New Enquiry').length, color: '#3b82f6' },
-      { label: 'Contacted', value: leads.filter((l) => l.stage === 'Contacted').length, color: '#f97316' },
       { label: 'Meeting', value: leads.filter((l) => l.stage === 'Meeting Set').length, color: '#3b82f6' },
       { label: 'Qualified', value: leads.filter((l) => l.stage === 'Qualified Lead').length, color: '#eab308' },
+      { label: 'Not Qualified', value: leads.filter((l) => l.stage === 'Not Qualified').length, color: '#ef4444' },
     ];
 
     // Society registration counts
@@ -44,13 +41,6 @@ router.get('/', auth, async (req, res) => {
       color: societyColors[label] || '#3b82f6',
     }));
 
-    // Works status (commented out — Musical Works disabled)
-    // const worksStatusData = [
-    //   { label: 'Registered', value: works.filter((w) => w.status === 'Registered').length, color: '#3b82f6', ring: '#3b82f6' },
-    //   { label: 'Pending', value: works.filter((w) => w.status === 'Pending Review').length, color: '#22c55e', ring: '#22c55e' },
-    //   { label: 'Draft', value: works.filter((w) => w.status === 'Draft').length, color: '#6b7280', ring: '#6b7280' },
-    // ];
-
     // Onboarding by month (last 6 months)
     const now = new Date();
     const onboardingData = [];
@@ -67,7 +57,6 @@ router.get('/', auth, async (req, res) => {
     res.json({
       pipelineData,
       societyData,
-      // worksStatusData,
       onboardingData,
     });
   } catch (err) {

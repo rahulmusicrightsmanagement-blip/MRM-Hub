@@ -39,6 +39,7 @@ const societyEntrySchema = new mongoose.Schema({
     initials: { type: String, default: '' },
     color: { type: String, default: '' },
   },
+  deadline: { type: Date, default: null },
   steps: { type: stepsSchema, default: () => ({}) },
   remarks: { type: [remarkSchema], default: [] },
 });

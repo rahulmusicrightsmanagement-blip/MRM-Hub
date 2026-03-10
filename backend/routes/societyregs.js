@@ -2,6 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const SocietyRegistration = require('../models/SocietyRegistration');
 const Task = require('../models/Task');
+const OnboardingEntry = require('../models/OnboardingEntry');
+const Member = require('../models/Member');
 const { auth } = require('../middleware/auth');
 const { uploadFile } = require('../utils/gdrive');
 
@@ -14,6 +16,43 @@ const nowHHmm = () => {
 };
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+/* ─── Sync helpers ─── */
+
+// Sync deadline from society entry → matching tracker task(s)
+const syncDeadlineToTracker = async (regId, society, deadline) => {
+  try {
+    const escapedSociety = society.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await Task.updateMany(
+      { sourceType: 'societyreg', sourceId: regId, title: { $regex: escapedSociety, $options: 'i' } },
+      { $set: { deadline: deadline ? new Date(deadline) : null } }
+    );
+  } catch (err) { console.error('syncDeadlineToTracker error:', err); }
+};
+
+// Add society to onboarding entry's selectedSocieties (if entry exists)
+const syncSocietyToOnboarding = async (memberName, society) => {
+  try {
+    const entry = await OnboardingEntry.findOne({ name: memberName });
+    if (entry && !entry.selectedSocieties.includes(society)) {
+      entry.selectedSocieties.push(society);
+      await entry.save();
+    }
+  } catch (err) { console.error('syncSocietyToOnboarding error:', err); }
+};
+
+// Sync society registration count to Member model
+const syncRegistrationsToMember = async (memberName) => {
+  try {
+    const reg = await SocietyRegistration.findOne({ name: memberName });
+    if (!reg) return;
+    let count = 0;
+    for (const [, entry] of reg.societies) {
+      if (entry.status && entry.status !== 'N/A') count++;
+    }
+    await Member.updateOne({ name: memberName }, { $set: { registrations: count } });
+  } catch (err) { console.error('syncRegistrationsToMember error:', err); }
+};
 
 // GET /api/societyregs
 router.get('/', auth, async (req, res) => {
@@ -36,14 +75,22 @@ router.post('/', auth, async (req, res) => {
       reg = new SocietyRegistration({ name: member, societies: new Map(), assignees: new Map() });
     }
 
-    reg.societies.set(society, { status: 'In Progress', assignee: {}, steps: {}, remarks: [] });
+    const assigneeObj = spoc ? {
+      name: spoc,
+      initials: spoc.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+      color: '#6366f1',
+    } : {};
+
+    reg.societies.set(society, {
+      status: 'In Progress',
+      assignee: assigneeObj,
+      deadline: deadline ? new Date(deadline) : null,
+      steps: {},
+      remarks: [],
+    });
 
     if (spoc) {
-      reg.assignees.set(society, {
-        name: spoc,
-        initials: spoc.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
-        color: '#6366f1',
-      });
+      reg.assignees.set(society, assigneeObj);
     }
 
     await reg.save();
@@ -68,6 +115,12 @@ router.post('/', auth, async (req, res) => {
       console.error('Auto-create tracker task (society reg) error:', taskErr);
     }
 
+    // Sync society → onboarding selectedSocieties
+    syncSocietyToOnboarding(member, society);
+
+    // Sync registration count → Member
+    syncRegistrationsToMember(member);
+
     res.status(201).json({ registration: reg });
   } catch (err) {
     console.error('Create registration error:', err);
@@ -81,22 +134,72 @@ router.put('/:id', auth, async (req, res) => {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
-    const { society, status, assignee } = req.body;
+    const { society, status, assignee, deadline } = req.body;
     if (society && status) {
       const existing = reg.societies.get(society);
       const existingObj = existing ? existing.toObject() : {};
       reg.societies.set(society, {
         status,
-        assignee: existingObj.assignee || {},
+        assignee: assignee || existingObj.assignee || {},
+        deadline: deadline ? new Date(deadline) : existingObj.deadline || null,
         steps: existingObj.steps || {},
         remarks: existingObj.remarks || [],
       });
+    } else {
+      // Update deadline or assignee without changing status
+      if (society && deadline !== undefined) {
+        const existing = reg.societies.get(society);
+        if (existing) {
+          const existingObj = existing.toObject();
+          reg.societies.set(society, { ...existingObj, deadline: deadline ? new Date(deadline) : null });
+        }
+      }
     }
     if (society && assignee) {
       reg.assignees.set(society, assignee);
     }
 
     await reg.save();
+
+    // Sync deadline changes → tracker task(s)
+    if (society && deadline !== undefined) {
+      const entry = reg.societies.get(society);
+      const dl = entry ? (entry.toObject ? entry.toObject() : entry).deadline : (deadline || null);
+      syncDeadlineToTracker(reg._id, society, dl);
+    }
+
+    // Sync new society → onboarding selectedSocieties
+    if (society && status === 'In Progress') {
+      syncSocietyToOnboarding(reg.name, society);
+    }
+
+    // Sync registration count → Member
+    if (society && status) {
+      syncRegistrationsToMember(reg.name);
+    }
+
+    // Auto-create a Tracker task when assigning (status = 'In Progress' + assignee)
+    if (society && status === 'In Progress' && assignee && assignee.name) {
+      try {
+        await Task.create({
+          title: `Society Reg — ${reg.name} — ${society}`,
+          date: new Date(),
+          startTime: nowHHmm(),
+          duration: 45,
+          category: 'Registration',
+          priority: 'Medium',
+          spoc: assignee.name,
+          assignedDate: new Date(),
+          deadline: deadline ? new Date(deadline) : null,
+          sourceType: 'societyreg',
+          sourceId: reg._id,
+          createdBy: req.user?.id,
+        });
+      } catch (taskErr) {
+        console.error('Auto-create tracker task (society assign) error:', taskErr);
+      }
+    }
+
     res.json({ registration: reg });
   } catch (err) {
     console.error('Update registration error:', err);
