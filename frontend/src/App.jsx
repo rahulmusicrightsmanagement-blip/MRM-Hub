@@ -15,7 +15,7 @@ import Login from './pages/Login';
 import SpocManagement from './pages/SpocManagement';
 
 const ProtectedRoutes = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isFullAccess, hasRole } = useAuth();
 
   if (loading) {
     return (
@@ -26,6 +26,13 @@ const ProtectedRoutes = () => {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Role-gated wrapper: redirects to "/" if user lacks access
+  const Gate = ({ roles, fullOnly, children }) => {
+    if (fullOnly && !isFullAccess) return <Navigate to="/" replace />;
+    if (roles && !isFullAccess && !roles.some((r) => hasRole(r))) return <Navigate to="/" replace />;
+    return children;
+  };
 
   return (
     <Layout>
@@ -39,7 +46,7 @@ const ProtectedRoutes = () => {
         <Route path="/members/:id" element={<MemberProfile />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/spoc-management" element={<SpocManagement />} />
+        <Route path="/spoc-management" element={<Gate fullOnly><SpocManagement /></Gate>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

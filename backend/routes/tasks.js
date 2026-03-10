@@ -2,6 +2,7 @@ const express = require('express');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const notify = require('../utils/notify');
 
 const router = express.Router();
 
@@ -21,6 +22,11 @@ router.get('/', auth, async (req, res) => {
       filter.spoc = spoc;
     }
 
+    // RBAC: non-full-access users see only their assigned tasks
+    if (!req.user.isFullAccess()) {
+      filter.spoc = req.user.name;
+    }
+
     const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 });
     res.json({ tasks });
   } catch (err) {
@@ -36,6 +42,11 @@ router.get('/stats', auth, async (req, res) => {
     const filter = {};
     if (start && end) {
       filter.date = { $gte: new Date(start), $lte: new Date(end) };
+    }
+
+    // RBAC: non-full-access users see only their stats
+    if (!req.user.isFullAccess()) {
+      filter.spoc = req.user.name;
     }
 
     const tasks = await Task.find(filter);
@@ -87,6 +98,21 @@ router.post('/', auth, async (req, res) => {
     });
 
     await task.save();
+
+    // Notify assigned SPOC
+    if (task.spoc) {
+      notify({
+        recipientName: task.spoc,
+        type: 'task_assigned',
+        title: 'New task assigned to you',
+        message: `Task "${task.title}" has been assigned to you.`,
+        relatedType: 'task',
+        relatedId: task._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
+
     res.status(201).json({ task });
   } catch (err) {
     console.error('Create task error:', err);
@@ -103,6 +129,20 @@ router.put('/:id', auth, async (req, res) => {
     // Auto-set assignedDate when spoc changes
     if (req.body.spoc !== undefined && req.body.spoc !== task.spoc) {
       task.assignedDate = req.body.spoc ? new Date() : null;
+
+      // Notify new SPOC on reassignment
+      if (req.body.spoc) {
+        notify({
+          recipientName: req.body.spoc,
+          type: 'task_assigned',
+          title: 'Task reassigned to you',
+          message: `Task "${task.title}" has been assigned to you.`,
+          relatedType: 'task',
+          relatedId: task._id.toString(),
+          triggeredBy: req.user.name,
+          triggeredById: req.user._id,
+        });
+      }
     }
 
     const fields = ['title', 'date', 'startTime', 'duration', 'category', 'priority', 'spoc', 'spocColor', 'completed', 'notes', 'deadline'];

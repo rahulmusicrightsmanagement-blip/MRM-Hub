@@ -22,16 +22,15 @@ const navItems = [
   { name: 'Members', path: '/members', icon: Users },
   { name: 'Tracker', path: '/tracker', icon: ClipboardList },
   { name: 'Analytics', path: '/analytics', icon: BarChart3 },
-  { name: 'SPOC Management', path: '/spoc-management', icon: ShieldCheck, adminOrManager: true },
+  { name: 'SPOC Management', path: '/spoc-management', icon: ShieldCheck, fullAccessOnly: true },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user, logout, isAdmin, isManager } = useAuth();
+  const { user, logout, isFullAccess } = useAuth();
 
   const visibleItems = navItems.filter((item) => {
-    if (item.adminOnly) return isAdmin;
-    if (item.adminOrManager) return isAdmin || isManager;
+    if (item.fullAccessOnly) return isFullAccess;
     return true;
   });
 
@@ -45,7 +44,7 @@ const Sidebar = () => {
     : 'U';
 
   const avatarColor =
-    user?.role === 'admin' ? '#7c3aed' : user?.role === 'manager' ? '#2563eb' : '#059669';
+    user?.roles?.includes('admin') ? '#7c3aed' : user?.roles?.includes('lead') ? '#2563eb' : '#059669';
 
   return (
     <aside
@@ -155,7 +154,7 @@ const Sidebar = () => {
           <p style={{ fontSize: '14px', fontWeight: 500, color: 'white', lineHeight: '1.2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {user?.name || 'User'}
           </p>
-          <p style={{ fontSize: '12px', color: '#6b7280', textTransform: 'capitalize' }}>{user?.role || 'spoc'}</p>
+          <p style={{ fontSize: '12px', color: '#6b7280', textTransform: 'capitalize' }}>{user?.roles?.join(', ') || 'member'}</p>
         </div>
         <button
           onClick={logout}

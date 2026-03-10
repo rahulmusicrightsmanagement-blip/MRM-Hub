@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(url, { ...options, headers });
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       // Token expired or account deactivated
       logout();
       throw new Error('Session expired');
@@ -70,8 +70,13 @@ export const AuthProvider = ({ children }) => {
     return res;
   };
 
+  const isAdmin = user?.roles?.includes('admin') || false;
+  const isLead = user?.roles?.includes('lead') || false;
+  const isFullAccess = isAdmin || isLead;
+  const hasRole = (role) => user?.roles?.includes(role) || false;
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, authFetch, isAdmin: user?.role?.toLowerCase() === 'admin', isManager: user?.role?.toLowerCase() === 'manager' }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, authFetch, isAdmin, isLead, isFullAccess, hasRole }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,7 +11,12 @@ const router = express.Router();
 // GET /api/members
 router.get('/', auth, async (req, res) => {
   try {
-    const members = await Member.find().sort({ createdAt: -1 }).lean();
+    const filter = {};
+    // RBAC: non-full-access users see only their assigned members
+    if (!req.user.isFullAccess()) {
+      filter.spoc = req.user.name;
+    }
+    const members = await Member.find(filter).sort({ createdAt: -1 }).lean();
 
     // Compute live works & registrations counts for each member
     const enriched = await Promise.all(

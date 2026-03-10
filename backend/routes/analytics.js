@@ -9,11 +9,34 @@ const router = express.Router();
 // GET /api/analytics
 router.get('/', auth, async (req, res) => {
   try {
+    // RBAC scoping
+    const isFA = req.user.isFullAccess();
+    const spocFilter = isFA ? {} : { spoc: req.user.name };
+
     const [leads, registrations, onboarding] = await Promise.all([
-      Lead.find(),
+      Lead.find(spocFilter),
       SocietyRegistration.find(),
-      OnboardingEntry.find(),
+      OnboardingEntry.find(spocFilter),
     ]);
+
+    // For society regs, filter by assignee if not full access
+    let filteredRegs = registrations;
+    if (!isFA) {
+      const userName = req.user.name;
+      filteredRegs = registrations.filter((reg) => {
+        if (reg.assignees) {
+          for (const [, assignee] of reg.assignees) {
+            if (assignee && assignee.name === userName) return true;
+          }
+        }
+        if (reg.societies) {
+          for (const [, entry] of reg.societies) {
+            if (entry && entry.assignee && entry.assignee.name === userName) return true;
+          }
+        }
+        return false;
+      });
+    }
 
     // Pipeline data
     const pipelineData = [
@@ -25,7 +48,7 @@ router.get('/', auth, async (req, res) => {
 
     // Society registration counts
     const societyCounts = {};
-    registrations.forEach((reg) => {
+    filteredRegs.forEach((reg) => {
       if (reg.societies) {
         for (const [key, entry] of reg.societies) {
           if (entry.status === 'Registered') {

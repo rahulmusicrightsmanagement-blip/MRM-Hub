@@ -13,6 +13,7 @@ const onboardingRoutes = require('./routes/onboarding');
 const dashboardRoutes = require('./routes/dashboard');
 const analyticsRoutes = require('./routes/analytics');
 const taskRoutes = require('./routes/tasks');
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

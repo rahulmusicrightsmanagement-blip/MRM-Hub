@@ -6,6 +6,7 @@ const OnboardingEntry = require('../models/OnboardingEntry');
 const Member = require('../models/Member');
 const { auth } = require('../middleware/auth');
 const { uploadFile } = require('../utils/gdrive');
+const notify = require('../utils/notify');
 
 const router = express.Router();
 
@@ -58,7 +59,29 @@ const syncRegistrationsToMember = async (memberName) => {
 router.get('/', auth, async (req, res) => {
   try {
     const registrations = await SocietyRegistration.find().sort({ createdAt: -1 });
-    res.json({ registrations });
+
+    // RBAC: non-full-access users see only registrations where they are an assignee
+    let filtered = registrations;
+    if (!req.user.isFullAccess()) {
+      const userName = req.user.name;
+      filtered = registrations.filter((reg) => {
+        // Check if this user is an assignee in any society
+        if (reg.assignees) {
+          for (const [, assignee] of reg.assignees) {
+            if (assignee && assignee.name === userName) return true;
+          }
+        }
+        // Also check per-society entry assignees
+        if (reg.societies) {
+          for (const [, entry] of reg.societies) {
+            if (entry && entry.assignee && entry.assignee.name === userName) return true;
+          }
+        }
+        return false;
+      });
+    }
+
+    res.json({ registrations: filtered });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -94,6 +117,20 @@ router.post('/', auth, async (req, res) => {
     }
 
     await reg.save();
+
+    // Notify assigned SPOC
+    if (spoc) {
+      notify({
+        recipientName: spoc,
+        type: 'society_assigned',
+        title: 'Society registration assigned',
+        message: `Society "${society}" for member "${member}" has been assigned to you.`,
+        relatedType: 'societyreg',
+        relatedId: reg._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
 
     // Auto-create a Tracker task for the new registration
     try {
@@ -180,6 +217,18 @@ router.put('/:id', auth, async (req, res) => {
 
     // Auto-create a Tracker task when assigning (status = 'In Progress' + assignee)
     if (society && status === 'In Progress' && assignee && assignee.name) {
+      // Notify assignee
+      notify({
+        recipientName: assignee.name,
+        type: 'society_assigned',
+        title: 'Society registration assigned',
+        message: `Society "${society}" for member "${reg.name}" has been assigned to you.`,
+        relatedType: 'societyreg',
+        relatedId: reg._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+
       try {
         await Task.create({
           title: `Society Reg — ${reg.name} — ${society}`,

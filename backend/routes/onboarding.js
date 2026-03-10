@@ -6,6 +6,7 @@ const Member = require('../models/Member');
 const Task = require('../models/Task');
 const { auth } = require('../middleware/auth');
 const { uploadFile, deleteFile } = require('../utils/gdrive');
+const notify = require('../utils/notify');
 
 // Helper: sync KYC status from onboarding entry to linked Member
 const syncKycToMember = async (entry) => {
@@ -65,12 +66,18 @@ router.get('/', auth, async (req, res) => {
 
     const entries = await OnboardingEntry.find().sort({ createdAt: -1 });
 
+    // RBAC: non-full-access users see only their assigned entries
+    let filtered = entries;
+    if (!req.user.isFullAccess()) {
+      filtered = entries.filter((e) => e.spoc === req.user.name);
+    }
+
     // One-time sync: update Member kycStatus for entries past KYC stage
-    for (const entry of entries) {
+    for (const entry of filtered) {
       await syncKycToMember(entry);
     }
 
-    res.json({ entries });
+    res.json({ entries: filtered });
   } catch (err) {
     console.error('GET onboarding error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -101,6 +108,20 @@ router.post('/', auth, async (req, res) => {
     });
 
     await entry.save();
+
+    // Notify assigned SPOC
+    if (entry.spoc) {
+      notify({
+        recipientName: entry.spoc,
+        type: 'onboarding_assigned',
+        title: 'Onboarding entry assigned to you',
+        message: `Onboarding for "${entry.name}" has been assigned to you.`,
+        relatedType: 'onboarding',
+        relatedId: entry._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
 
     // Auto-create a Tracker task for the new onboarding entry
     try {
@@ -138,6 +159,20 @@ router.put('/:id', auth, async (req, res) => {
     // Auto-set assignedDate when spoc changes
     if (req.body.spoc !== undefined && req.body.spoc !== entry.spoc) {
       entry.assignedDate = req.body.spoc ? new Date() : null;
+
+      // Notify new SPOC on reassignment
+      if (req.body.spoc) {
+        notify({
+          recipientName: req.body.spoc,
+          type: 'onboarding_assigned',
+          title: 'Onboarding reassigned to you',
+          message: `Onboarding for "${entry.name}" has been assigned to you.`,
+          relatedType: 'onboarding',
+          relatedId: entry._id.toString(),
+          triggeredBy: req.user.name,
+          triggeredById: req.user._id,
+        });
+      }
     }
 
     const fields = [

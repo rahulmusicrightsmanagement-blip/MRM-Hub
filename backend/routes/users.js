@@ -1,11 +1,17 @@
 const express = require('express');
 const User = require('../models/User');
-const { auth, adminOnly, adminOrManager } = require('../middleware/auth');
+const { VALID_ROLES } = require('../models/User');
+const { auth, adminOnly, fullAccessOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/users — list all SPOCs (admin & manager)
-router.get('/', auth, adminOrManager, async (req, res) => {
+// GET /api/users/roles — list valid roles
+router.get('/roles', auth, (req, res) => {
+  res.json({ roles: VALID_ROLES });
+});
+
+// GET /api/users — list all SPOCs (admin & lead only)
+router.get('/', auth, fullAccessOnly, async (req, res) => {
   try {
     const users = await User.find().sort({ createdAt: -1 });
     res.json({ users });
@@ -14,13 +20,20 @@ router.get('/', auth, adminOrManager, async (req, res) => {
   }
 });
 
-// POST /api/users — create a new SPOC (admin & manager)
-router.post('/', auth, adminOrManager, async (req, res) => {
+// POST /api/users — create a new SPOC (admin & lead only)
+router.post('/', auth, fullAccessOnly, async (req, res) => {
   try {
-    const { name, email, password, role, phone, department } = req.body;
+    const { name, email, password, roles, phone, department } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    // Validate roles
+    const roleArray = Array.isArray(roles) ? roles : ['lead'];
+    const invalidRoles = roleArray.filter((r) => !VALID_ROLES.includes(r));
+    if (invalidRoles.length > 0) {
+      return res.status(400).json({ message: `Invalid roles: ${invalidRoles.join(', ')}` });
     }
 
     // Check duplicate email
@@ -33,7 +46,7 @@ router.post('/', auth, adminOrManager, async (req, res) => {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password,
-      role: role || 'spoc',
+      roles: roleArray,
       phone: phone || '',
       department: department || '',
       isActive: true,
@@ -65,7 +78,14 @@ router.put('/:id', auth, adminOnly, async (req, res) => {
       if (dup) return res.status(400).json({ message: 'Email already in use' });
       user.email = email.toLowerCase().trim();
     }
-    if (role) user.role = role;
+    if (req.body.roles) {
+      const roleArray = Array.isArray(req.body.roles) ? req.body.roles : [req.body.roles];
+      const invalidRoles = roleArray.filter((r) => !VALID_ROLES.includes(r));
+      if (invalidRoles.length > 0) {
+        return res.status(400).json({ message: `Invalid roles: ${invalidRoles.join(', ')}` });
+      }
+      user.roles = roleArray;
+    }
     if (phone !== undefined) user.phone = phone;
     if (department !== undefined) user.department = department;
     if (password) user.password = password; // pre-save hook will hash it

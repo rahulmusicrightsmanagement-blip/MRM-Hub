@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
-import { Bell } from 'lucide-react';
 import Sidebar from './Sidebar';
+import NotificationPanel from './NotificationPanel';
 
 const pageTitles = {
   '/': 'Dashboard',
@@ -41,28 +41,7 @@ const Layout = ({ children }) => {
         >
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{title}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative', cursor: 'pointer' }}>
-              <Bell style={{ width: '20px', height: '20px', color: '#9ca3af' }} />
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
-                  width: '18px',
-                  height: '18px',
-                  backgroundColor: '#ef4444',
-                  borderRadius: '50%',
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                }}
-              >
-                3
-              </span>
-            </div>
+            <NotificationPanel />
             <span style={{ fontSize: '14px', color: '#9ca3af' }}>{dateStr}</span>
           </div>
         </header>

@@ -18,12 +18,35 @@ const SOCIETIES = [
 // GET /api/dashboard/stats
 router.get('/stats', auth, async (req, res) => {
   try {
+    // RBAC scoping
+    const isFA = req.user.isFullAccess();
+    const spocFilter = isFA ? {} : { spoc: req.user.name };
+
     const [members, leads, onboarding, registrations] = await Promise.all([
-      Member.find(),
-      Lead.find(),
-      OnboardingEntry.find(),
+      Member.find(spocFilter),
+      Lead.find(spocFilter),
+      OnboardingEntry.find(spocFilter),
       SocietyRegistration.find(),
     ]);
+
+    // For society regs, filter by assignee if not full access
+    let filteredRegs = registrations;
+    if (!isFA) {
+      const userName = req.user.name;
+      filteredRegs = registrations.filter((reg) => {
+        if (reg.assignees) {
+          for (const [, assignee] of reg.assignees) {
+            if (assignee && assignee.name === userName) return true;
+          }
+        }
+        if (reg.societies) {
+          for (const [, entry] of reg.societies) {
+            if (entry && entry.assignee && entry.assignee.name === userName) return true;
+          }
+        }
+        return false;
+      });
+    }
 
     /* ─── Top-level stats ─── */
     const activeMembers = members.filter((m) => m.status === 'Active').length;
@@ -32,7 +55,7 @@ router.get('/stats', auth, async (req, res) => {
 
     let registeredCount = 0;
     let inProgressCount = 0;
-    registrations.forEach((reg) => {
+    filteredRegs.forEach((reg) => {
       if (reg.societies) {
         for (const [, entry] of reg.societies) {
           if (entry.status === 'Registered') registeredCount++;
@@ -71,7 +94,7 @@ router.get('/stats', auth, async (req, res) => {
     const societyFlags = {};
     SOCIETIES.forEach((s) => { societyFlags[s.key] = s.flag; });
 
-    const societyData = registrations.slice(0, 8).map((reg) => {
+    const societyData = filteredRegs.slice(0, 8).map((reg) => {
       const societies = {};
       for (const s of SOCIETIES) {
         const entry = reg.societies?.get(s.key);

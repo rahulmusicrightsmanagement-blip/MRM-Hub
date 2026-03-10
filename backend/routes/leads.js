@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const Member = require('../models/Member');
 const Task = require('../models/Task');
 const { auth } = require('../middleware/auth');
+const notify = require('../utils/notify');
 
 const router = express.Router();
 
@@ -15,7 +16,12 @@ const nowHHmm = () => {
 // GET /api/leads
 router.get('/', auth, async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const filter = {};
+    // RBAC: non-full-access users see only their assigned leads
+    if (!req.user.isFullAccess()) {
+      filter.spoc = req.user.name;
+    }
+    const leads = await Lead.find(filter).sort({ createdAt: -1 });
     res.json({ leads });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -47,6 +53,20 @@ router.post('/', auth, async (req, res) => {
     });
 
     await lead.save();
+
+    // Notify assigned SPOC
+    if (lead.spoc) {
+      notify({
+        recipientName: lead.spoc,
+        type: 'lead_assigned',
+        title: 'New lead assigned to you',
+        message: `Lead "${lead.name}" has been assigned to you.`,
+        relatedType: 'lead',
+        relatedId: lead._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
 
     // Auto-create member if one doesn't already exist with this name/email
     try {
@@ -111,6 +131,20 @@ router.put('/:id', auth, async (req, res) => {
     // Auto-set assignedDate when spoc changes
     if (req.body.spoc !== undefined && req.body.spoc !== lead.spoc) {
       lead.assignedDate = req.body.spoc ? new Date() : null;
+
+      // Notify new SPOC on reassignment
+      if (req.body.spoc) {
+        notify({
+          recipientName: req.body.spoc,
+          type: 'lead_assigned',
+          title: 'Lead reassigned to you',
+          message: `Lead "${lead.name}" has been assigned to you.`,
+          relatedType: 'lead',
+          relatedId: lead._id.toString(),
+          triggeredBy: req.user.name,
+          triggeredById: req.user._id,
+        });
+      }
     }
 
     const fields = ['name', 'genre', 'email', 'phone', 'source', 'priority', 'stage', 'spoc', 'notes', 'deadline', 'callDone', 'inquiryNotes', 'meetingDate', 'meetingLink', 'meetingAssignedWith', 'meetingNotes', 'inquiryVerified', 'meetingVerified', 'movedToOnboarding', 'onboardingSpoc', 'onboardingContractType', 'onboardedAt', 'previousStage', 'notQualifiedReason'];

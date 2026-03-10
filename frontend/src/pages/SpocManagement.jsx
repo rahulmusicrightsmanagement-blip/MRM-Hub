@@ -3,14 +3,22 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { Plus, Search, Edit2, Trash2, X, Shield, UserCheck, Eye, EyeOff } from 'lucide-react';
 
-const roleColors = {
-  admin: { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa' },
-  manager: { bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa' },
-  spoc: { bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399' },
+const ROLE_META = {
+  admin: { label: 'Admin', bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', avatar: '#7c3aed' },
+  lead: { label: 'Lead', bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa', avatar: '#2563eb' },
+  onboarding_manager: { label: 'Onboarding Mgr', bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', avatar: '#059669' },
+  society_manager: { label: 'Society Mgr', bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', avatar: '#d97706' },
+  music_work_manager: { label: 'Music Work Mgr', bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', avatar: '#db2777' },
+};
+
+const getAvatarColor = (roles) => {
+  if (roles.includes('admin')) return '#7c3aed';
+  if (roles.includes('lead')) return '#2563eb';
+  return ROLE_META[roles[0]]?.avatar || '#059669';
 };
 
 const SpocManagement = () => {
-  const { authFetch, isAdmin, isManager, user: currentUser } = useAuth();
+  const { authFetch, isFullAccess, user: currentUser } = useAuth();
   const { addToast } = useToast();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -40,7 +48,7 @@ const SpocManagement = () => {
     (u) =>
       u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.role.toLowerCase().includes(search.toLowerCase()) ||
+      (u.roles || []).some((r) => r.toLowerCase().includes(search.toLowerCase())) ||
       (u.department || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -60,10 +68,10 @@ const SpocManagement = () => {
     }
   };
 
-  if (!isAdmin && !isManager) {
+  if (!isFullAccess) {
     return (
       <div style={{ padding: '40px', color: '#6b7280', textAlign: 'center', fontSize: '16px' }}>
-        Access denied. Admin or Manager only.
+        Access denied. Admin or Lead only.
       </div>
     );
   }
@@ -122,12 +130,14 @@ const SpocManagement = () => {
       </div>
 
       {/* Stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {[
           { label: 'Total Members', value: users.length, color: '#60a5fa' },
-          { label: 'Admins', value: users.filter((u) => u.role === 'admin').length, color: '#a78bfa' },
-          { label: 'Managers', value: users.filter((u) => u.role === 'manager').length, color: '#3b82f6' },
-          { label: 'SPOCs', value: users.filter((u) => u.role === 'spoc').length, color: '#34d399' },
+          ...Object.entries(ROLE_META).map(([key, meta]) => ({
+            label: meta.label + 's',
+            value: users.filter((u) => (u.roles || []).includes(key)).length,
+            color: meta.text,
+          })),
         ].map((s) => (
           <div
             key={s.label}
@@ -161,7 +171,7 @@ const SpocManagement = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #1e2540' }}>
-                {['Name', 'Email', 'Role', 'Department', 'Status', 'Actions'].map((h) => (
+                {['Name', 'Email', 'Roles', 'Department', 'Status', 'Actions'].map((h) => (
                   <th
                     key={h}
                     style={{
@@ -181,7 +191,7 @@ const SpocManagement = () => {
             </thead>
             <tbody>
               {filtered.map((u) => {
-                const rc = roleColors[u.role] || roleColors.spoc;
+                const userRoles = u.roles || ['lead'];
                 const initials = u.name
                   .split(' ')
                   .map((w) => w[0])
@@ -198,7 +208,7 @@ const SpocManagement = () => {
                             width: '34px',
                             height: '34px',
                             borderRadius: '50%',
-                            backgroundColor: u.role === 'admin' ? '#7c3aed' : u.role === 'manager' ? '#2563eb' : '#059669',
+                            backgroundColor: getAvatarColor(userRoles),
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -215,21 +225,18 @@ const SpocManagement = () => {
                     </td>
                     {/* Email */}
                     <td style={{ padding: '14px 18px', fontSize: '13px', color: '#9ca3af' }}>{u.email}</td>
-                    {/* Role */}
+                    {/* Roles */}
                     <td style={{ padding: '14px 18px' }}>
-                      <span
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          backgroundColor: rc.bg,
-                          color: rc.text,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {u.role}
-                      </span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {userRoles.map((r) => {
+                          const meta = ROLE_META[r] || ROLE_META.lead;
+                          return (
+                            <span key={r} style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, backgroundColor: meta.bg, color: meta.text, whiteSpace: 'nowrap' }}>
+                              {meta.label}
+                            </span>
+                          );
+                        })}
+                      </div>
                     </td>
                     {/* Department */}
                     <td style={{ padding: '14px 18px', fontSize: '13px', color: '#9ca3af' }}>{u.department || '—'}</td>
@@ -258,7 +265,7 @@ const SpocManagement = () => {
                     </td>
                     {/* Actions */}
                     <td style={{ padding: '14px 18px' }}>
-                      {isAdmin ? (
+                      {isFullAccess ? (
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button
                             onClick={() => {
@@ -385,7 +392,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
     name: user?.name || '',
     email: user?.email || '',
     password: '',
-    role: user?.role || 'spoc',
+    roles: user?.roles || ['lead'],
     phone: user?.phone || '',
     department: user?.department || '',
     isActive: user?.isActive ?? true,
@@ -395,6 +402,14 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
   const [error, setError] = useState('');
 
   const handleChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+
+  const toggleRole = (role) => {
+    setForm((p) => {
+      const has = p.roles.includes(role);
+      const next = has ? p.roles.filter((r) => r !== role) : [...p.roles, role];
+      return { ...p, roles: next.length > 0 ? next : p.roles }; // keep at least 1
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -407,11 +422,15 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
       setError('Password is required for new member');
       return;
     }
+    if (form.roles.length === 0) {
+      setError('At least one role must be selected');
+      return;
+    }
 
     setSaving(true);
     try {
       const body = { ...form };
-      if (isEdit && !body.password) delete body.password; // don't send empty password on edit
+      if (isEdit && !body.password) delete body.password;
 
       const url = isEdit ? `/api/users/${user._id}` : '/api/users';
       const method = isEdit ? 'PUT' : 'POST';
@@ -515,21 +534,40 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
             </div>
           </div>
 
-          {/* Role + Department */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Role</label>
-              <input
-                value={form.role}
-                onChange={(e) => handleChange('role', e.target.value)}
-                placeholder="e.g. SPOC, Manager, Admin"
-                style={inputStyle}
-              />
+          {/* Roles (multi-select checkboxes) */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Roles *</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {Object.entries(ROLE_META).map(([key, meta]) => {
+                const selected = form.roles.includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleRole(key)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '8px',
+                      border: `1px solid ${selected ? meta.text : '#1e2540'}`,
+                      backgroundColor: selected ? meta.bg : 'transparent',
+                      color: selected ? meta.text : '#6b7280',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {meta.label}
+                  </button>
+                );
+              })}
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Department</label>
-              <input value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="e.g. Rights Mgmt" style={inputStyle} />
-            </div>
+          </div>
+
+          {/* Department */}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Department</label>
+            <input value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="e.g. Rights Mgmt" style={inputStyle} />
           </div>
 
           {/* Phone */}
