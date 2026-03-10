@@ -192,36 +192,70 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
               </div>
             )}
 
-            {/* Step 8: Login details (ID & Password) */}
+            {/* Step 8: Login details (ID & Password) + CAE & Commission */}
             {step.hasLogin && localSteps[step.key] === 'Yes' && (
-              <div style={{ marginTop: '10px', paddingLeft: '34px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '160px' }}>
-                  <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Login ID</label>
-                  {readOnly ? (
-                    <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginId || '—'}</p>
-                  ) : (
-                    <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
-                      placeholder="Enter login ID..."
-                      value={localSteps.loginId || ''}
-                      onChange={(e) => setLocalSteps((p) => ({ ...p, loginId: e.target.value }))}
-                      onBlur={(e) => saveLoginField('loginId', e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginId', e.target.value)}
-                    />
-                  )}
+              <div style={{ marginTop: '10px', paddingLeft: '34px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* Row 1: Login ID & Password */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Login ID</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginId || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="Enter login ID..."
+                        value={localSteps.loginId || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, loginId: e.target.value }))}
+                        onBlur={(e) => saveLoginField('loginId', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginId', e.target.value)}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Password</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginPassword || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="Enter password..."
+                        value={localSteps.loginPassword || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, loginPassword: e.target.value }))}
+                        onBlur={(e) => saveLoginField('loginPassword', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginPassword', e.target.value)}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div style={{ flex: 1, minWidth: '160px' }}>
-                  <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Password</label>
-                  {readOnly ? (
-                    <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginPassword || '—'}</p>
-                  ) : (
-                    <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
-                      placeholder="Enter password..."
-                      value={localSteps.loginPassword || ''}
-                      onChange={(e) => setLocalSteps((p) => ({ ...p, loginPassword: e.target.value }))}
-                      onBlur={(e) => saveLoginField('loginPassword', e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginPassword', e.target.value)}
-                    />
-                  )}
+                {/* Row 2: CAE Number & Commission Rate */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>CAE Number</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.caeNumber || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="Enter CAE number..."
+                        value={localSteps.caeNumber || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, caeNumber: e.target.value }))}
+                        onBlur={(e) => saveLoginField('caeNumber', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('caeNumber', e.target.value)}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Commission Rate</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.commissionRate || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="e.g. 15%"
+                        value={localSteps.commissionRate || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, commissionRate: e.target.value }))}
+                        onBlur={(e) => saveLoginField('commissionRate', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('commissionRate', e.target.value)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -566,7 +600,6 @@ const SocietyReg = () => {
   const [members, setMembers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -617,21 +650,6 @@ const SocietyReg = () => {
     const norm = { ...updated, societies: updated.societies || {}, assignees: updated.assignees || {} };
     setMembers((prev) => prev.map((m) => (m._id === norm._id ? norm : m)));
     setSelectedMember((prev) => (prev && prev._id === norm._id ? norm : prev));
-  };
-
-  const handleStartRegistration = async (form) => {
-    try {
-      const res = await authFetch('/api/societyregs', { method: 'POST', body: JSON.stringify(form) });
-      const data = await res.json();
-      if (res.ok) {
-        const regsRes = await authFetch('/api/societyregs');
-        const regsData = await regsRes.json();
-        setMembers((regsData.registrations || []).map((reg) => ({
-          ...reg, societies: reg.societies || {}, assignees: reg.assignees || {},
-        })));
-        addToast('Registration started');
-      } else addToast('Failed to start registration', 'error');
-    } catch (err) { console.error(err); addToast('Failed to start registration', 'error'); }
   };
 
   const handleAssignAndStart = async (memberId, societyKey, teamMember) => {
@@ -691,9 +709,6 @@ const SocietyReg = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Collecting Society Registrations</h1>
-          <button onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-            <Plus style={{ width: '16px', height: '16px' }} /> Start Registration
-          </button>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Manage member registrations across 12 collecting societies</p>
       </div>
@@ -754,7 +769,6 @@ const SocietyReg = () => {
         )}
       </div>
 
-      {showAddModal && <StartRegModal members={allMembers} teamMembers={teamMembers} onClose={() => setShowAddModal(false)} onStart={handleStartRegistration} />}
       {selectedMember && (
         <MemberDetailModal
           member={selectedMember}

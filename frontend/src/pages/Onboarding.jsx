@@ -1340,7 +1340,6 @@ const Onboarding = () => {
   const [entries, setEntries] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1437,9 +1436,6 @@ const Onboarding = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Onboarding</h1>
-          <button onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-            <Plus style={{ width: '16px', height: '16px' }} /> Start Onboarding
-          </button>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Track client onboarding from document submission to active membership</p>
       </div>
@@ -1466,7 +1462,6 @@ const Onboarding = () => {
       </div>
 
       {/* Modals */}
-      {showAddModal && <AddOnboardingModal onClose={() => setShowAddModal(false)} onAdd={handleAddEntry} teamMembers={teamMembers} members={members} />}
       {editingEntry && <AddOnboardingModal onClose={() => setEditingEntry(null)} onAdd={handleEditSubmit} teamMembers={teamMembers} members={members} initialData={editingEntry} />}
       {selectedMember && (
         <OnboardingDetailModal

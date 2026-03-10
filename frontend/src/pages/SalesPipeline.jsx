@@ -84,7 +84,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
   const [form, setForm] = useState(
     initialData
       ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
-      : { name: '', genre: '', email: '', phone: '', source: 'Website Form', priority: 'medium', spoc: '', notes: '', deadline: '' },
+      : { name: '', genre: '', email: '', phone: '', source: '', priority: 'medium', spoc: '', notes: '', deadline: '' },
   );
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -95,7 +95,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
   };
 
   const handleSubmit = () => {
-    if (!form.name || !form.email) return;
+    if (!form.name) return;
     onSubmit(form);
     onClose();
   };
@@ -113,54 +113,71 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
           <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-          {isEdit ? (
-            <div><label style={LABEL}>Name *</label><input style={INPUT} value={form.name} onChange={(e) => set('name', e.target.value)} /></div>
-          ) : (
-            <div>
+        {isEdit ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div><label style={LABEL}>Name *</label><input style={INPUT} value={form.name} onChange={(e) => set('name', e.target.value)} /></div>
+              <div><label style={LABEL}>Genre</label><input style={INPUT} placeholder="e.g. Bollywood Playback" value={form.genre} onChange={(e) => set('genre', e.target.value)} /></div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div><label style={LABEL}>Email *</label><input style={INPUT} placeholder="email@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+              <div><label style={LABEL}>Phone</label><input style={INPUT} placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div>
+                <label style={LABEL}>Lead Source</label>
+                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
+                  {SOURCE_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={LABEL}>Priority</label>
+                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.priority} onChange={(e) => set('priority', e.target.value)}>
+                  <option value="high">high</option><option value="medium">medium</option><option value="low">low</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={LABEL}>Assign SPOC</label>
+              <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
+                <option value="">Select a team member..</option>
+                {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={LABEL}>Deadline</label>
+              <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+            </div>
+
+            <div style={{ marginBottom: '28px' }}>
+              <label style={LABEL}>Notes</label>
+              <textarea style={{ ...INPUT, minHeight: '90px', resize: 'vertical' }} placeholder="Add initial notes about this lead..." value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ marginBottom: '20px' }}>
               <SearchableSelect label="Select Member" required options={members} value={form.name} onChange={handleMemberSelect} placeholder="Search member..." emptyMessage="No members found. Add members first." />
             </div>
-          )}
-          <div><label style={LABEL}>Genre</label><input style={INPUT} placeholder="e.g. Bollywood Playback" value={form.genre} onChange={(e) => set('genre', e.target.value)} /></div>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-          <div><label style={LABEL}>Email *</label><input style={INPUT} placeholder="email@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-          <div><label style={LABEL}>Phone</label><input style={INPUT} placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-        </div>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={LABEL}>Assign SPOC</label>
+              <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
+                <option value="">Select a team member..</option>
+                {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-          <div>
-            <label style={LABEL}>Lead Source</label>
-            <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
-              {SOURCE_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={LABEL}>Priority</label>
-            <select style={{ ...INPUT, cursor: 'pointer' }} value={form.priority} onChange={(e) => set('priority', e.target.value)}>
-              <option value="high">high</option><option value="medium">medium</option><option value="low">low</option>
-            </select>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={LABEL}>Assign SPOC</label>
-          <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
-            <option value="">Select a team member..</option>
-            {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={LABEL}>Deadline</label>
-          <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
-        </div>
-
-        <div style={{ marginBottom: '28px' }}>
-          <label style={LABEL}>Notes</label>
-          <textarea style={{ ...INPUT, minHeight: '90px', resize: 'vertical' }} placeholder="Add initial notes about this lead..." value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-        </div>
+            <div style={{ marginBottom: '28px' }}>
+              <label style={LABEL}>Deadline</label>
+              <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+            </div>
+          </>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
           <button type="button" onClick={onClose} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
@@ -380,7 +397,7 @@ const SubTaskRow = ({ task, leadId, onToggleSubtask }) => {
    ═══════════════════════════════════════════ */
 const LeadDetailModal = ({
   lead, onClose, onMoveNext, onUpdateLead,
-  onDeleteLead, onEditLead, onToggleSubtask,
+  onDeleteLead, onToggleSubtask,
   onAddSubtask, teamMembers, onMoveToOnboarding, onMarkNotQualified, onRevertLead, onRestartOnboarding,
 }) => {
   const { addToast } = useToast();
@@ -707,9 +724,6 @@ const LeadDetailModal = ({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <PriorityBadge priority={lead.priority} />
-            <button type="button" onClick={() => onEditLead(lead)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}>
-              <Edit3 style={{ width: '16px', height: '16px' }} />
-            </button>
             <button type="button" onClick={() => setConfirmDelete(true)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}>
               <Trash2 style={{ width: '16px', height: '16px' }} />
             </button>
@@ -971,7 +985,6 @@ const SalesPipeline = () => {
   const [teamMembers, setTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingLead, setEditingLead] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -1000,25 +1013,6 @@ const SalesPipeline = () => {
       if (res.ok) { setLeads((p) => [data.lead, ...p]); addToast('Lead created'); }
       else addToast('Failed to create lead', 'error');
     } catch (err) { console.error('Failed to add lead:', err); addToast('Failed to create lead', 'error'); }
-  };
-
-  const handleEditLead = (lead) => {
-    setSelectedLead(null);
-    setEditingLead({
-      _id: lead._id, name: lead.name, genre: lead.genre,
-      email: lead.email, phone: lead.phone, source: lead.source,
-      priority: lead.priority, spoc: lead.spoc, notes: lead.notes,
-    });
-  };
-
-  const handleEditSubmit = async (form) => {
-    if (!editingLead) return;
-    try {
-      const res = await authFetch(`/api/leads/${editingLead._id}`, { method: 'PUT', body: JSON.stringify(form) });
-      const data = await res.json();
-      if (res.ok) { setLeads((p) => p.map((l) => (l._id === editingLead._id ? data.lead : l))); addToast('Lead updated'); }
-      else addToast('Failed to update lead', 'error');
-    } catch (err) { console.error('Failed to edit lead:', err); addToast('Failed to update lead', 'error'); }
   };
 
   const handleDeleteLead = async (leadId) => {
@@ -1199,7 +1193,6 @@ const SalesPipeline = () => {
       </div>
 
       {showAddModal && <LeadFormModal onClose={() => setShowAddModal(false)} onSubmit={handleAddLead} teamMembers={teamMembers} members={members} />}
-      {editingLead && <LeadFormModal onClose={() => setEditingLead(null)} onSubmit={handleEditSubmit} teamMembers={teamMembers} members={members} initialData={editingLead} />}
       {selectedLead && (
         <LeadDetailModal
           lead={selectedLead}
@@ -1207,7 +1200,6 @@ const SalesPipeline = () => {
           onMoveNext={handleMoveNext}
           onUpdateLead={handleUpdateLead}
           onDeleteLead={handleDeleteLead}
-          onEditLead={handleEditLead}
           onToggleSubtask={handleToggleSubtask}
           onAddSubtask={handleAddSubtask}
           teamMembers={teamMembers}

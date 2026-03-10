@@ -21,6 +21,8 @@ const stepsSchema = new mongoose.Schema({
   loginDetails:              { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   loginId:                   { type: String, default: '' },
   loginPassword:             { type: String, default: '' },
+  caeNumber:                 { type: String, default: '' },
+  commissionRate:            { type: String, default: '' },
   thirdPartyAuthorization:   { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   bankMandateUpdate:         { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
 }, { _id: false });

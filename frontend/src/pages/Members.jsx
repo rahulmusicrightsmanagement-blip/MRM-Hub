@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -88,8 +89,8 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
   const isEdit = !!initialData;
   const [form, setForm] = useState(
     initialData
-      ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
-      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', spoc: '', deadline: '' },
+      ? { ...initialData }
+      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', leadSource: '', priority: 'medium' },
   );
 
   const h = (f, v) => setForm((p) => ({ ...p, [f]: v }));
@@ -163,19 +164,23 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
           </div>
         </div>
 
-        {/* Assignment */}
-        <div style={{ ...sectionStyle, marginTop: '24px' }}>Assignment</div>
+        {/* Lead Info */}
+        <div style={{ ...sectionStyle, marginTop: '24px' }}>Lead Information</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
-            <label style={labelStyle}>Assign SPOC</label>
-            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.spoc} onChange={(e) => h('spoc', e.target.value)}>
-              <option value="">Select a team member...</option>
-              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+            <label style={labelStyle}>Lead Source</label>
+            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.leadSource} onChange={(e) => h('leadSource', e.target.value)}>
+              <option value="">Select source...</option>
+              {['Website Form', 'LinkedIn Outreach', 'Instagram DM', 'Industry Event', 'Referral', 'Direct Outreach'].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Deadline</label>
-            <input type="date" style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} value={form.deadline} onChange={(e) => h('deadline', e.target.value)} />
+            <label style={labelStyle}>Priority</label>
+            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.priority} onChange={(e) => h('priority', e.target.value)}>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
           </div>
         </div>
 
@@ -453,6 +458,7 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
 
 /* ────────── Main Page ────────── */
 const Members = () => {
+  const navigate = useNavigate();
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const [members, setMembers] = useState([]);
@@ -461,6 +467,7 @@ const Members = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -603,7 +610,7 @@ const Members = () => {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
           {filteredMembers.map((m) => (
-            <div key={m._id} onClick={() => setSelectedMember(m)}
+            <div key={m._id} onClick={() => navigate(`/members/${m._id}`)}
               style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#1e2540')}>
@@ -619,6 +626,15 @@ const Members = () => {
                   </div>
                   <div style={{ color: '#8892b0', fontSize: '12px', marginTop: '2px' }}>{Array.isArray(m.role) ? m.role.join(', ') : m.role}</div>
                 </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(m._id); }}
+                  title="Delete member"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
               {/* Stats */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '13px', color: '#8892b0' }}>
@@ -629,6 +645,17 @@ const Members = () => {
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <StatusBadge status={`KYC: ${m.kycStatus}`} colors={{ 'KYC: Verified': { bg: '#065f46', text: '#34d399' }, 'KYC: Pending': { bg: '#7f1d1d', text: '#f87171' } }} />
               </div>
+
+              {/* Delete confirmation */}
+              {confirmDeleteId === m._id && (
+                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', color: '#fca5a5' }}>Delete this member?</span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMember(m._id); setConfirmDeleteId(null); }} style={{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

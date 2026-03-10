@@ -26,6 +26,8 @@ const memberSchema = new mongoose.Schema(
     ipiNumber: { type: String, default: '' },
     isni: { type: String, default: '' },
     territories: { type: String, default: '' },
+    leadSource: { type: String, default: '' },
+    priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },
     works: { type: Number, default: 0 },
     registrations: { type: Number, default: 0 },
     joinDate: { type: String, default: '' },

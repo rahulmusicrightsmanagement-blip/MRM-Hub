@@ -9,6 +9,7 @@ import SocietyReg from './pages/SocietyReg';
 // import MusicalWorks from './pages/MusicalWorks';
 import Royalty from './pages/Royalty';
 import Members from './pages/Members';
+import MemberProfile from './pages/MemberProfile';
 import Tracker from './pages/Tracker';
 import Analytics from './pages/Analytics';
 import Login from './pages/Login';
@@ -37,6 +38,7 @@ const ProtectedRoutes = () => {
         {/* <Route path="/musical-works" element={<MusicalWorks />} /> */}
         <Route path="/royalty" element={<Royalty />} />
         <Route path="/members" element={<Members />} />
+        <Route path="/members/:id" element={<MemberProfile />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/spoc-management" element={<SpocManagement />} />

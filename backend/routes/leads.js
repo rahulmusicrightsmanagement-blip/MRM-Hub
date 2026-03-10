@@ -1,5 +1,6 @@
 const express = require('express');
 const Lead = require('../models/Lead');
+const Member = require('../models/Member');
 const Task = require('../models/Task');
 const { auth } = require('../middleware/auth');
 
@@ -46,6 +47,33 @@ router.post('/', auth, async (req, res) => {
     });
 
     await lead.save();
+
+    // Auto-create member if one doesn't already exist with this name/email
+    try {
+      const existingMember = await Member.findOne({
+        $or: [
+          { name: new RegExp(`^${lead.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          { email: lead.email },
+        ],
+      });
+      if (!existingMember) {
+        const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
+        const memberColor = colors[Math.floor(Math.random() * colors.length)];
+        await Member.create({
+          name: lead.name.trim(),
+          email: lead.email,
+          color: memberColor,
+          phone: lead.phone || '',
+          genre: lead.genre || '',
+          spoc: lead.spoc || '',
+          assignedDate: lead.spoc ? new Date() : null,
+          deadline: lead.deadline || null,
+          joinDate: new Date().toISOString().split('T')[0],
+        });
+      }
+    } catch (memberErr) {
+      console.error('Auto-create member error:', memberErr);
+    }
 
     // Auto-create a Tracker task for the new lead
     try {
