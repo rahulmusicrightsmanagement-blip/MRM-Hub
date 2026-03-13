@@ -62,7 +62,7 @@ const TripleToggle = ({ value, onChange }) => {
     <div style={{ display: 'flex', gap: '4px' }}>
       <button onClick={() => onChange('Yes')} style={{ ...btnBase, background: value === 'Yes' ? '#166534' : '#1e2540', color: value === 'Yes' ? '#86efac' : '#6b7280', border: value === 'Yes' ? '1px solid #22c55e' : '1px solid #2d3348' }}>Yes</button>
       <button onClick={() => onChange('No')} style={{ ...btnBase, background: value === 'No' ? '#991b1b' : '#1e2540', color: value === 'No' ? '#fca5a5' : '#6b7280', border: value === 'No' ? '1px solid #ef4444' : '1px solid #2d3348' }}>No</button>
-      <button onClick={() => onChange('NA')} style={{ ...btnBase, background: value === 'NA' ? '#374151' : '#1e2540', color: value === 'NA' ? '#d1d5db' : '#6b7280', border: value === 'NA' ? '1px solid #6b7280' : '1px solid #2d3348' }}>N/A</button>
+      <button onClick={() => onChange('NA')} style={{ ...btnBase, background: value === 'NA' ? '#854d0e' : '#1e2540', color: value === 'NA' ? '#fde047' : '#6b7280', border: value === 'NA' ? '1px solid #f59e0b' : '1px solid #2d3348' }}>N/A</button>
     </div>
   );
 };
@@ -70,7 +70,7 @@ const TripleToggle = ({ value, onChange }) => {
 /* ═══════════════════════════════════════════════════════
    In-Progress Steps Panel — shown when viewing an "In Progress" society
    ═══════════════════════════════════════════════════════ */
-const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, token, readOnly = false }) => {
+const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, token, readOnly = false, notAssigned = false }) => {
   const { addToast } = useToast();
   const [localSteps, setLocalSteps] = useState(steps || {});
   const [newRemark, setNewRemark] = useState('');
@@ -143,7 +143,13 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
 
   return (
     <div style={{ padding: '16px 18px', borderTop: '1px solid #1e2540' }}>
-      <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '14px' }}>Registration Progress — {societyKey}</p>
+      <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: notAssigned ? '8px' : '14px' }}>Registration Progress — {societyKey}</p>
+      {notAssigned && (
+        <div style={{ marginBottom: '14px', padding: '8px 14px', backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px' }}>🔒</span>
+          <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 500 }}>You are not assigned to this society — view only.</span>
+        </div>
+      )}
 
       {/* Steps 1–10 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -153,16 +159,16 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                  background: localSteps[step.key] === 'Yes' ? '#166534' : localSteps[step.key] === 'No' ? '#991b1b' : '#1e2540',
-                  color: localSteps[step.key] === 'Yes' ? '#86efac' : localSteps[step.key] === 'No' ? '#fca5a5' : '#6b7280',
-                  border: localSteps[step.key] === 'Yes' ? '1px solid #22c55e' : localSteps[step.key] === 'No' ? '1px solid #ef4444' : '1px solid #2d3348',
+                  background: localSteps[step.key] === 'Yes' ? '#166534' : localSteps[step.key] === 'No' ? '#991b1b' : localSteps[step.key] === 'NA' ? '#854d0e' : '#1e2540',
+                  color: localSteps[step.key] === 'Yes' ? '#86efac' : localSteps[step.key] === 'No' ? '#fca5a5' : localSteps[step.key] === 'NA' ? '#fde047' : '#6b7280',
+                  border: localSteps[step.key] === 'Yes' ? '1px solid #22c55e' : localSteps[step.key] === 'No' ? '1px solid #ef4444' : localSteps[step.key] === 'NA' ? '1px solid #f59e0b' : '1px solid #2d3348',
                 }}>{step.num}</span>
                 <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>{step.label}</span>
               </div>
               {readOnly ? (
                 <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '6px',
-                  background: (localSteps[step.key] || 'NA') === 'Yes' ? '#166534' : (localSteps[step.key] || 'NA') === 'No' ? '#991b1b' : '#374151',
-                  color: (localSteps[step.key] || 'NA') === 'Yes' ? '#86efac' : (localSteps[step.key] || 'NA') === 'No' ? '#fca5a5' : '#d1d5db',
+                  background: (localSteps[step.key] || 'NA') === 'Yes' ? '#166534' : (localSteps[step.key] || 'NA') === 'No' ? '#991b1b' : '#854d0e',
+                  color: (localSteps[step.key] || 'NA') === 'Yes' ? '#86efac' : (localSteps[step.key] || 'NA') === 'No' ? '#fca5a5' : '#fde047',
                 }}>{localSteps[step.key] || 'N/A'}</span>
               ) : (
                 <TripleToggle value={localSteps[step.key] || 'NA'} onChange={(val) => saveStep(step.key, val)} />
@@ -378,6 +384,15 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
    Member Detail Modal — shows all 12 societies with expand for steps
    ═══════════════════════════════════════════════════════ */
 const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUpdated, onDelete, onRename, teamMembers, authFetch, token }) => {
+  const { user, isAdmin } = useAuth();
+  const { addToast } = useToast();
+
+  const isAssignedToSoc = (socKey) => {
+    if (isAdmin) return true;
+    const assignee = getAssignee(socKey);
+    return assignee && user && assignee.name === user.name;
+  };
+
   const [assigningKey, setAssigningKey] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
   const [confirmDone, setConfirmDone] = useState(null);
@@ -545,7 +560,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             />
                           ) : entryDeadline ? (
                             <span
-                              onClick={(e) => { e.stopPropagation(); setEditingDeadline(soc.key); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
+                                setEditingDeadline(soc.key);
+                              }}
                               style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#1e2540', color: dlColor?.color || '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' }}
                               title={`Deadline: ${fmtDeadline(entryDeadline)} — ${dlColor?.label || ''} (click to edit)`}
                             >
@@ -553,7 +572,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             </span>
                           ) : (
                             <button
-                              onClick={(e) => { e.stopPropagation(); setEditingDeadline(soc.key); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
+                                setEditingDeadline(soc.key);
+                              }}
                               style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', background: 'rgba(99,102,241,0.06)', border: '1px dashed #2d3348', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                             >
                               + Set Deadline
@@ -563,10 +586,29 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      {assignee && assignee.name && (
-                        <div style={{ width: '26px', height: '26px', borderRadius: '50%', backgroundColor: assignee.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 700, flexShrink: 0 }} title={assignee.name}>
-                          {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                      {assignee && assignee.name ? (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '3px 10px 3px 3px',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(99,102,241,0.28)',
+                            backgroundColor: 'rgba(99,102,241,0.12)',
+                            maxWidth: '180px',
+                          }}
+                          title={assignee.name}
+                        >
+                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: assignee.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+                            {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#c7d2fe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {assignee.name}
+                          </span>
                         </div>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Unassigned</span>
                       )}
                       <StatusBadge status={status} isOverdue={status === 'In Progress' && dlColor && dlColor.label === 'Overdue'} />
 
@@ -583,7 +625,10 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             style={{ fontSize: '12px', fontWeight: 600, color: '#60a5fa', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isExpanded ? 'Close' : 'View'}
                           </button>
-                          <button onClick={() => { setConfirmDone(isConfirmingDone ? null : soc.key); setExpandedKey(null); setAssigningKey(null); }} disabled={isLoading}
+                          <button onClick={() => {
+                            if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
+                            setConfirmDone(isConfirmingDone ? null : soc.key); setExpandedKey(null); setAssigningKey(null);
+                          }} disabled={isLoading}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#34d399', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             Done
                           </button>
@@ -638,7 +683,8 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       onUpdated={onUpdated}
                       authFetch={authFetch}
                       token={token}
-                      readOnly={status === 'Registered'}
+                      readOnly={status === 'Registered' || !isAssignedToSoc(soc.key)}
+                      notAssigned={status !== 'Registered' && !isAssignedToSoc(soc.key)}
                     />
                   )}
 

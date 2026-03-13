@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Music, Eye, EyeOff } from 'lucide-react';
+import { Music, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const { login } = useAuth();
@@ -13,15 +13,32 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!email || !password) {
-      setError('Please fill in all fields');
+    if (!email && !password) {
+      setError('Please enter your email and password to sign in.');
+      return;
+    }
+    if (!email) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
       return;
     }
     setLoading(true);
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.message);
+      const msg = err.message?.toLowerCase() || '';
+      if (msg.includes('invalid email or password')) {
+        setError('Incorrect email or password. Please try again.');
+      } else if (msg.includes('deactivated')) {
+        setError('Your account has been deactivated. Please contact your admin.');
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -66,25 +83,29 @@ const Login = () => {
           </div>
           <div>
             <h1 style={{ color: 'white', fontWeight: 700, fontSize: '20px', lineHeight: '1.2' }}>MRM Hub</h1>
-            <p style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '2px' }}>Artist Portal</p>
+            <p style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '2px' }}>CRM Portal</p>
           </div>
         </div>
 
         <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 700, textAlign: 'center', marginBottom: '6px' }}>Welcome Back</h2>
-        <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', marginBottom: '28px' }}>Sign in to your account</p>
+        <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', marginBottom: '28px' }}>Sign in to manage your workspace</p>
 
         {error && (
           <div
             style={{
-              padding: '10px 14px',
+              padding: '12px 14px',
               marginBottom: '18px',
               borderRadius: '8px',
               backgroundColor: 'rgba(239, 68, 68, 0.12)',
               border: '1px solid rgba(239, 68, 68, 0.25)',
               fontSize: '13px',
               color: '#f87171',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
             }}
           >
+            <AlertCircle style={{ width: '16px', height: '16px', flexShrink: 0 }} />
             {error}
           </div>
         )}
@@ -98,7 +119,7 @@ const Login = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@mrmhub.com"
+              placeholder="Please add ur Email"
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -122,7 +143,7 @@ const Login = () => {
                 type={showPw ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Please add ur Password"
                 style={{
                   width: '100%',
                   padding: '10px 40px 10px 14px',

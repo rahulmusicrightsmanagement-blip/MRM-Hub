@@ -10,7 +10,7 @@ const pageTitles = {
   '/royalty': 'Music Works',
   '/members': 'Members',
   '/tracker': 'Tracker',
-  '/analytics': 'Analytics',
+  '/analytics': 'Reports',
   '/spoc-management': 'SPOC Management',
 };
 

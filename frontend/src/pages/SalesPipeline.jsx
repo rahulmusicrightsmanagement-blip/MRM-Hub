@@ -1002,7 +1002,7 @@ const SalesPipeline = () => {
       try {
         const [lR, uR, mR] = await Promise.all([
           authFetch('/api/leads'),
-          authFetch('/api/users'),
+          authFetch('/api/users/team'),
           authFetch('/api/members'),
         ]);
         const [lD, uD, mD] = await Promise.all([lR.json(), uR.json(), mR.json()]);

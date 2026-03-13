@@ -21,7 +21,7 @@ const navItems = [
   { name: 'Music Works', path: '/royalty', icon: Music },
   { name: 'Members', path: '/members', icon: Users },
   { name: 'Tracker', path: '/tracker', icon: ClipboardList },
-  { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+  { name: 'Reports', path: '/analytics', icon: BarChart3 },
   { name: 'SPOC Management', path: '/spoc-management', icon: ShieldCheck, fullAccessOnly: true },
 ];
 

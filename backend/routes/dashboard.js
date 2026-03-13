@@ -7,12 +7,9 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
-/* ─── 12 Collecting Societies (must match SocietyReg page) ─── */
 const SOCIETIES = [
-  { key: 'IPRS', flag: '🇮🇳' }, { key: 'PRS', flag: '🇬🇧' }, { key: 'ASCAP', flag: '🇺🇸' },
-  { key: 'PPL(INDIA)', flag: '🇮🇳' }, { key: 'PPL(UK)', flag: '🇬🇧' }, { key: 'SOUND EXCHANGE', flag: '🇺🇸' },
-  { key: 'ISAMRA', flag: '🇮🇳' }, { key: 'BMI', flag: '🇺🇸' }, { key: 'GEMA', flag: '🇩🇪' },
-  { key: 'MLC', flag: '🇺🇸' }, { key: 'IMRO', flag: '🇮🇪' }, { key: 'SOCAN', flag: '🇨🇦' },
+  'IPRS', 'PRS', 'ASCAP', 'PPL(INDIA)', 'PPL(UK)',
+  'SOUND EXCHANGE', 'ISAMRA', 'BMI', 'GEMA', 'MLC', 'IMRO', 'SOCAN',
 ];
 
 // GET /api/dashboard/stats
@@ -55,14 +52,55 @@ router.get('/stats', auth, async (req, res) => {
 
     let registeredCount = 0;
     let inProgressCount = 0;
+    let overdueCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const societyCountsMap = new Map();
+    SOCIETIES.forEach((society) => {
+      societyCountsMap.set(society, {
+        society,
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        overdue: 0,
+      });
+    });
+
     filteredRegs.forEach((reg) => {
       if (reg.societies) {
-        for (const [, entry] of reg.societies) {
-          if (entry.status === 'Registered') registeredCount++;
-          if (entry.status === 'In Progress') inProgressCount++;
+        for (const [society, entry] of reg.societies) {
+          const societyCounter = societyCountsMap.get(society);
+          if (entry.status === 'Registered') {
+            registeredCount++;
+            if (societyCounter) {
+              societyCounter.completed++;
+              societyCounter.total++;
+            }
+            continue;
+          }
+          if (entry.status === 'In Progress') {
+            const deadline = entry.deadline ? new Date(entry.deadline) : null;
+            if (deadline) deadline.setHours(0, 0, 0, 0);
+            if (deadline && deadline < today) {
+              overdueCount++;
+              if (societyCounter) {
+                societyCounter.overdue++;
+                societyCounter.total++;
+              }
+            } else {
+              inProgressCount++;
+              if (societyCounter) {
+                societyCounter.inProgress++;
+                societyCounter.total++;
+              }
+            }
+          }
         }
       }
     });
+    const societyTotalCount = registeredCount + inProgressCount + overdueCount;
+    const societyCounts = SOCIETIES.map((society) => societyCountsMap.get(society));
 
     /* ─── Sales Pipeline breakdown ─── */
     const pipelineStages = [
@@ -90,21 +128,6 @@ router.get('/stats', auth, async (req, res) => {
       count: onboarding.filter((e) => e.stage === s.stage).length,
     }));
 
-    /* ─── Society registration table (all 12 societies) ─── */
-    const societyFlags = {};
-    SOCIETIES.forEach((s) => { societyFlags[s.key] = s.flag; });
-
-    const societyData = filteredRegs.slice(0, 8).map((reg) => {
-      const societies = {};
-      for (const s of SOCIETIES) {
-        const entry = reg.societies?.get(s.key);
-        societies[s.key] = entry
-          ? (entry.status === 'Registered' ? 'done' : entry.status === 'In Progress' ? 'pending' : 'not-started')
-          : null;
-      }
-      return { member: reg.name, societies };
-    });
-
     /* ─── Recent leads (last 5) ─── */
     const recentLeads = leads
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
@@ -118,12 +141,13 @@ router.get('/stats', auth, async (req, res) => {
         onboardingCount,
         registeredCount,
         inProgressCount,
+        overdueCount,
+        societyTotalCount,
         totalMembers: members.length,
       },
       pipelineData,
       onboardingData,
-      societyData,
-      societyFlags,
+      societyCounts,
       recentLeads,
     });
   } catch (err) {

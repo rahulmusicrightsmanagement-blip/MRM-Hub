@@ -474,7 +474,7 @@ const Members = () => {
       try {
         const [membersRes, usersRes] = await Promise.all([
           authFetch('/api/members'),
-          authFetch('/api/users'),
+          authFetch('/api/users/team'),
         ]);
         const membersData = await membersRes.json();
         const usersData = await usersRes.json();

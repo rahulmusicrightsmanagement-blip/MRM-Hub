@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Plus, Search, Edit2, Trash2, X, Shield, UserCheck, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 const ROLE_META = {
   admin: { label: 'Admin', bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', avatar: '#7c3aed' },
@@ -26,7 +26,6 @@ const SpocManagement = () => {
   const [editUser, setEditUser] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const fetchUsers = async () => {
     try {
@@ -414,16 +413,24 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.name || !form.email) {
-      setError('Name and email are required');
+    if (!form.name && !form.email) {
+      setError('Please enter the member\'s name and email address.');
+      return;
+    }
+    if (!form.name) {
+      setError('Please enter the member\'s full name.');
+      return;
+    }
+    if (!form.email) {
+      setError('Please enter a valid email address.');
       return;
     }
     if (!isEdit && !form.password) {
-      setError('Password is required for new member');
+      setError('Please set a password for the new member.');
       return;
     }
     if (form.roles.length === 0) {
-      setError('At least one role must be selected');
+      setError('Please select at least one role for the member.');
       return;
     }
 
@@ -493,7 +500,8 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
         </div>
 
         {error && (
-          <div style={{ padding: '10px 14px', marginBottom: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', fontSize: '13px', color: '#f87171' }}>
+          <div style={{ padding: '12px 14px', marginBottom: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', fontSize: '13px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertCircle style={{ width: '16px', height: '16px', flexShrink: 0 }} />
             {error}
           </div>
         )}

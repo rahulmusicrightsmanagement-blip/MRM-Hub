@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Bell, X, Check, CheckCheck, Trash2 } from 'lucide-react';
 
 const NotificationPanel = () => {
   const { authFetch } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -89,6 +91,31 @@ const NotificationPanel = () => {
     general: '#9ca3af',
   };
 
+  const getNotificationRoute = (n) => {
+    const key = (n.relatedType || n.type || '').toLowerCase();
+    if (key.includes('society')) return '/society-reg';
+    if (key.includes('onboarding')) return '/onboarding';
+    if (key.includes('lead')) return '/sales-pipeline';
+    if (key.includes('task')) return '/tracker';
+    if (key.includes('royalty') || key.includes('music')) return '/royalty';
+    if (key.includes('member')) return '/members';
+    return '/';
+  };
+
+  const openNotification = async (n) => {
+    if (!n.read) await markRead(n._id);
+    setOpen(false);
+
+    const route = getNotificationRoute(n);
+    if (n.relatedId) {
+      const type = encodeURIComponent(n.relatedType || n.type || 'general');
+      const id = encodeURIComponent(n.relatedId);
+      navigate(`${route}?notifType=${type}&notifId=${id}`);
+      return;
+    }
+    navigate(route);
+  };
+
   return (
     <div ref={panelRef} style={{ position: 'relative' }}>
       {/* Bell Icon */}
@@ -162,6 +189,7 @@ const NotificationPanel = () => {
               notifications.map((n) => (
                 <div
                   key={n._id}
+                  onClick={() => openNotification(n)}
                   style={{
                     display: 'flex',
                     gap: '10px',
@@ -169,6 +197,7 @@ const NotificationPanel = () => {
                     borderBottom: '1px solid #1e2540',
                     backgroundColor: n.read ? 'transparent' : 'rgba(59, 130, 246, 0.05)',
                     alignItems: 'flex-start',
+                    cursor: 'pointer',
                   }}
                 >
                   {/* Dot */}
@@ -186,11 +215,11 @@ const NotificationPanel = () => {
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                     {!n.read && (
-                      <button onClick={() => markRead(n._id)} title="Mark read" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                      <button onClick={(e) => { e.stopPropagation(); markRead(n._id); }} title="Mark read" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                         <Check style={{ width: '14px', height: '14px' }} />
                       </button>
                     )}
-                    <button onClick={() => deleteNotif(n._id)} title="Delete" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                    <button onClick={(e) => { e.stopPropagation(); deleteNotif(n._id); }} title="Delete" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                       <Trash2 style={{ width: '14px', height: '14px' }} />
                     </button>
                   </div>

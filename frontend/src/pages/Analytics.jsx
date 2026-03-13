@@ -1,220 +1,273 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-/* ── Ring Chart Component ── */
-const RingChart = ({ value, color, size = 72 }) => {
-  const strokeWidth = 5;
-  const radius = (size - strokeWidth * 2) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const total = Math.max(value, 1);
-  const offset = circumference * (1 - value / total);
-  return (
-    <div style={{ position: 'relative', width: size, height: size }}>
-      <svg width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#1e2540" strokeWidth={strokeWidth} />
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
-          strokeDasharray={circumference} strokeDashoffset={value === 0 ? circumference : circumference * 0.15} strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      </svg>
-      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '18px', fontWeight: 700 }}>
-        {value}
-      </span>
-    </div>
-  );
+const cardStyle = {
+  background: '#141720',
+  border: '1px solid #1e2540',
+  borderRadius: '12px',
+  padding: '20px',
 };
 
-/* ── Main ── */
+const labelStyle = {
+  fontSize: '12px',
+  color: '#9ca3af',
+  marginBottom: '6px',
+  display: 'block',
+  fontWeight: 600,
+};
+
+const selectStyle = {
+  background: '#1a1f2e',
+  border: '1px solid #2a3050',
+  color: '#fff',
+  borderRadius: '8px',
+  padding: '9px 12px',
+  fontSize: '13px',
+  minWidth: '180px',
+};
+
+const dateInputStyle = {
+  ...selectStyle,
+  minWidth: '170px',
+};
+
+const downloadExcel = (title, rows, headers, meta = {}) => {
+  const exportRows = rows.map((row) => {
+    const out = {};
+    headers.forEach((header) => {
+      out[header.label] = row[header.key];
+    });
+    return out;
+  });
+
+  const metaRows = Object.entries(meta)
+    .filter(([, value]) => value !== undefined && value !== '')
+    .map(([key, value]) => ({ [headers[0].label]: key, [headers[1].label]: value }));
+
+  const worksheet = XLSX.utils.json_to_sheet([]);
+  XLSX.utils.sheet_add_aoa(worksheet, [[title]], { origin: 'A1' });
+  if (metaRows.length) {
+    XLSX.utils.sheet_add_json(worksheet, metaRows, { origin: 'A3', skipHeader: false });
+    XLSX.utils.sheet_add_json(worksheet, exportRows, { origin: `A${metaRows.length + 6}`, skipHeader: false });
+  } else {
+    XLSX.utils.sheet_add_json(worksheet, exportRows, { origin: 'A3', skipHeader: false });
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Report');
+  XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}.xlsx`);
+};
+
+const downloadPdf = (title, rows, headers, meta = {}) => {
+  const doc = new jsPDF();
+  doc.setFontSize(14);
+  doc.text(title, 14, 16);
+
+  let currentY = 24;
+  Object.entries(meta)
+    .filter(([, value]) => value !== undefined && value !== '')
+    .forEach(([key, value]) => {
+      doc.setFontSize(10);
+      doc.text(`${key}: ${value}`, 14, currentY);
+      currentY += 6;
+    });
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [[headers[0].label, headers[1].label]],
+    body: rows.map((r) => [String(r[headers[0].key]), String(r[headers[1].key])]),
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [30, 37, 64] },
+  });
+  doc.save(`${title.replace(/\s+/g, '_')}.pdf`);
+};
+
+const MetricRow = ({ label, value, color }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid #1e2540' }}>
+    <span style={{ color: '#d1d5db', fontSize: '13px', fontWeight: 600 }}>{label}</span>
+    <span style={{ color, fontSize: '16px', fontWeight: 800, textAlign: 'right' }}>{value}</span>
+  </div>
+);
+
+const ReportCard = ({ title, rows, headers, meta }) => (
+  <div style={cardStyle}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          onClick={() => downloadExcel(title, rows, headers, meta)}
+          style={{ background: '#1e2540', border: '1px solid #334155', color: '#c7d2fe', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Download size={13} /> Excel
+        </button>
+        <button
+          onClick={() => downloadPdf(title, rows, headers, meta)}
+          style={{ background: '#1e2540', border: '1px solid #334155', color: '#c7d2fe', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Download size={13} /> PDF
+        </button>
+      </div>
+    </div>
+
+    <div style={{ borderTop: '1px solid #1e2540' }}>
+      {rows.map((row, idx) => (
+        <MetricRow
+          key={row[headers[0].key]}
+          label={row[headers[0].key]}
+          value={row[headers[1].key]}
+          color={idx === 0 ? '#93c5fd' : idx === 1 ? '#86efac' : idx === 2 ? '#fde047' : '#fca5a5'}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+const SkeletonCard = ({ title }) => (
+  <div style={cardStyle}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
+    </div>
+    <div style={{ borderTop: '1px solid #1e2540' }}>
+      {[1, 2, 3, 4].map((n) => (
+        <div key={n} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid #1e2540' }}>
+          <div style={{ height: '16px', width: '60%', borderRadius: '6px', background: '#1e2540' }} />
+          <div style={{ height: '16px', width: '32px', justifySelf: 'end', borderRadius: '6px', background: '#1e2540' }} />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const Analytics = () => {
   const { authFetch } = useAuth();
-  const [activeTab, setActiveTab] = useState('Dashboards');
-  const tabs = ['Dashboards', 'Reports', 'Notifications'];
-
-  const [pipelineData, setPipelineData] = useState([]);
-  const [societyData, setSocietyData] = useState([]);
-  // const [worksStatusData, setWorksStatusData] = useState([]);
-  const [onboardingData, setOnboardingData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [societyLoading, setSocietyLoading] = useState(true);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [society, setSociety] = useState('IPRS');
+  const [societyOptions, setSocietyOptions] = useState([]);
+  const [salesReport, setSalesReport] = useState({ total: 0, completed: 0, inProgress: 0, overdue: 0 });
+  const [onboardingReport, setOnboardingReport] = useState({ total: 0, completed: 0, inProgress: 0, overdue: 0 });
+  const [societyReport, setSocietyReport] = useState({ society: 'IPRS', total: 0, completed: 0, inProgress: 0, overdue: 0 });
+  const [musicWorkReport, setMusicWorkReport] = useState({ totalWorks: 0, totalSongs: 0, totalBGMMovies: 0, totalTVBGM: 0, totalTVBGMEpisode: 0 });
 
-  const reportsData = [
-    { name: 'Monthly Royalty Summary', date: 'Feb 2026', type: 'Royalties' },
-    { name: 'Society Registration Status', date: 'Feb 2026', type: 'Registration' },
-    { name: 'Pipeline Conversion Report', date: 'Jan 2026', type: 'Sales' },
-    { name: 'KYC Compliance Report', date: 'Jan 2026', type: 'Compliance' },
-    { name: 'Quarterly Works Audit', date: 'Q4 2025', type: 'Audit' },
-  ];
-
-  const [notifications, setNotifications] = useState([]);
+  const selectedRangeLabel = startDate || endDate
+    ? `${startDate || 'Beginning'} to ${endDate || 'Today'}`
+    : 'All Time';
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchReports = async () => {
+      setLoading(true);
       try {
-        const res = await authFetch('/api/analytics');
-        if (res.ok) {
-          const data = await res.json();
-          setPipelineData(data.pipelineData || []);
-          setSocietyData(data.societyData || []);
-          // setWorksStatusData(data.worksStatusData || []);
-          setOnboardingData(data.onboardingData || []);
-        }
+        const params = new URLSearchParams({ society, startDate, endDate });
+        const res = await authFetch(`/api/analytics?${params.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch reports');
+        const data = await res.json();
+
+        setSocietyOptions(data.filters?.societyOptions || []);
+        setSalesReport(data.salesReport || { total: 0, completed: 0, inProgress: 0, overdue: 0 });
+        setOnboardingReport(data.onboardingReport || { total: 0, completed: 0, inProgress: 0, overdue: 0 });
+        setSocietyReport(data.societyReport || { society, total: 0, completed: 0, inProgress: 0, overdue: 0 });
+        setMusicWorkReport(data.musicWorkReport || { totalWorks: 0, totalSongs: 0, totalBGMMovies: 0, totalTVBGM: 0, totalTVBGMEpisode: 0 });
       } catch (err) {
-        console.error('Failed to fetch analytics:', err);
+        console.error(err);
       } finally {
         setLoading(false);
+        setSocietyLoading(false);
       }
     };
-    fetchAnalytics();
-  }, [authFetch]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const maxOnboarding = Math.max(...onboardingData.map((d) => d.value), 1);
+    fetchReports();
+  }, [authFetch, startDate, endDate]);
 
-  const cardStyle = {
-    background: '#141720',
-    border: '1px solid #1e2540',
-    borderRadius: '12px',
-    padding: '24px',
-  };
+  useEffect(() => {
+    const fetchSocietyReport = async () => {
+      setSocietyLoading(true);
+      try {
+        const params = new URLSearchParams({ society, startDate, endDate });
+        const res = await authFetch(`/api/analytics/society-report?${params.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch society report');
+        const data = await res.json();
+        setSocietyOptions(data.filters?.societyOptions || []);
+        setSocietyReport(data.societyReport || { society, total: 0, completed: 0, inProgress: 0, overdue: 0 });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSocietyLoading(false);
+      }
+    };
+
+    fetchSocietyReport();
+  }, [authFetch, society, startDate, endDate]);
+
+  const salesRows = useMemo(() => [
+    { status: 'Total', count: salesReport.total },
+    { status: 'Completed', count: salesReport.completed },
+    { status: 'In Progress', count: salesReport.inProgress },
+    { status: 'Overdue', count: salesReport.overdue },
+  ], [salesReport]);
+
+  const onboardingRows = useMemo(() => [
+    { status: 'Total', count: onboardingReport.total },
+    { status: 'Completed', count: onboardingReport.completed },
+    { status: 'In Progress', count: onboardingReport.inProgress },
+    { status: 'Overdue', count: onboardingReport.overdue },
+  ], [onboardingReport]);
+
+  const societyRows = useMemo(() => [
+    { status: 'Total', count: societyReport.total },
+    { status: 'Completed', count: societyReport.completed },
+    { status: 'In Progress', count: societyReport.inProgress },
+    { status: 'Overdue', count: societyReport.overdue },
+  ], [societyReport]);
+
+  const musicRows = useMemo(() => [
+    { workType: 'Total Works', count: musicWorkReport.totalWorks },
+    { workType: 'Total Songs', count: musicWorkReport.totalSongs },
+    { workType: 'Total BGM Movies', count: musicWorkReport.totalBGMMovies },
+    { workType: 'Total TV BGM', count: musicWorkReport.totalTVBGM },
+    { workType: 'Total TV BGM Episodes', count: musicWorkReport.totalTVBGMEpisode },
+  ], [musicWorkReport]);
 
   return (
     <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>Analytics</h1>
-        <p style={{ color: '#8892b0', fontSize: '14px', margin: '4px 0 0' }}>Dashboards, reports, and notifications</p>
+      <div style={{ marginBottom: '20px' }}>
+        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>Reports</h1>
+        <p style={{ color: '#9ca3af', fontSize: '14px', margin: '4px 0 0' }}>Monthly or all-time downloadable reports (Excel / PDF)</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', background: '#141720', borderRadius: '8px', padding: '3px', marginBottom: '24px', width: 'fit-content' }}>
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setActiveTab(t)}
-            style={{
-              padding: '8px 18px', borderRadius: '6px', border: 'none',
-              background: activeTab === t ? '#1e2540' : 'transparent',
-              color: activeTab === t ? '#fff' : '#8892b0',
-              fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-            {t}
-            {t === 'Notifications' && unreadCount > 0 && (
-              <span style={{ background: '#ef4444', color: '#fff', padding: '1px 7px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600 }}>{unreadCount}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Dashboards Tab */}
-      {activeTab === 'Dashboards' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-
-          {/* Pipeline Conversion Funnel */}
-          <div style={cardStyle}>
-            <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 24px' }}>Pipeline Conversion Funnel</h3>
-            {pipelineData.length === 0 && !loading ? (
-              <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', padding: '40px 0' }}>No pipeline data yet</p>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '140px', paddingBottom: '0' }}>
-                {pipelineData.map((d) => {
-                  const maxVal = Math.max(...pipelineData.map((x) => x.value), 1);
-                  const barH = (d.value / maxVal) * 100;
-                  return (
-                    <div key={d.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flex: 1 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100px' }}>
-                        <div style={{ width: '40px', height: `${barH}%`, background: d.color, borderRadius: '4px 4px 0 0', minHeight: '8px', transition: 'height 0.3s' }} />
-                      </div>
-                      <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>{d.value}</span>
-                      <span style={{ color: '#6b7280', fontSize: '12px' }}>{d.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Registrations by Society */}
-          <div style={cardStyle}>
-            <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 24px' }}>Registrations by Society</h3>
-            {societyData.length === 0 && !loading ? (
-              <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', padding: '40px 0' }}>No registration data yet</p>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '140px' }}>
-                {societyData.map((d) => {
-                  const maxVal = Math.max(...societyData.map((x) => x.value), 1);
-                  const barH = (d.value / maxVal) * 100;
-                  return (
-                    <div key={d.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flex: 1 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100px' }}>
-                        <div style={{ width: '36px', height: `${barH}%`, background: d.color, borderRadius: '4px 4px 0 0', minHeight: '8px', transition: 'height 0.3s' }} />
-                      </div>
-                      <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>{d.value}</span>
-                      <span style={{ color: '#6b7280', fontSize: '12px' }}>{d.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Monthly Onboarding Trend */}
-          <div style={cardStyle}>
-            <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: '0 0 24px' }}>Monthly Onboarding Trend</h3>
-            {onboardingData.length === 0 && !loading ? (
-              <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', padding: '40px 0' }}>No onboarding data yet</p>
-            ) : (
-              <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '140px' }}>
-                {onboardingData.map((d) => {
-                  const barH = maxOnboarding > 0 ? (d.value / maxOnboarding) * 100 : 0;
-                  return (
-                    <div key={d.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flex: 1 }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100px' }}>
-                        <div style={{ width: '36px', height: `${barH}%`, background: 'linear-gradient(180deg, #c084fc, #ec4899)', borderRadius: '4px 4px 0 0', minHeight: '8px', transition: 'height 0.3s' }} />
-                      </div>
-                      <span style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>{d.value}</span>
-                      <span style={{ color: '#6b7280', fontSize: '12px' }}>{d.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+      <div style={{ ...cardStyle, marginBottom: '18px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'end' }}>
+        <div>
+          <label style={labelStyle}>Start Date</label>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={dateInputStyle} />
         </div>
-      )}
 
-      {/* Reports Tab */}
-      {activeTab === 'Reports' && (
-        <div style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', padding: '14px 20px', borderBottom: '1px solid #1e2540' }}>
-            {['Report Name', 'Period', 'Type'].map((h) => (
-              <span key={h} style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</span>
+        <div>
+          <label style={labelStyle}>End Date</label>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={dateInputStyle} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Society (for Society Report)</label>
+          <select value={society} onChange={(e) => setSociety(e.target.value)} style={selectStyle}>
+            {societyOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
             ))}
-          </div>
-          {reportsData.map((r, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', padding: '14px 20px', borderBottom: '1px solid #1e2540', alignItems: 'center', transition: 'background 0.15s' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#1a1f30')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 500 }}>{r.name}</span>
-              <span style={{ color: '#8892b0', fontSize: '13px' }}>{r.date}</span>
-              <span style={{ background: '#1e2540', color: '#8892b0', padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 500, width: 'fit-content' }}>{r.type}</span>
-            </div>
-          ))}
+          </select>
         </div>
-      )}
+      </div>
 
-      {/* Notifications Tab */}
-      {activeTab === 'Notifications' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {notifications.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', padding: '48px 0' }}>No notifications.</div>
-          ) : (
-            notifications.map((n) => (
-              <div key={n.id} style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '10px', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {!n.read && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
-                <div style={{ flex: 1 }}>
-                  <p style={{ color: '#fff', fontSize: '14px', fontWeight: 500, margin: 0 }}>{n.text}</p>
-                  <span style={{ color: '#6b7280', fontSize: '12px' }}>{n.time}</span>
-                </div>
-              </div>
-            ))
-          )}
+      {loading ? (
+        <div style={{ ...cardStyle, color: '#9ca3af', fontSize: '14px', textAlign: 'center' }}>Loading reports...</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+          {societyLoading ? <SkeletonCard title={`${society} Society Report`} /> : <ReportCard title={`${societyReport.society} Society Report`} rows={societyRows} headers={[{ key: 'status', label: 'Status' }, { key: 'count', label: 'Count' }]} meta={{ Range: selectedRangeLabel, Society: societyReport.society, Generated: new Date().toLocaleDateString() }} />}
+          <ReportCard title="Sales Report" rows={salesRows} headers={[{ key: 'status', label: 'Status' }, { key: 'count', label: 'Count' }]} meta={{ Range: selectedRangeLabel, Report: 'Sales', Generated: new Date().toLocaleDateString() }} />
+          <ReportCard title="Onboarding Report" rows={onboardingRows} headers={[{ key: 'status', label: 'Status' }, { key: 'count', label: 'Count' }]} meta={{ Range: selectedRangeLabel, Report: 'Onboarding', Generated: new Date().toLocaleDateString() }} />
+          <ReportCard title="Music Works Report" rows={musicRows} headers={[{ key: 'workType', label: 'Work Type' }, { key: 'count', label: 'Count' }]} meta={{ Range: selectedRangeLabel, Report: 'Music Works', Generated: new Date().toLocaleDateString() }} />
         </div>
       )}
     </div>

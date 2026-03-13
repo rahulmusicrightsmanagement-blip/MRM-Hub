@@ -60,28 +60,9 @@ router.get('/', auth, async (req, res) => {
   try {
     const registrations = await SocietyRegistration.find().sort({ createdAt: -1 });
 
-    // RBAC: non-full-access users see only registrations where they are an assignee
-    let filtered = registrations;
-    if (!req.user.isFullAccess()) {
-      const userName = req.user.name;
-      filtered = registrations.filter((reg) => {
-        // Check if this user is an assignee in any society
-        if (reg.assignees) {
-          for (const [, assignee] of reg.assignees) {
-            if (assignee && assignee.name === userName) return true;
-          }
-        }
-        // Also check per-society entry assignees
-        if (reg.societies) {
-          for (const [, entry] of reg.societies) {
-            if (entry && entry.assignee && entry.assignee.name === userName) return true;
-          }
-        }
-        return false;
-      });
-    }
-
-    res.json({ registrations: filtered });
+    // View access: all authenticated users can see all registrations.
+    // Edit access is controlled on write endpoints (steps/remarks/upload, etc.).
+    res.json({ registrations });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -172,6 +153,7 @@ router.put('/:id', auth, async (req, res) => {
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
     const { society, status, assignee, deadline } = req.body;
+
     if (society && status) {
       const existing = reg.societies.get(society);
       const existingObj = existing ? existing.toObject() : {};
@@ -268,6 +250,14 @@ router.put('/:id/steps', auth, async (req, res) => {
     const entry = reg.societies.get(society);
     if (!entry) return res.status(404).json({ message: 'Society entry not found' });
 
+    // RBAC: only the assigned SPOC or an admin can edit steps
+    if (!req.user.hasRole('admin')) {
+      const assigneeName = entry.assignee?.name || '';
+      if (!assigneeName || assigneeName !== req.user.name) {
+        return res.status(403).json({ message: 'You are not assigned to this task' });
+      }
+    }
+
     const entryObj = entry.toObject();
     const currentSteps = entryObj.steps || {};
     const updatedSteps = { ...currentSteps, ...steps };
@@ -297,6 +287,14 @@ router.post('/:id/remarks', auth, async (req, res) => {
     const entry = reg.societies.get(society);
     if (!entry) return res.status(404).json({ message: 'Society entry not found' });
 
+    // RBAC: only the assigned SPOC or an admin can add remarks
+    if (!req.user.hasRole('admin')) {
+      const assigneeName = entry.assignee?.name || '';
+      if (!assigneeName || assigneeName !== req.user.name) {
+        return res.status(403).json({ message: 'You are not assigned to this task' });
+      }
+    }
+
     const entryObj = entry.toObject();
     const remarks = entryObj.remarks || [];
     remarks.push({ text, createdAt: new Date() });
@@ -323,6 +321,14 @@ router.delete('/:id/remarks', auth, async (req, res) => {
     const entry = reg.societies.get(society);
     if (!entry) return res.status(404).json({ message: 'Society entry not found' });
 
+    // RBAC: only the assigned SPOC or an admin can delete remarks
+    if (!req.user.hasRole('admin')) {
+      const assigneeName = entry.assignee?.name || '';
+      if (!assigneeName || assigneeName !== req.user.name) {
+        return res.status(403).json({ message: 'You are not assigned to this task' });
+      }
+    }
+
     const entryObj = entry.toObject();
     entryObj.remarks = (entryObj.remarks || []).filter((r) => r._id.toString() !== remarkId);
     reg.societies.set(society, entryObj);
@@ -347,6 +353,14 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
 
     const entry = reg.societies.get(society);
     if (!entry) return res.status(404).json({ message: 'Society entry not found' });
+
+    // RBAC: only the assigned SPOC or an admin can upload documents
+    if (!req.user.hasRole('admin')) {
+      const assigneeName = entry.assignee?.name || '';
+      if (!assigneeName || assigneeName !== req.user.name) {
+        return res.status(403).json({ message: 'You are not assigned to this task' });
+      }
+    }
 
     // Upload to Google Drive
     const driveResult = await uploadFile(req.file, `SocietyReg_${reg.name}_${society}`);

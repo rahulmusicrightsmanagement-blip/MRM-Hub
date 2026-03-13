@@ -66,9 +66,9 @@ router.get('/', auth, async (req, res) => {
 
     const entries = await OnboardingEntry.find().sort({ createdAt: -1 });
 
-    // RBAC: non-full-access users see only their assigned entries
+    // RBAC: only admins see all entries; everyone else sees only their assigned (SPOC) entries
     let filtered = entries;
-    if (!req.user.isFullAccess()) {
+    if (!req.user.hasRole('admin')) {
       filtered = entries.filter((e) => e.spoc === req.user.name);
     }
 

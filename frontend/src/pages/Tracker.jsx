@@ -709,10 +709,10 @@ const Tracker = () => {
   /* ── Fetch team members ── */
   const fetchTeamMembers = useCallback(async () => {
     try {
-      const res = await authFetch(`${API}/users`);
+      const res = await authFetch(`${API}/users/team`);
       if (res.ok) {
         const data = await res.json();
-        const members = (data.users || []).filter((u) => u.isActive).map((u, i) => ({
+        const members = (data.users || []).map((u, i) => ({
           ...u,
           color: SPOC_COLORS[i % SPOC_COLORS.length],
         }));

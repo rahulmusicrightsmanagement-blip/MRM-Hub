@@ -1342,7 +1342,7 @@ const Onboarding = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [entriesRes, usersRes, membersRes] = await Promise.all([authFetch('/api/onboarding'), authFetch('/api/users'), authFetch('/api/members')]);
+        const [entriesRes, usersRes, membersRes] = await Promise.all([authFetch('/api/onboarding'), authFetch('/api/users/team'), authFetch('/api/members')]);
         const entriesData = await entriesRes.json();
         const usersData = await usersRes.json();
         const membersData = await membersRes.json();

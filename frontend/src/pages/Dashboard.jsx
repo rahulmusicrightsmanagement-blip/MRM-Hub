@@ -9,8 +9,6 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
-  Circle,
-  Minus,
   Activity,
 } from 'lucide-react';
 
@@ -20,19 +18,6 @@ const cardStyle = {
   border: '1px solid #1e2540',
   borderRadius: '14px',
   padding: '24px',
-};
-
-const StatusIcon = ({ status }) => {
-  switch (status) {
-    case 'done':
-      return <CheckCircle2 style={{ width: '16px', height: '16px', color: '#34d399' }} />;
-    case 'pending':
-      return <Clock style={{ width: '16px', height: '16px', color: '#eab308' }} />;
-    case 'not-started':
-      return <Circle style={{ width: '16px', height: '16px', color: '#6b7280' }} />;
-    default:
-      return <Minus style={{ width: '16px', height: '16px', color: '#374151' }} />;
-  }
 };
 
 const ViewAllBtn = ({ onClick }) => (
@@ -62,12 +47,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     activeMembers: 0, totalLeads: 0, onboardingCount: 0,
-    totalWorks: 0, registeredCount: 0, inProgressCount: 0, totalMembers: 0,
+    totalWorks: 0, registeredCount: 0, inProgressCount: 0, overdueCount: 0, societyTotalCount: 0, totalMembers: 0,
   });
   const [pipelineData, setPipelineData] = useState([]);
   const [onboardingData, setOnboardingData] = useState([]);
-  const [societyData, setSocietyData] = useState([]);
-  const [societyFlags, setSocietyFlags] = useState({});
+  const [societyCounts, setSocietyCounts] = useState([]);
   const [recentLeads, setRecentLeads] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -80,8 +64,7 @@ const Dashboard = () => {
           setStats(data.stats);
           setPipelineData(data.pipelineData || []);
           setOnboardingData(data.onboardingData || []);
-          setSocietyData(data.societyData || []);
-          setSocietyFlags(data.societyFlags || {});
+          setSocietyCounts(data.societyCounts || []);
           setRecentLeads(data.recentLeads || []);
         }
       } catch (err) {
@@ -239,55 +222,34 @@ const Dashboard = () => {
             <ViewAllBtn onClick={() => navigate('/society-reg')} />
           </div>
 
-          {/* Summary badges */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <CheckCircle2 style={{ width: '14px', height: '14px', color: '#34d399' }} />
-              <span style={{ color: '#9ca3af' }}>Registered:</span>
-              <span style={{ color: 'white', fontWeight: 600 }}>{stats.registeredCount}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <Clock style={{ width: '14px', height: '14px', color: '#eab308' }} />
-              <span style={{ color: '#9ca3af' }}>In Progress:</span>
-              <span style={{ color: 'white', fontWeight: 600 }}>{stats.inProgressCount}</span>
-            </div>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
+          <div
+            onClick={() => navigate('/society-reg')}
+            style={{ border: '1px solid #1e2540', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer' }}
+          >
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #1e2540' }}>
-                  <th style={{ textAlign: 'left', fontSize: '11px', fontWeight: 600, color: '#6b7280', paddingBottom: '12px', paddingRight: '12px' }}>Member</th>
-                  {Object.keys(societyFlags).map((soc) => (
-                    <th key={soc} style={{ textAlign: 'center', fontSize: '9px', fontWeight: 600, color: '#6b7280', paddingBottom: '12px', paddingLeft: '3px', paddingRight: '3px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <span style={{ fontSize: '13px' }}>{societyFlags[soc]}</span>
-                        <span>{soc}</span>
-                      </div>
-                    </th>
-                  ))}
+                <tr style={{ backgroundColor: '#12172b', borderBottom: '1px solid #1e2540' }}>
+                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '11px', color: '#6b7280', letterSpacing: '0.4px' }}>Society</th>
+                  <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '11px', color: '#6b7280', letterSpacing: '0.4px' }}>Total</th>
+                  <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '11px', color: '#6b7280', letterSpacing: '0.4px' }}>Completed</th>
+                  <th style={{ textAlign: 'right', padding: '10px 8px', fontSize: '11px', color: '#6b7280', letterSpacing: '0.4px' }}>In Progress</th>
+                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '11px', color: '#6b7280', letterSpacing: '0.4px' }}>Overdue</th>
                 </tr>
               </thead>
               <tbody>
-                {societyData.map((row, idx) => (
-                  <tr key={row.member} style={{ borderBottom: idx < societyData.length - 1 ? '1px solid #1a1f35' : 'none', cursor: 'pointer' }}
-                    onClick={() => navigate('/society-reg')}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1a1f35'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}>
-                    <td style={{ padding: '10px 12px 10px 0', fontSize: '13px', color: '#e5e7eb', fontWeight: 500, whiteSpace: 'nowrap' }}>{row.member}</td>
-                    {Object.keys(societyFlags).map((soc) => (
-                      <td key={soc} style={{ padding: '10px 3px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <StatusIcon status={row.societies[soc]} />
-                        </div>
-                      </td>
-                    ))}
+                {societyCounts.map((item, index) => (
+                  <tr key={item.society} style={{ borderBottom: index < societyCounts.length - 1 ? '1px solid #1e2540' : 'none' }}>
+                    <td style={{ padding: '10px 14px', fontSize: '12px', color: '#d1d5db', fontWeight: 600 }}>{item.society}</td>
+                    <td style={{ padding: '10px 8px', textAlign: 'right', fontSize: '13px', color: '#93c5fd', fontWeight: 700 }}>{item.total}</td>
+                    <td style={{ padding: '10px 8px', textAlign: 'right', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>{item.completed}</td>
+                    <td style={{ padding: '10px 8px', textAlign: 'right', fontSize: '13px', color: '#fde047', fontWeight: 700 }}>{item.inProgress}</td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>{item.overdue}</td>
                   </tr>
                 ))}
-                {societyData.length === 0 && (
+                {societyCounts.length === 0 && (
                   <tr>
-                    <td colSpan={Object.keys(societyFlags).length + 1} style={{ padding: '30px 0', textAlign: 'center', fontSize: '13px', color: '#6b7280' }}>
-                      No registrations yet
+                    <td colSpan={5} style={{ padding: '16px 14px', textAlign: 'center', fontSize: '13px', color: '#6b7280' }}>
+                      No society data
                     </td>
                   </tr>
                 )}

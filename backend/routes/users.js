@@ -10,6 +10,17 @@ router.get('/roles', auth, (req, res) => {
   res.json({ roles: VALID_ROLES });
 });
 
+// GET /api/users/team — lightweight list of team member names (all authenticated users)
+router.get('/team', auth, async (req, res) => {
+  try {
+    const users = await User.find({ isActive: true }).select('name _id roles').sort({ name: 1 });
+    res.json({ users });
+  } catch (err) {
+    console.error('Team endpoint error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/users — list all SPOCs (admin & lead only)
 router.get('/', auth, fullAccessOnly, async (req, res) => {
   try {
