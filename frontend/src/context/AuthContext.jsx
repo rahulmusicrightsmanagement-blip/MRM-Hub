@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import { withApiBase } from '../utils/api';
 
 const AuthContext = createContext(null);
-
-const API = '/api';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -15,7 +14,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       return;
     }
-    fetch(`${API}/auth/me`, {
+    fetch(withApiBase('/api/auth/me'), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
@@ -35,7 +34,7 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (email, password) => {
-    const res = await fetch(`${API}/auth/login`, {
+    const res = await fetch(withApiBase('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -61,7 +60,7 @@ export const AuthProvider = ({ children }) => {
       ...(options.headers || {}),
     };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(url, { ...options, headers });
+    const res = await fetch(withApiBase(url), { ...options, headers });
     if (res.status === 401) {
       // Token expired or account deactivated
       logout();

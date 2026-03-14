@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { withApiBase } from '../utils/api';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -98,7 +99,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
       fd.append('file', stagedFile);
       fd.append('year', String(year));
       fd.append('month', month);
-      const res = await fetch(`/api/royalty/${clientId}/upload`, {
+      const res = await fetch(withApiBase(`/api/royalty/${clientId}/upload`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -412,7 +413,7 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
     try {
       const fd = new FormData();
       fd.append('file', stagedDocFile);
-      const res = await fetch(`/api/royalty/${client._id}/upload-document`, {
+      const res = await fetch(withApiBase(`/api/royalty/${client._id}/upload-document`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,

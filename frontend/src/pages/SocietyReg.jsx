@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 /* ─── 12 Collecting Societies ─── */
@@ -107,7 +108,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
       const fd = new FormData();
       fd.append('file', file);
       fd.append('society', societyKey);
-      const res = await fetch(`/api/societyregs/${regId}/upload`, {
+      const res = await fetch(withApiBase(`/api/societyregs/${regId}/upload`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 /* ─── Constants ─── */
@@ -264,7 +265,7 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(`/api/onboarding/${entry._id}/documents/${docId}/upload`, {
+      const res = await fetch(withApiBase(`/api/onboarding/${entry._id}/documents/${docId}/upload`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -455,7 +456,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(`/api/onboarding/${entry._id}/contract/upload`, {
+      const res = await fetch(withApiBase(`/api/onboarding/${entry._id}/contract/upload`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
