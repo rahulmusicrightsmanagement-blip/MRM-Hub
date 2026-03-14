@@ -393,7 +393,7 @@ router.post('/:id/documents/:docId/upload', auth, upload.single('file'), async (
     // Build descriptive file name: "Member Name - Doc Label.ext"
     const ext = require('path').extname(req.file.originalname);
     const driveName = `${entry.name} - ${doc.label}${ext}`;
-    const gfile = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName);
+    const gfile = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName, { subFolder: 'Onboarding' });
     doc.fileUrl = gfile.webViewLink;
     doc.fileName = gfile.fileName;
     doc.gdriveFileId = gfile.fileId;
@@ -428,7 +428,7 @@ router.post('/:id/contract/upload', auth, upload.single('file'), async (req, res
     // Build descriptive file name: "Member Name - Contract.ext"
     const ext = require('path').extname(req.file.originalname);
     const driveName = `${entry.name} - Contract${ext}`;
-    const gfile = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName);
+    const gfile = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName, { subFolder: 'Onboarding' });
     entry.contractFileUrl = gfile.webViewLink;
     entry.contractFileName = gfile.fileName;
     entry.contractGdriveFileId = gfile.fileId;

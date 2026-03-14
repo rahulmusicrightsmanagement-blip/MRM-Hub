@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const Royalty = require('../models/Royalty');
 const { auth } = require('../middleware/auth');
-const { uploadFile } = require('../utils/gdrive');
+const { uploadFileMusic } = require('../utils/gdrive');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -132,8 +132,8 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
     const yearEntry = client.years.find((y) => y.year === Number(year));
     if (!yearEntry) return res.status(404).json({ message: `Year ${year} not found` });
 
-    // Upload to Google Drive
-    const driveResult = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, `Royalty_${client.clientName}_${year}_${month}`);
+    // Upload to Music Drive (separate GDrive account)
+    const driveResult = await uploadFileMusic(req.file.buffer, req.file.originalname, req.file.mimetype, `Royalty_${client.clientName}_${year}_${month}`);
 
     const existing = yearEntry.months.get(month);
     const existingObj = existing ? existing.toObject() : {};
@@ -159,7 +159,7 @@ router.post('/:id/upload-document', auth, upload.single('file'), async (req, res
     if (!client) return res.status(404).json({ message: 'Client not found' });
     if (!req.file) return res.status(400).json({ message: 'No file provided' });
 
-    const driveResult = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, `Documents_${client.clientName}`);
+    const driveResult = await uploadFileMusic(req.file.buffer, req.file.originalname, req.file.mimetype, `Documents_${client.clientName}`);
 
     client.documentFileName = req.file.originalname;
     client.documentFileUrl = driveResult.webViewLink || '';

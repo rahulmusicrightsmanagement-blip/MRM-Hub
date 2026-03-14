@@ -362,13 +362,14 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
       }
     }
 
-    // Upload to Google Drive
-    const driveResult = await uploadFile(req.file, `SocietyReg_${reg.name}_${society}`);
+    // Upload to Google Drive → Society sub-folder
+    const driveName = `SocietyReg_${reg.name}_${society}`;
+    const driveResult = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName, { subFolder: 'Society' });
     const entryObj = entry.toObject();
     const steps = entryObj.steps || {};
     steps.applicationSentFileUrl = driveResult.webViewLink || '';
     steps.applicationSentFileName = req.file.originalname;
-    steps.applicationSentGdriveFileId = driveResult.id || '';
+    steps.applicationSentGdriveFileId = driveResult.fileId || '';
 
     reg.societies.set(society, { ...entryObj, steps });
 
