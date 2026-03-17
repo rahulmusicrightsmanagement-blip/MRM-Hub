@@ -478,7 +478,6 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
         justifyContent: 'center',
         zIndex: 1000,
       }}
-      onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
