@@ -1237,7 +1237,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
             </div>
           )}
 
-          {/* Row 1 — secondary: Move to Stage + Not Qualified */}}
+          {/* Row 1 — secondary: Move to Stage + Not Qualified */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ position: 'relative' }}>
               <button onClick={() => setShowMoveStage(!showMoveStage)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>

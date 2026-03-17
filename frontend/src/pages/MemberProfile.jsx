@@ -44,7 +44,6 @@ const stageColors = {
   'Active Member': { bg: '#065f46', text: '#34d399' },
   'Contact Made': { bg: '#374151', text: '#9ca3af' },
   Completed: { bg: '#065f46', text: '#34d399' },
-  'Not Qualified': { bg: '#7f1d1d', text: '#f87171' },
   'Under Review': { bg: '#713f12', text: '#fbbf24' },
 };
 
