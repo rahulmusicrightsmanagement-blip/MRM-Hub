@@ -150,7 +150,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
 
             <div style={{ marginBottom: '20px' }}>
               <label style={LABEL}>Deadline</label>
-              <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+              <input style={INPUT} type="date" min="2000-01-01" max="2099-12-31" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
             </div>
 
             <div style={{ marginBottom: '28px' }}>
@@ -183,7 +183,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
 
             <div style={{ marginBottom: '28px' }}>
               <label style={LABEL}>Deadline</label>
-              <input style={INPUT} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
+              <input style={INPUT} type="date" min="2000-01-01" max="2099-12-31" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
             </div>
           </>
         )}
@@ -343,6 +343,7 @@ const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
           <label style={LABEL}>Deadline</label>
           <input
             type="date"
+            min="2000-01-01" max="2099-12-31"
             style={{ ...INPUT, cursor: 'pointer', colorScheme: 'dark' }}
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
@@ -487,6 +488,7 @@ const LeadDetailModal = ({
                 <input type="date" value={meetingDate}
                   onChange={(e) => setMeetingDate(e.target.value)}
                   onBlur={() => { if (meetingDate !== (lead.meetingDate || '')) update({ meetingDate }); }}
+                  min="2000-01-01" max="2099-12-31"
                   style={{ ...INPUT, cursor: 'pointer', colorScheme: 'dark' }} />
               </div>
               <div>

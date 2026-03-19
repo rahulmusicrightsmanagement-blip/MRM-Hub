@@ -341,15 +341,25 @@ router.delete('/:id/remarks', auth, async (req, res) => {
   }
 });
 
-// POST /api/societyregs/:id/upload — upload file for "Application Sent to Society" step
+// Mapping from step key to file field prefix
+const STEP_FILE_PREFIXES = {
+  nocReceived: 'nocReceived',
+  applicationSentToSociety: 'applicationSent',
+  thirdPartyAuthorization: 'thirdPartyAuth',
+  bankMandateUpdate: 'bankMandate',
+};
+
+// POST /api/societyregs/:id/upload — upload file for a step
 router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
-    const { society } = req.body;
+    const { society, stepKey } = req.body;
     if (!society) return res.status(400).json({ message: 'Society is required' });
     if (!req.file) return res.status(400).json({ message: 'No file provided' });
+
+    const prefix = STEP_FILE_PREFIXES[stepKey] || STEP_FILE_PREFIXES.applicationSentToSociety;
 
     const entry = reg.societies.get(society);
     if (!entry) return res.status(404).json({ message: 'Society entry not found' });
@@ -367,9 +377,9 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
     const driveResult = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName, { subFolder: 'Society' });
     const entryObj = entry.toObject();
     const steps = entryObj.steps || {};
-    steps.applicationSentFileUrl = driveResult.webViewLink || '';
-    steps.applicationSentFileName = req.file.originalname;
-    steps.applicationSentGdriveFileId = driveResult.fileId || '';
+    steps[`${prefix}FileUrl`] = driveResult.webViewLink || '';
+    steps[`${prefix}FileName`] = req.file.originalname;
+    steps[`${prefix}GdriveFileId`] = driveResult.fileId || '';
 
     reg.societies.set(society, { ...entryObj, steps });
 

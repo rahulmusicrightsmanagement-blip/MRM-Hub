@@ -24,15 +24,15 @@ const SOCIETIES = [
 /* ─── 10 tracking steps (plus remarks) ─── */
 const STEP_DEFINITIONS = [
   { key: 'territoryWithdrawal', label: 'Territory Withdrawal', num: 1 },
-  { key: 'nocReceived', label: 'NOC Received', num: 2 },
+  { key: 'nocReceived', label: 'NOC Received', num: 2, hasUpload: true },
   { key: 'applicationFiled', label: 'Application Filed', num: 3 },
   { key: 'paymentDone', label: 'Payment Done', num: 4 },
   { key: 'applicationSigned', label: 'Application Signed', num: 5 },
   { key: 'applicationSentToSociety', label: 'Application Sent to Society', num: 6, hasUpload: true },
   { key: 'membershipConfirmation', label: 'Membership Confirmation', num: 7 },
   { key: 'loginDetails', label: 'Login Details', num: 8, hasLogin: true },
-  { key: 'thirdPartyAuthorization', label: 'Third Party Authorization Done', num: 9 },
-  { key: 'bankMandateUpdate', label: 'Bank Mandate Update', num: 10 },
+  { key: 'thirdPartyAuthorization', label: 'Third Party Authorization Done', num: 9, hasUpload: true },
+  { key: 'bankMandateUpdate', label: 'Bank Mandate Update', num: 10, hasUpload: true },
 ];
 
 /* ─── Shared styles ─── */
@@ -76,7 +76,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   const [localSteps, setLocalSteps] = useState(steps || {});
   const [newRemark, setNewRemark] = useState('');
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef(null);
+  const fileRefs = useRef({});
 
   useEffect(() => { setLocalSteps(steps || {}); }, [steps]);
 
@@ -102,12 +102,21 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
     } catch (err) { console.error(err); addToast('Failed to save', 'error'); }
   };
 
-  const uploadFile = async (file) => {
+  // Map step keys to file field prefixes
+  const FILE_PREFIXES = {
+    nocReceived: 'nocReceived',
+    applicationSentToSociety: 'applicationSent',
+    thirdPartyAuthorization: 'thirdPartyAuth',
+    bankMandateUpdate: 'bankMandate',
+  };
+
+  const uploadFile = async (file, stepKey) => {
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('society', societyKey);
+      fd.append('stepKey', stepKey);
       const res = await fetch(withApiBase(`/api/societyregs/${regId}/upload`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -176,29 +185,34 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
               )}
             </div>
 
-            {/* Step 6: Upload document */}
-            {step.hasUpload && localSteps[step.key] === 'Yes' && (
-              <div style={{ marginTop: '10px', paddingLeft: '34px' }}>
-                {localSteps.applicationSentFileName ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FileText style={{ width: '14px', height: '14px', color: '#10b981' }} />
-                    {localSteps.applicationSentFileUrl ? (
-                      <a href={localSteps.applicationSentFileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#818cf8', textDecoration: 'underline' }}>{localSteps.applicationSentFileName}</a>
-                    ) : (
-                      <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{localSteps.applicationSentFileName}</span>
-                    )}
-                  </div>
-                ) : null}
-                {!readOnly && (
-                  <>
-                    <input type="file" ref={fileRef} style={{ display: 'none' }} onChange={(e) => { if (e.target.files[0]) uploadFile(e.target.files[0]); }} />
-                    <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px dashed #3a3f60', background: 'transparent', color: '#6366f1', fontSize: '12px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
-                      <Upload style={{ width: '14px', height: '14px' }} /> {uploading ? 'Uploading...' : localSteps.applicationSentFileName ? 'Replace Document' : 'Upload Document'}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Upload document for steps with hasUpload */}
+            {step.hasUpload && localSteps[step.key] === 'Yes' && (() => {
+              const prefix = FILE_PREFIXES[step.key];
+              const fileName = localSteps[`${prefix}FileName`];
+              const fileUrl = localSteps[`${prefix}FileUrl`];
+              return (
+                <div style={{ marginTop: '10px', paddingLeft: '34px' }}>
+                  {fileName ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText style={{ width: '14px', height: '14px', color: '#10b981' }} />
+                      {fileUrl ? (
+                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#818cf8', textDecoration: 'underline' }}>{fileName}</a>
+                      ) : (
+                        <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{fileName}</span>
+                      )}
+                    </div>
+                  ) : null}
+                  {!readOnly && (
+                    <>
+                      <input type="file" ref={(el) => { fileRefs.current[step.key] = el; }} style={{ display: 'none' }} onChange={(e) => { if (e.target.files[0]) uploadFile(e.target.files[0], step.key); }} />
+                      <button onClick={() => fileRefs.current[step.key]?.click()} disabled={uploading} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px dashed #3a3f60', background: 'transparent', color: '#6366f1', fontSize: '12px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
+                        <Upload style={{ width: '14px', height: '14px' }} /> {uploading ? 'Uploading...' : fileName ? 'Replace Document' : 'Upload Document'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Step 8: Login details (ID & Password) + CAE & Commission */}
             {step.hasLogin && localSteps[step.key] === 'Yes' && (
@@ -554,6 +568,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             <input
                               type="date"
                               autoFocus
+                              min="2000-01-01" max="2099-12-31"
                               defaultValue={fmtDateISO(entryDeadline)}
                               onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
@@ -663,6 +678,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
                           <input type="date" value={assignForm.deadline} onChange={(e) => setAssignForm((p) => ({ ...p, deadline: e.target.value }))}
+                            min="2000-01-01" max="2099-12-31"
                             style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
                         </div>
                         <button disabled={!assignForm.spoc || isLoading} onClick={() => handleAssign(soc.key)}

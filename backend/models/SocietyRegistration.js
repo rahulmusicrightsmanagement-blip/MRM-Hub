@@ -10,6 +10,9 @@ const SOCIETIES = [
 const stepsSchema = new mongoose.Schema({
   territoryWithdrawal:       { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   nocReceived:               { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
+  nocReceivedFileUrl:        { type: String, default: '' },
+  nocReceivedFileName:       { type: String, default: '' },
+  nocReceivedGdriveFileId:   { type: String, default: '' },
   applicationFiled:          { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   paymentDone:               { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   applicationSigned:         { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
@@ -24,7 +27,13 @@ const stepsSchema = new mongoose.Schema({
   caeNumber:                 { type: String, default: '' },
   commissionRate:            { type: String, default: '' },
   thirdPartyAuthorization:   { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
+  thirdPartyAuthFileUrl:     { type: String, default: '' },
+  thirdPartyAuthFileName:    { type: String, default: '' },
+  thirdPartyAuthGdriveFileId: { type: String, default: '' },
   bankMandateUpdate:         { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
+  bankMandateFileUrl:        { type: String, default: '' },
+  bankMandateFileName:       { type: String, default: '' },
+  bankMandateGdriveFileId:   { type: String, default: '' },
 }, { _id: false });
 
 const remarkSchema = new mongoose.Schema({
