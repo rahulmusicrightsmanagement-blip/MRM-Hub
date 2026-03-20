@@ -349,6 +349,14 @@ const STEP_FILE_PREFIXES = {
   bankMandateUpdate: 'bankMandate',
 };
 
+// Readable names for each step (used in uploaded file names)
+const STEP_DISPLAY_NAMES = {
+  nocReceived: 'NOC',
+  applicationSentToSociety: 'Application_Sent_To_Society',
+  thirdPartyAuthorization: 'Third_Party_Authorization',
+  bankMandateUpdate: 'Bank_Mandate_Update',
+};
+
 // POST /api/societyregs/:id/upload — upload file for a step
 router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
   try {
@@ -373,7 +381,9 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
     }
 
     // Upload to Google Drive → Society sub-folder
-    const driveName = `SocietyReg_${reg.name}_${society}`;
+    const stepLabel = STEP_DISPLAY_NAMES[stepKey] || stepKey;
+    const ext = require('path').extname(req.file.originalname);
+    const driveName = `Society_Registration_${stepLabel}_${reg.name}${ext}`;
     const driveResult = await uploadFile(req.file.buffer, req.file.originalname, req.file.mimetype, driveName, { subFolder: 'Society' });
     const entryObj = entry.toObject();
     const steps = entryObj.steps || {};
