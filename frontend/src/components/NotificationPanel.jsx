@@ -30,7 +30,7 @@ const NotificationPanel = () => {
   // Poll unread count every 15s
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 15000);
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 

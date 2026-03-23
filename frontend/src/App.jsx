@@ -108,7 +108,7 @@ const SessionTimeoutModal = () => {
           Session Timed Out
         </h3>
         <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px' }}>
-          You have been logged out due to 10 minutes of inactivity. Please sign in again to continue.
+          You have been logged out due to 30 minutes of inactivity. Please sign in again to continue.
         </p>
 
         <button

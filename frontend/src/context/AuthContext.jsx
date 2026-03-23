@@ -3,7 +3,7 @@ import { withApiBase } from '../utils/api';
 
 const AuthContext = createContext(null);
 
-const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const CHECK_INTERVAL = 5000; // check every 5 seconds
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
