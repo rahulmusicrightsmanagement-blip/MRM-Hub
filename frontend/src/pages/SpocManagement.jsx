@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Plus, Search, Edit2, Trash2, X, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Eye, EyeOff, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 
 const ROLE_META = {
   admin: { label: 'Admin', bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', avatar: '#7c3aed' },
@@ -399,38 +399,66 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
   const [showPw, setShowPw] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [qrData, setQrData] = useState(null);
+  const [manualSecret, setManualSecret] = useState('');
+  const [resettingTotp, setResettingTotp] = useState(false);
 
-  const handleChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
+  const handleChange = (field, value) => {
+    setForm((p) => ({ ...p, [field]: value }));
+    setFieldErrors((p) => ({ ...p, [field]: '' }));
+  };
 
   const toggleRole = (role) => {
     setForm((p) => {
       const has = p.roles.includes(role);
       const next = has ? p.roles.filter((r) => r !== role) : [...p.roles, role];
-      return { ...p, roles: next.length > 0 ? next : p.roles }; // keep at least 1
+      return { ...p, roles: next.length > 0 ? next : p.roles };
     });
+    setFieldErrors((p) => ({ ...p, roles: '' }));
+  };
+
+  const validateForm = () => {
+    const errs = {};
+    const trimmedName = form.name.trim();
+    const trimmedEmail = form.email.trim();
+
+    if (!trimmedName) {
+      errs.name = 'Full name is required.';
+    } else if (trimmedName.length < 2) {
+      errs.name = 'Name must be at least 2 characters.';
+    }
+
+    if (!trimmedEmail) {
+      errs.email = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      errs.email = 'Enter a valid email address.';
+    }
+
+    if (!isEdit && !form.password) {
+      errs.password = 'Password is required for new members.';
+    } else if (form.password && form.password.length < 6) {
+      errs.password = 'Password must be at least 6 characters.';
+    }
+
+    if (form.roles.length === 0) {
+      errs.roles = 'Select at least one role.';
+    }
+
+    if (form.phone && !/^[+]?[\d\s\-()]{7,15}$/.test(form.phone.trim())) {
+      errs.phone = 'Enter a valid phone number.';
+    }
+
+    return errs;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.name && !form.email) {
-      setError('Please enter the member\'s name and email address.');
-      return;
-    }
-    if (!form.name) {
-      setError('Please enter the member\'s full name.');
-      return;
-    }
-    if (!form.email) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    if (!isEdit && !form.password) {
-      setError('Please set a password for the new member.');
-      return;
-    }
-    if (form.roles.length === 0) {
-      setError('Please select at least one role for the member.');
+    const errs = validateForm();
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setError('Please fix the highlighted fields.');
       return;
     }
 
@@ -446,7 +474,14 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
       if (!res.ok) throw new Error(data.message || 'Failed to save');
       await onSaved();
       addToast(isEdit ? 'Team member updated' : 'Team member added');
-      onClose();
+
+      // Show QR code for new member
+      if (!isEdit && data.totpQr) {
+        setQrData(data.totpQr);
+        setManualSecret(data.totpSecret || '');
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err.message);
       addToast(err.message || 'Failed to save', 'error');
@@ -455,17 +490,35 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
     }
   };
 
-  const inputStyle = {
+  const handleResetTotp = async () => {
+    setResettingTotp(true);
+    try {
+      const res = await authFetch(`/api/users/${user._id}/reset-totp`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to reset');
+      setQrData(data.qrDataUrl);
+      setManualSecret(data.totpSecret || '');
+      addToast('2FA reset — share new QR with team member');
+    } catch (err) {
+      addToast(err.message || 'Failed to reset 2FA', 'error');
+    } finally {
+      setResettingTotp(false);
+    }
+  };
+
+  const inputStyle = (field) => ({
     width: '100%',
     padding: '10px 14px',
     backgroundColor: '#0f1117',
-    border: '1px solid #1e2540',
+    border: `1px solid ${fieldErrors[field] ? '#ef4444' : '#1e2540'}`,
     borderRadius: '8px',
     color: 'white',
     fontSize: '14px',
     outline: 'none',
     boxSizing: 'border-box',
-  };
+  });
+
+  const fieldErrorStyle = { fontSize: '12px', color: '#f87171', marginTop: '4px' };
 
   return (
     <div
@@ -491,6 +544,98 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
           border: '1px solid #1e2540',
         }}
       >
+        {/* QR Code View (shown after creating a new member or resetting 2FA) */}
+        {qrData ? (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+              <h3 style={{ color: 'white', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShieldCheck style={{ width: '22px', height: '22px', color: '#4ade80' }} />
+                {isEdit ? 'Reset 2FA' : 'Setup Authenticator'}
+              </h3>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px' }}>
+                <X style={{ width: '18px', height: '18px' }} />
+              </button>
+            </div>
+
+            {/* Description */}
+            <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '24px', lineHeight: 1.6 }}>
+              Ask the team member to scan this QR code with their authenticator app
+              <br /><span style={{ color: '#6b7280', fontSize: '12px' }}>(Google Authenticator, Microsoft Authenticator, etc.)</span>
+            </p>
+
+            {/* QR Code */}
+            <div style={{ display: 'inline-block', padding: '20px', backgroundColor: 'white', borderRadius: '16px', marginBottom: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.3)' }}>
+              <img src={qrData} alt="TOTP QR Code" style={{ width: '180px', height: '180px', display: 'block' }} />
+            </div>
+
+            {/* Manual Secret */}
+            {manualSecret && (
+              <div style={{ marginBottom: '20px' }}>
+                <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '8px' }}>Or enter this code manually:</p>
+                <div style={{
+                  padding: '10px 14px',
+                  backgroundColor: '#0f1117',
+                  border: '1px solid #1e2540',
+                  borderRadius: '8px',
+                  overflowX: 'auto',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '100%',
+                }}>
+                  <code style={{
+                    color: '#60a5fa',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    letterSpacing: '1.5px',
+                    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+                    wordBreak: 'break-all',
+                    whiteSpace: 'normal',
+                  }}>{manualSecret}</code>
+                </div>
+              </div>
+            )}
+
+            {/* Warning */}
+            <div style={{
+              padding: '12px 16px',
+              backgroundColor: 'rgba(245,158,11,0.08)',
+              border: '1px solid rgba(245,158,11,0.2)',
+              borderRadius: '10px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              textAlign: 'left',
+            }}>
+              <AlertCircle style={{ width: '18px', height: '18px', color: '#fbbf24', flexShrink: 0 }} />
+              <p style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 500, lineHeight: 1.5 }}>
+                This QR code will not be shown again. Make sure it is scanned before closing.
+              </p>
+            </div>
+
+            {/* Done Button */}
+            <button
+              onClick={onClose}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                color: 'white',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={(e) => { e.target.style.opacity = '0.9'; }}
+              onMouseLeave={(e) => { e.target.style.opacity = '1'; }}
+            >
+              Done — QR Code Scanned
+            </button>
+          </div>
+        ) : (
+        <>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <h3 style={{ color: 'white', fontSize: '17px', fontWeight: 700 }}>{isEdit ? 'Edit Member' : 'Add New Member'}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
@@ -508,19 +653,21 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Name */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Full Name *</label>
-            <input value={form.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Enter full name" style={inputStyle} />
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.name ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Full Name *</label>
+            <input value={form.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Enter full name" style={inputStyle('name')} />
+            {fieldErrors.name && <p style={fieldErrorStyle}>{fieldErrors.name}</p>}
           </div>
 
           {/* Email */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Email *</label>
-            <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} placeholder="name@mrmhub.com" style={inputStyle} />
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.email ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Email *</label>
+            <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} placeholder="name@mrmhub.com" style={inputStyle('email')} />
+            {fieldErrors.email && <p style={fieldErrorStyle}>{fieldErrors.email}</p>}
           </div>
 
           {/* Password */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.password ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>
               Password {isEdit ? '(leave blank to keep current)' : '*'}
             </label>
             <div style={{ position: 'relative' }}>
@@ -529,7 +676,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                 value={form.password}
                 onChange={(e) => handleChange('password', e.target.value)}
                 placeholder={isEdit ? '••••••••' : 'Enter password'}
-                style={{ ...inputStyle, paddingRight: '40px' }}
+                style={{ ...inputStyle('password'), paddingRight: '40px' }}
               />
               <button
                 type="button"
@@ -539,11 +686,12 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                 {showPw ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
               </button>
             </div>
+            {fieldErrors.password && <p style={fieldErrorStyle}>{fieldErrors.password}</p>}
           </div>
 
           {/* Roles (multi-select checkboxes) */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '8px' }}>Roles *</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.roles ? '#f87171' : '#9ca3af', marginBottom: '8px' }}>Roles *</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {Object.entries(ROLE_META).map(([key, meta]) => {
                 const selected = form.roles.includes(key);
@@ -569,19 +717,50 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                 );
               })}
             </div>
+            {fieldErrors.roles && <p style={fieldErrorStyle}>{fieldErrors.roles}</p>}
           </div>
 
           {/* Department */}
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Department</label>
-            <input value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="e.g. Rights Mgmt" style={inputStyle} />
+            <input value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="e.g. Rights Mgmt" style={inputStyle('department')} />
           </div>
 
           {/* Phone */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Phone</label>
-            <input value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} placeholder="+91 XXXXX XXXXX" style={inputStyle} />
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.phone ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Phone</label>
+            <input value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} placeholder="+91 XXXXX XXXXX" style={inputStyle('phone')} />
+            {fieldErrors.phone && <p style={fieldErrorStyle}>{fieldErrors.phone}</p>}
           </div>
+
+          {/* Reset 2FA (edit only) */}
+          {isEdit && (
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Two-Factor Authentication</label>
+              <button
+                type="button"
+                onClick={handleResetTotp}
+                disabled={resettingTotp}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  backgroundColor: 'rgba(245,158,11,0.08)',
+                  color: '#fbbf24',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: resettingTotp ? 'not-allowed' : 'pointer',
+                  opacity: resettingTotp ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw style={{ width: '14px', height: '14px' }} />
+                {resettingTotp ? 'Resetting...' : 'Reset 2FA / Show New QR'}
+              </button>
+            </div>
+          )}
 
           {/* Active toggle (edit only) */}
           {isEdit && (
@@ -640,6 +819,8 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
             {saving ? 'Saving...' : isEdit ? 'Update Member' : 'Add Member'}
           </button>
         </form>
+        </>
+        )}
       </div>
     </div>
   );

@@ -60,11 +60,84 @@ const LoginGuard = () => {
   return <Login />;
 };
 
+const SessionTimeoutModal = () => {
+  const { sessionExpired, dismissSessionExpired } = useAuth();
+  if (!sessionExpired) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <div
+        style={{
+          width: '400px',
+          padding: '36px',
+          backgroundColor: '#141720',
+          borderRadius: '16px',
+          border: '1px solid #1e2540',
+          textAlign: 'center',
+        }}
+      >
+        {/* Clock icon */}
+        <div style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
+          background: 'rgba(245,158,11,0.12)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '20px',
+        }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        </div>
+
+        <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
+          Session Timed Out
+        </h3>
+        <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px' }}>
+          You have been logged out due to 10 minutes of inactivity. Please sign in again to continue.
+        </p>
+
+        <button
+          onClick={dismissSessionExpired}
+          style={{
+            width: '100%',
+            padding: '12px',
+            borderRadius: '10px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            color: 'white',
+            fontSize: '15px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Sign In Again
+        </button>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   return (
     <Router>
       <AuthProvider>
         <ToastProvider>
+          <SessionTimeoutModal />
           <Routes>
             <Route path="/login" element={<LoginGuard />} />
             <Route path="/*" element={<ProtectedRoutes />} />
