@@ -1,14 +1,17 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
 const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // POST /api/auth/login
+// Step 1: email + password → if TOTP enabled, returns { requireOtp: true }
+// Step 2: email + password + otp → returns token
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, otp } = req.body;
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
@@ -22,6 +25,24 @@ router.post('/login', async (req, res) => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
+
+    // If user has TOTP enabled, require OTP
+    if (user.totpSecret) {
+      if (!otp) {
+        return res.status(200).json({ requireOtp: true });
+      }
+
+      const isValid = speakeasy.totp.verify({
+        secret: user.totpSecret,
+        encoding: 'base32',
+        token: otp.toString().trim(),
+        window: 2, // allow 60s drift
+      });
+
+      if (!isValid) {
+        return res.status(401).json({ message: 'Invalid OTP. Please check your authenticator app.' });
+      }
+    }
 
     const token = jwt.sign(
       { id: user._id, role: user.role },

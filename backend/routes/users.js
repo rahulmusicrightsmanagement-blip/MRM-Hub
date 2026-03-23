@@ -1,4 +1,6 @@
 const express = require('express');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 const User = require('../models/User');
 const { VALID_ROLES } = require('../models/User');
 const { auth, adminOnly, fullAccessOnly } = require('../middleware/auth');
@@ -53,6 +55,12 @@ router.post('/', auth, fullAccessOnly, async (req, res) => {
       return res.status(400).json({ message: 'A user with this email already exists' });
     }
 
+    // Generate TOTP secret
+    const secret = speakeasy.generateSecret({
+      name: `MRM Hub (${email.toLowerCase().trim()})`,
+      issuer: 'MRM Hub',
+    });
+
     const user = new User({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -61,12 +69,73 @@ router.post('/', auth, fullAccessOnly, async (req, res) => {
       phone: phone || '',
       department: department || '',
       isActive: true,
+      totpSecret: secret.base32,
     });
 
     await user.save();
-    res.status(201).json({ user: user.toJSON() });
+
+    // Generate QR code data URL for the authenticator app
+    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+    res.status(201).json({ user: user.toJSON(), totpQr: qrDataUrl, totpSecret: secret.base32 });
   } catch (err) {
     console.error('Create user error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/users/:id/totp-qr — get QR code for existing user (admin only)
+router.get('/:id/totp-qr', auth, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    let secretBase32 = user.totpSecret;
+
+    // If no secret exists yet, generate one
+    if (!secretBase32) {
+      const secret = speakeasy.generateSecret({
+        name: `MRM Hub (${user.email})`,
+        issuer: 'MRM Hub',
+      });
+      user.totpSecret = secret.base32;
+      await user.save();
+      secretBase32 = secret.base32;
+    }
+
+    const otpauthUrl = speakeasy.otpauthURL({
+      secret: secretBase32,
+      encoding: 'base32',
+      label: `MRM Hub (${user.email})`,
+      issuer: 'MRM Hub',
+    });
+
+    const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+    res.json({ qrDataUrl, totpSecret: secretBase32 });
+  } catch (err) {
+    console.error('Get TOTP QR error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/users/:id/reset-totp — regenerate TOTP secret (admin only)
+router.post('/:id/reset-totp', auth, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const secret = speakeasy.generateSecret({
+      name: `MRM Hub (${user.email})`,
+      issuer: 'MRM Hub',
+    });
+
+    user.totpSecret = secret.base32;
+    await user.save();
+
+    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+    res.json({ qrDataUrl, totpSecret: secret.base32 });
+  } catch (err) {
+    console.error('Reset TOTP error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

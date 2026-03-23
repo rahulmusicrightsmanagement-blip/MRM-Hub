@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     department: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
+    totpSecret: { type: String, default: '' },
   },
   { timestamps: true, collection: 'spoc_users' }
 );
@@ -46,6 +47,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toJSON = function () {
   const obj = this.toObject({ virtuals: true });
   delete obj.password;
+  delete obj.totpSecret;
   delete obj.__v;
   delete obj.updatedAt;
   return obj;
