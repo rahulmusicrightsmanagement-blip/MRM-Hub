@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { withApiBase } from '../utils/api';
@@ -62,9 +62,19 @@ const PriorityBadge = ({ priority }) => {
 /* ─── Multi-Role Select ─── */
 const MultiRoleSelect = ({ selected, onChange }) => {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const toggle = (role) => onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }} ref={ref}>
       <label style={labelStyle}>Role</label>
       <div onClick={() => setOpen(!open)} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '42px', flexWrap: 'wrap', gap: '4px' }}>
         {selected.length === 0 ? <span style={{ color: '#6b7280' }}>Select roles...</span> : (
@@ -1342,6 +1352,7 @@ const Onboarding = () => {
   const [editingEntry, setEditingEntry] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1428,6 +1439,18 @@ const Onboarding = () => {
     setSelectedMember((prev) => (prev && prev._id === updatedEntry._id ? updatedEntry : prev));
   };
 
+  const filteredEntries = useMemo(() => {
+    if (!searchQuery.trim()) return entries;
+    const q = searchQuery.toLowerCase();
+    return entries.filter((e) =>
+      e.name.toLowerCase().includes(q) ||
+      (e.email && e.email.toLowerCase().includes(q)) ||
+      (e.phone && e.phone.includes(q)) ||
+      (e.spoc && e.spoc.toLowerCase().includes(q)) ||
+      (e.contractType && e.contractType.toLowerCase().includes(q))
+    );
+  }, [entries, searchQuery]);
+
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading onboarding...</div>;
 
   return (
@@ -1435,6 +1458,15 @@ const Onboarding = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Onboarding</h1>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+            <input
+              placeholder="Search by name, email, SPOC..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '260px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+            />
+          </div>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Track client onboarding from document submission to active membership</p>
       </div>
@@ -1442,7 +1474,7 @@ const Onboarding = () => {
       {/* Kanban columns */}
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`, gap: '20px', flex: 1, minHeight: 0 }}>
         {STAGES.map((stage) => {
-          const stageEntries = entries.filter((e) => e.stage === stage);
+          const stageEntries = filteredEntries.filter((e) => e.stage === stage);
           return (
             <div key={stage} style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>

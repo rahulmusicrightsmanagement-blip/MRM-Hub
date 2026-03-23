@@ -697,7 +697,12 @@ const Royalty = () => {
     if (selectedClient?._id === updatedClient._id) setSelectedClient(updatedClient);
   };
 
-  const filtered = clients.filter((c) => c.clientName.toLowerCase().includes(search.toLowerCase()));
+  const filtered = clients.filter((c) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return c.clientName.toLowerCase().includes(q) ||
+      (c.clientEmail && c.clientEmail.toLowerCase().includes(q));
+  });
 
   return (
     <div style={{ padding: '28px 36px', minHeight: '100%' }}>

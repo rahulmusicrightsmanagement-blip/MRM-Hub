@@ -27,10 +27,10 @@ const NotificationPanel = () => {
     } catch { /* ignore */ }
   };
 
-  // Poll unread count every 30s
+  // Poll unread count every 15s
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
+    const interval = setInterval(fetchUnreadCount, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -88,6 +88,12 @@ const NotificationPanel = () => {
     lead_assigned: '#34d399',
     onboarding_assigned: '#fbbf24',
     society_assigned: '#f472b6',
+    stage_changed: '#a78bfa',
+    document_uploaded: '#2dd4bf',
+    remark_added: '#fb923c',
+    status_changed: '#e879f9',
+    task_completed: '#4ade80',
+    deadline_approaching: '#f87171',
     general: '#9ca3af',
   };
 

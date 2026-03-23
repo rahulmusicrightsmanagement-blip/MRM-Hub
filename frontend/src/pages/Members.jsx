@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -48,11 +48,21 @@ const ROLE_OPTIONS = ['Singer-Songwriter', 'Playback Singer', 'Composer', 'Lyric
 
 const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const toggle = (role) => {
     onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }} ref={ref}>
       <label style={labelStyle}>Role</label>
       <div onClick={() => setOpen(!open)} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '42px', flexWrap: 'wrap', gap: '4px' }}>
         {selected.length === 0 ? <span style={{ color: '#6b7280' }}>Select roles...</span> : (
@@ -495,8 +505,11 @@ const Members = () => {
     return members.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
+        (m.email && m.email.toLowerCase().includes(q)) ||
         (Array.isArray(m.role) ? m.role.some((r) => r.toLowerCase().includes(q)) : (m.role || '').toLowerCase().includes(q)) ||
-        (m.genre && m.genre.toLowerCase().includes(q))
+        (m.genre && m.genre.toLowerCase().includes(q)) ||
+        (m.status && m.status.toLowerCase().includes(q)) ||
+        (m.spoc && m.spoc.toLowerCase().includes(q))
     );
   }, [members, searchQuery]);
 

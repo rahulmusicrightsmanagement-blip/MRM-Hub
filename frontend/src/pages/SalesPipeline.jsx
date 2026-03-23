@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Plus, Filter, X, Mail, Phone, MessageSquare, ArrowRight,
+  Plus, Filter, X, Mail, Phone, MessageSquare, ArrowRight, Search,
   CheckSquare, Square, ChevronRight, Briefcase, Clock,
   CheckCircle, Circle, Trash2, Edit3, Save, Eye, XCircle, UserPlus,
 } from 'lucide-react';
@@ -998,6 +998,7 @@ const SalesPipeline = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -1164,6 +1165,18 @@ const SalesPipeline = () => {
     } catch (err) { console.error('Restart onboarding error:', err); addToast('Failed to restart onboarding', 'error'); }
   };
 
+  const filteredLeads = useMemo(() => {
+    if (!searchQuery.trim()) return leads;
+    const q = searchQuery.toLowerCase();
+    return leads.filter((l) =>
+      l.name.toLowerCase().includes(q) ||
+      (l.email && l.email.toLowerCase().includes(q)) ||
+      (l.phone && l.phone.includes(q)) ||
+      (l.spoc && l.spoc.toLowerCase().includes(q)) ||
+      (l.source && l.source.toLowerCase().includes(q))
+    );
+  }, [leads, searchQuery]);
+
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading pipeline...</div>;
 
   return (
@@ -1171,10 +1184,16 @@ const SalesPipeline = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Sales Pipeline</h1>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button type="button" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>
-              <Filter style={{ width: '16px', height: '16px' }} /> Filter
-            </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input
+                placeholder="Search leads..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '220px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+              />
+            </div>
             <button type="button" onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
               <Plus style={{ width: '16px', height: '16px' }} /> New Lead
             </button>
@@ -1185,7 +1204,7 @@ const SalesPipeline = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', flex: 1, minHeight: 0 }}>
         {STAGES.map((stage) => {
-          const stageLeads = leads.filter((l) => l.stage === stage);
+          const stageLeads = filteredLeads.filter((l) => l.stage === stage);
           return (
             <div key={stage} style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>

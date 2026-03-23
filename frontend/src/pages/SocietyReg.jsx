@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown } from 'lucide-react';
+import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { withApiBase } from '../utils/api';
@@ -217,15 +217,15 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
             {/* Step 8: Login details (ID & Password) + CAE & Commission */}
             {step.hasLogin && localSteps[step.key] === 'Yes' && (
               <div style={{ marginTop: '10px', paddingLeft: '34px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Row 1: Login ID & Password */}
+                {/* Row 1: Primary Login ID & Password */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: '160px' }}>
-                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Login ID</label>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Primary Login ID</label>
                     {readOnly ? (
                       <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginId || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
-                        placeholder="Enter login ID..."
+                        placeholder="Enter primary login ID..."
                         value={localSteps.loginId || ''}
                         onChange={(e) => setLocalSteps((p) => ({ ...p, loginId: e.target.value }))}
                         onBlur={(e) => saveLoginField('loginId', e.target.value)}
@@ -234,16 +234,47 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                     )}
                   </div>
                   <div style={{ flex: 1, minWidth: '160px' }}>
-                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Password</label>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Primary Password</label>
                     {readOnly ? (
                       <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginPassword || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
-                        placeholder="Enter password..."
+                        placeholder="Enter primary password..."
                         value={localSteps.loginPassword || ''}
                         onChange={(e) => setLocalSteps((p) => ({ ...p, loginPassword: e.target.value }))}
                         onBlur={(e) => saveLoginField('loginPassword', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginPassword', e.target.value)}
+                      />
+                    )}
+                  </div>
+                </div>
+                {/* Row 2: Secondary Login ID & Password */}
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Secondary Login ID</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.secondaryLoginId || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="Enter secondary login ID..."
+                        value={localSteps.secondaryLoginId || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, secondaryLoginId: e.target.value }))}
+                        onBlur={(e) => saveLoginField('secondaryLoginId', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('secondaryLoginId', e.target.value)}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: '160px' }}>
+                    <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Secondary Password</label>
+                    {readOnly ? (
+                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.secondaryLoginPassword || '—'}</p>
+                    ) : (
+                      <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
+                        placeholder="Enter secondary password..."
+                        value={localSteps.secondaryLoginPassword || ''}
+                        onChange={(e) => setLocalSteps((p) => ({ ...p, secondaryLoginPassword: e.target.value }))}
+                        onBlur={(e) => saveLoginField('secondaryLoginPassword', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLoginField('secondaryLoginPassword', e.target.value)}
                       />
                     )}
                   </div>
@@ -745,6 +776,7 @@ const SocietyReg = () => {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({}); // { 'IPRS': 'In Progress', 'PRS': 'Registered', ... }
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -873,15 +905,24 @@ const SocietyReg = () => {
   const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'All').length;
 
   const filteredMembers = useMemo(() => {
+    let result = members;
+    // Text search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((m) => m.name.toLowerCase().includes(q));
+    }
+    // Status filters
     const activeFilters = Object.entries(filters).filter(([, v]) => v && v !== 'All');
-    if (activeFilters.length === 0) return members;
-    return members.filter((m) =>
-      activeFilters.every(([socKey, filterVal]) => {
-        if (filterVal === 'Overdue') return isSocOverdue(m, socKey);
-        return getSocStatus(m, socKey) === filterVal;
-      })
-    );
-  }, [members, filters]);
+    if (activeFilters.length > 0) {
+      result = result.filter((m) =>
+        activeFilters.every(([socKey, filterVal]) => {
+          if (filterVal === 'Overdue') return isSocOverdue(m, socKey);
+          return getSocStatus(m, socKey) === filterVal;
+        })
+      );
+    }
+    return result;
+  }, [members, filters, searchQuery]);
 
   const setFilter = (socKey, value) => {
     setFilters((prev) => {
@@ -901,6 +942,15 @@ const SocietyReg = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Collecting Society Registrations</h1>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+            <input
+              placeholder="Search members..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '240px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+            />
+          </div>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Manage member registrations across 12 collecting societies</p>
       </div>

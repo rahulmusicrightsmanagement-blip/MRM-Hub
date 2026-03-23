@@ -1,10 +1,6 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
-dist-ssr/
-
 # Environment variables
 .env
 .env.*
@@ -15,21 +11,40 @@ logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Editor/IDE
 .vscode/*
 !.vscode/extensions.json
 .idea/
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
+# Secrets & credentials
+*.pem
+*.key
+*.cert
+config/gdrive-service-account.json
+
+# Uploads
+uploads/
+
+# Coverage & testing
+coverage/
+.nyc_output/
+
 # Misc
 *.local
-coverage/
+*.tsbuildinfo

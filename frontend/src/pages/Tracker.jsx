@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, ChevronLeft, ChevronRight, Clock, X, Calendar, CheckCircle,
-  AlertTriangle, Zap, ListTodo, Trash2, Check,
+  AlertTriangle, Zap, ListTodo, Trash2, Check, Search,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -691,6 +691,7 @@ const Tracker = () => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const weekEnd = useMemo(() => getSunday(weekStart), [weekStart]);
   const weekDays = useMemo(() => {
@@ -846,16 +847,28 @@ const Tracker = () => {
   };
   const goToday = () => setWeekStart(getMonday(new Date()));
 
+  /* ── Filter tasks by search query ── */
+  const searchedTasks = useMemo(() => {
+    if (!searchQuery.trim()) return tasks;
+    const q = searchQuery.toLowerCase();
+    return tasks.filter((t) =>
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      (t.description && t.description.toLowerCase().includes(q)) ||
+      (t.category && t.category.toLowerCase().includes(q)) ||
+      (t.spoc && t.spoc.toLowerCase().includes(q))
+    );
+  }, [tasks, searchQuery]);
+
   /* ── Tasks grouped by day and time for week view ── */
   const tasksByDay = useMemo(() => {
     const map = {};
     weekDays.forEach((d) => { map[fmtDateISO(d)] = []; });
-    tasks.forEach((t) => {
+    searchedTasks.forEach((t) => {
       const key = fmtDateISO(new Date(t.date));
       if (map[key]) map[key].push(t);
     });
     return map;
-  }, [tasks, weekDays]);
+  }, [searchedTasks, weekDays]);
 
   const todayStr = fmtDateISO(new Date());
 
@@ -915,8 +928,17 @@ const Tracker = () => {
           </button>
         </div>
 
-        {/* Filters + View toggle */}
+        {/* Search + Filters + View toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+            <input
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '180px', padding: '8px 12px 8px 32px', background: '#141720', border: '1px solid #2d3348', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+            />
+          </div>
           <FilterDropdown value={categoryFilter} options={CATEGORIES} onChange={setCategoryFilter} width={160} />
           <FilterDropdown value={spocFilter} options={spocOptions} onChange={setSpocFilter} width={150} />
           <div style={{
@@ -947,7 +969,7 @@ const Tracker = () => {
       }}>
         {viewMode === 'Agenda' ? (
           <div style={{ padding: '20px' }}>
-            <AgendaView tasks={tasks} weekDays={weekDays} onTaskClick={setSelectedTask} />
+            <AgendaView tasks={searchedTasks} weekDays={weekDays} onTaskClick={setSelectedTask} />
           </div>
         ) : (
           /* Week Calendar View */

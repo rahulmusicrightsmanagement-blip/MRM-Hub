@@ -13,6 +13,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    esbuild: {
+      drop: ['console', 'debugger'],
+      legalComments: 'none',
+    },
+    build: {
+      minify: 'esbuild',
+    },
     server: {
       proxy: {
         '/api': {
