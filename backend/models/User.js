@@ -42,10 +42,12 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove password from JSON output, include virtuals
+// Remove password from JSON output (global plugin handles __v/updatedAt)
 userSchema.methods.toJSON = function () {
   const obj = this.toObject({ virtuals: true });
   delete obj.password;
+  delete obj.__v;
+  delete obj.updatedAt;
   return obj;
 };
 

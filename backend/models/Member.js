@@ -51,4 +51,9 @@ memberSchema.pre('save', function () {
   }
 });
 
+memberSchema.index({ spoc: 1 });
+memberSchema.index({ email: 1 });
+memberSchema.index({ name: 1 });
+memberSchema.index({ status: 1 });
+
 module.exports = mongoose.model('Member', memberSchema);

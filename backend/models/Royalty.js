@@ -38,4 +38,7 @@ const royaltySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+royaltySchema.index({ clientName: 1 });
+royaltySchema.index({ clientEmail: 1 });
+
 module.exports = mongoose.model('Royalty', royaltySchema);

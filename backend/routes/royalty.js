@@ -2,17 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const Royalty = require('../models/Royalty');
 const { auth } = require('../middleware/auth');
+const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFileMusic } = require('../utils/gdrive');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // GET /api/royalty
 router.get('/', auth, async (req, res) => {
   try {
-    const clients = await Royalty.find().sort({ createdAt: -1 });
+    const clients = await Royalty.find().sort({ createdAt: -1 }).lean();
     res.json({ clients });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

@@ -97,4 +97,9 @@ onboardingEntrySchema.pre('save', function () {
   }
 });
 
+onboardingEntrySchema.index({ spoc: 1 });
+onboardingEntrySchema.index({ email: 1 });
+onboardingEntrySchema.index({ stage: 1 });
+onboardingEntrySchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('OnboardingEntry', onboardingEntrySchema);

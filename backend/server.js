@@ -1,7 +1,14 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+
+// Strip internal Mongoose fields (__v, updatedAt) from all JSON responses
+const stripInternals = require('./utils/mongoSanitize');
+mongoose.plugin(stripInternals);
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -25,7 +32,29 @@ const allowedOrigins = [
   .filter(Boolean)
   .map((origin) => origin.trim().replace(/\/+$/, ''));
 
-// Middleware
+// Security headers
+app.use(helmet({
+  frameguard: { action: 'deny' },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  noSniff: true,
+  xPermittedCrossDomainPolicies: { permittedPolicies: 'none' },
+}));
+
+// Force HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      return next();
+    }
+    res.redirect(301, `https://${req.headers.host}${req.url}`);
+  });
+}
+
+// CORS (must be before rate limiting so preflight OPTIONS requests get correct headers)
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -35,6 +64,15 @@ app.use(cors({
   },
   credentials: true,
 }));
+
+// Gzip compression
+app.use(compression());
+
+// Rate limiting
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false }));
+
+// Body parser
 app.use(express.json());
 
 // Routes

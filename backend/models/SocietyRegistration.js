@@ -24,6 +24,8 @@ const stepsSchema = new mongoose.Schema({
   loginDetails:              { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
   loginId:                   { type: String, default: '' },
   loginPassword:             { type: String, default: '' },
+  secondaryLoginId:          { type: String, default: '' },
+  secondaryLoginPassword:    { type: String, default: '' },
   caeNumber:                 { type: String, default: '' },
   commissionRate:            { type: String, default: '' },
   thirdPartyAuthorization:   { type: String, default: 'NA', enum: ['Yes', 'No', 'NA'] },
@@ -73,5 +75,7 @@ const societyRegistrationSchema = new mongoose.Schema(
   },
   { timestamps: true, collection: 'society_registrations' }
 );
+
+societyRegistrationSchema.index({ name: 1 });
 
 module.exports = mongoose.model('SocietyRegistration', societyRegistrationSchema);

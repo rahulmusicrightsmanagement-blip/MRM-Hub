@@ -27,7 +27,7 @@ router.get('/', auth, async (req, res) => {
       filter.spoc = req.user.name;
     }
 
-    const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 });
+    const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 }).lean();
     res.json({ tasks });
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -49,7 +49,7 @@ router.get('/stats', auth, async (req, res) => {
       filter.spoc = req.user.name;
     }
 
-    const tasks = await Task.find(filter);
+    const tasks = await Task.find(filter).lean();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -145,6 +145,8 @@ router.put('/:id', auth, async (req, res) => {
       }
     }
 
+    const wasCompleted = task.completed;
+
     const fields = ['title', 'date', 'startTime', 'duration', 'category', 'priority', 'spoc', 'spocColor', 'completed', 'notes', 'deadline'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) task[f] = req.body[f];
@@ -153,6 +155,21 @@ router.put('/:id', auth, async (req, res) => {
     if (req.body.deadline) task.deadline = new Date(req.body.deadline);
 
     await task.save();
+
+    // Notify when task is marked completed (and it wasn't before)
+    if (task.completed && !wasCompleted && task.spoc) {
+      notify({
+        recipientName: task.spoc,
+        type: 'task_completed',
+        title: `Task "${task.title}" completed`,
+        message: `Your task has been marked as completed.`,
+        relatedType: 'task',
+        relatedId: task._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
+
     res.json({ task });
   } catch (err) {
     console.error('Update task error:', err);

@@ -21,7 +21,7 @@ router.get('/', auth, async (req, res) => {
     if (!req.user.isFullAccess()) {
       filter.spoc = req.user.name;
     }
-    const leads = await Lead.find(filter).sort({ createdAt: -1 });
+    const leads = await Lead.find(filter).sort({ createdAt: -1 }).lean();
     res.json({ leads });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -147,6 +147,8 @@ router.put('/:id', auth, async (req, res) => {
       }
     }
 
+    const oldStage = lead.stage;
+
     const fields = ['name', 'genre', 'email', 'phone', 'source', 'priority', 'stage', 'spoc', 'notes', 'deadline', 'callDone', 'inquiryNotes', 'meetingDate', 'meetingLink', 'meetingAssignedWith', 'meetingNotes', 'inquiryVerified', 'meetingVerified', 'movedToOnboarding', 'onboardingSpoc', 'onboardingContractType', 'onboardedAt', 'previousStage', 'notQualifiedReason'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) lead[f] = req.body[f];
@@ -154,6 +156,21 @@ router.put('/:id', auth, async (req, res) => {
     if (req.body.deadline) lead.deadline = new Date(req.body.deadline);
 
     await lead.save();
+
+    // Notify SPOC on stage change
+    if (req.body.stage && req.body.stage !== oldStage && lead.spoc) {
+      notify({
+        recipientName: lead.spoc,
+        type: 'stage_changed',
+        title: `Lead "${lead.name}" moved to ${lead.stage}`,
+        message: `Stage changed from ${oldStage} to ${lead.stage}.`,
+        relatedType: 'lead',
+        relatedId: lead._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
+
     res.json({ lead });
   } catch (err) {
     console.error('Update lead error:', err);

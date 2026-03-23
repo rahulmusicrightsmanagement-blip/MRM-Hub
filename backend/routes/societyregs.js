@@ -5,6 +5,7 @@ const Task = require('../models/Task');
 const OnboardingEntry = require('../models/OnboardingEntry');
 const Member = require('../models/Member');
 const { auth } = require('../middleware/auth');
+const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFile } = require('../utils/gdrive');
 const notify = require('../utils/notify');
 
@@ -16,7 +17,7 @@ const nowHHmm = () => {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter });
 
 /* ─── Sync helpers ─── */
 
@@ -48,7 +49,8 @@ const syncRegistrationsToMember = async (memberName) => {
     const reg = await SocietyRegistration.findOne({ name: memberName });
     if (!reg) return;
     let count = 0;
-    for (const [, entry] of reg.societies) {
+    const entries = reg.societies instanceof Map ? reg.societies.values() : Object.values(reg.societies);
+    for (const entry of entries) {
       if (entry.status && entry.status !== 'N/A') count++;
     }
     await Member.updateOne({ name: memberName }, { $set: { registrations: count } });
@@ -58,7 +60,7 @@ const syncRegistrationsToMember = async (memberName) => {
 // GET /api/societyregs
 router.get('/', auth, async (req, res) => {
   try {
-    const registrations = await SocietyRegistration.find().sort({ createdAt: -1 });
+    const registrations = await SocietyRegistration.find().sort({ createdAt: -1 }).lean();
 
     // View access: all authenticated users can see all registrations.
     // Edit access is controlled on write endpoints (steps/remarks/upload, etc.).
@@ -197,6 +199,23 @@ router.put('/:id', auth, async (req, res) => {
       syncRegistrationsToMember(reg.name);
     }
 
+    // Notify on status change (Registered, Not Started, etc.)
+    if (society && status) {
+      const entryAssignee = reg.societies.get(society)?.assignee?.name;
+      if (entryAssignee) {
+        notify({
+          recipientName: entryAssignee,
+          type: 'status_changed',
+          title: `${society} status → ${status}`,
+          message: `Society "${society}" for "${reg.name}" is now ${status}.`,
+          relatedType: 'societyreg',
+          relatedId: reg._id.toString(),
+          triggeredBy: req.user.name,
+          triggeredById: req.user._id,
+        });
+      }
+    }
+
     // Auto-create a Tracker task when assigning (status = 'In Progress' + assignee)
     if (society && status === 'In Progress' && assignee && assignee.name) {
       // Notify assignee
@@ -302,6 +321,22 @@ router.post('/:id/remarks', auth, async (req, res) => {
     reg.societies.set(society, { ...entryObj, remarks });
 
     await reg.save();
+
+    // Notify the assignee about the new remark
+    const assigneeName = entryObj.assignee?.name;
+    if (assigneeName) {
+      notify({
+        recipientName: assigneeName,
+        type: 'remark_added',
+        title: `New remark on ${society} — ${reg.name}`,
+        message: text.length > 80 ? text.slice(0, 80) + '...' : text,
+        relatedType: 'societyreg',
+        relatedId: reg._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
+
     res.json({ registration: reg });
   } catch (err) {
     console.error('Add remark error:', err);

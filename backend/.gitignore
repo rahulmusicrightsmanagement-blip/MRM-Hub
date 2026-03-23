@@ -1,4 +1,28 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Environment variables
 .env
+.env.*
+!.env.example
+
+# Secrets & credentials
 config/gdrive-service-account.json
+*.pem
+*.key
+*.cert
+
+# Uploads
 uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+
+# Coverage
+coverage/
+.nyc_output/

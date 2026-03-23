@@ -20,10 +20,10 @@ router.get('/stats', auth, async (req, res) => {
     const spocFilter = isFA ? {} : { spoc: req.user.name };
 
     const [members, leads, onboarding, registrations] = await Promise.all([
-      Member.find(spocFilter),
-      Lead.find(spocFilter),
-      OnboardingEntry.find(spocFilter),
-      SocietyRegistration.find(),
+      Member.find(spocFilter).lean(),
+      Lead.find(spocFilter).lean(),
+      OnboardingEntry.find(spocFilter).lean(),
+      SocietyRegistration.find().lean(),
     ]);
 
     // For society regs, filter by assignee if not full access
@@ -32,12 +32,12 @@ router.get('/stats', auth, async (req, res) => {
       const userName = req.user.name;
       filteredRegs = registrations.filter((reg) => {
         if (reg.assignees) {
-          for (const [, assignee] of reg.assignees) {
+          for (const assignee of Object.values(reg.assignees)) {
             if (assignee && assignee.name === userName) return true;
           }
         }
         if (reg.societies) {
-          for (const [, entry] of reg.societies) {
+          for (const entry of Object.values(reg.societies)) {
             if (entry && entry.assignee && entry.assignee.name === userName) return true;
           }
         }
@@ -69,7 +69,7 @@ router.get('/stats', auth, async (req, res) => {
 
     filteredRegs.forEach((reg) => {
       if (reg.societies) {
-        for (const [society, entry] of reg.societies) {
+        for (const [society, entry] of Object.entries(reg.societies)) {
           const societyCounter = societyCountsMap.get(society);
           if (entry.status === 'Registered') {
             registeredCount++;

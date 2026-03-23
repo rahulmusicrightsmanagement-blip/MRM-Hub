@@ -5,6 +5,7 @@ const Lead = require('../models/Lead');
 const Member = require('../models/Member');
 const Task = require('../models/Task');
 const { auth } = require('../middleware/auth');
+const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFile, deleteFile } = require('../utils/gdrive');
 const notify = require('../utils/notify');
 
@@ -50,7 +51,7 @@ const nowHHmm = () => {
 };
 
 /* ─── Multer config (memory — buffer goes to Google Drive) ─── */
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10 MB
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter }); // 10 MB
 
 /* ─── GET all entries ─── */
 router.get('/', auth, async (req, res) => {
@@ -64,18 +65,11 @@ router.get('/', auth, async (req, res) => {
       ] } }
     );
 
-    const entries = await OnboardingEntry.find().sort({ createdAt: -1 });
+    const filter = req.user.hasRole('admin') ? {} : { spoc: req.user.name };
+    const filtered = await OnboardingEntry.find(filter).sort({ createdAt: -1 }).lean();
 
-    // RBAC: only admins see all entries; everyone else sees only their assigned (SPOC) entries
-    let filtered = entries;
-    if (!req.user.hasRole('admin')) {
-      filtered = entries.filter((e) => e.spoc === req.user.name);
-    }
-
-    // One-time sync: update Member kycStatus for entries past KYC stage
-    for (const entry of filtered) {
-      await syncKycToMember(entry);
-    }
+    // Sync KYC status in parallel instead of sequentially
+    await Promise.all(filtered.map((entry) => syncKycToMember(entry)));
 
     res.json({ entries: filtered });
   } catch (err) {
@@ -175,6 +169,8 @@ router.put('/:id', auth, async (req, res) => {
       }
     }
 
+    const oldStage = entry.stage;
+
     const fields = [
       'name', 'role', 'email', 'phone', 'contractType', 'stage', 'spoc', 'notes', 'priority', 'deadline',
       'contractSent', 'contractReceived', 'contractFileUrl', 'contractFileName', 'contractStartDate', 'contractRenewalDate', 'selectedSocieties',
@@ -195,6 +191,20 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     await entry.save();
+
+    // Notify SPOC on stage change
+    if (req.body.stage && req.body.stage !== oldStage && entry.spoc) {
+      notify({
+        recipientName: entry.spoc,
+        type: 'stage_changed',
+        title: `"${entry.name}" moved to ${entry.stage}`,
+        message: `Onboarding stage changed from ${oldStage} to ${entry.stage}.`,
+        relatedType: 'onboarding',
+        relatedId: entry._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
 
     // Sync KYC status to Member when stage advances
     await syncKycToMember(entry);
@@ -399,6 +409,20 @@ router.post('/:id/documents/:docId/upload', auth, upload.single('file'), async (
     doc.gdriveFileId = gfile.fileId;
     doc.received = true;
     await entry.save();
+
+    // Notify SPOC about document upload
+    if (entry.spoc) {
+      notify({
+        recipientName: entry.spoc,
+        type: 'document_uploaded',
+        title: `Document uploaded for "${entry.name}"`,
+        message: `${doc.label} has been uploaded.`,
+        relatedType: 'onboarding',
+        relatedId: entry._id.toString(),
+        triggeredBy: req.user.name,
+        triggeredById: req.user._id,
+      });
+    }
 
     // Sync KYC status when document is uploaded (marked received)
     await syncKycToMember(entry);

@@ -59,12 +59,12 @@ const getScopedRegistrations = (registrations, user) => {
   if (user.isFullAccess()) return registrations;
   return registrations.filter((reg) => {
     if (reg.assignees) {
-      for (const [, assignee] of reg.assignees) {
+      for (const assignee of Object.values(reg.assignees)) {
         if (assignee && assignee.name === user.name) return true;
       }
     }
     if (reg.societies) {
-      for (const [, entry] of reg.societies) {
+      for (const entry of Object.values(reg.societies)) {
         if (entry && entry.assignee && entry.assignee.name === user.name) return true;
       }
     }
@@ -78,7 +78,8 @@ const buildSocietyReport = (regs, selectedSociety) => {
   let societyOverdue = 0;
 
   regs.forEach((reg) => {
-    const entry = reg.societies?.get(selectedSociety);
+    const societies = reg.societies instanceof Map ? Object.fromEntries(reg.societies) : reg.societies;
+    const entry = societies?.[selectedSociety];
     if (!entry) return;
 
     if (entry.status === 'Registered') {
@@ -113,10 +114,10 @@ router.get('/', auth, async (req, res) => {
     const spocFilter = isFA ? {} : { spoc: req.user.name };
 
     const [leads, onboarding, registrations, royaltyClients] = await Promise.all([
-      Lead.find(spocFilter),
-      OnboardingEntry.find(spocFilter),
-      SocietyRegistration.find(),
-      Royalty.find(),
+      Lead.find(spocFilter).lean(),
+      OnboardingEntry.find(spocFilter).lean(),
+      SocietyRegistration.find().lean(),
+      Royalty.find().lean(),
     ]);
 
     const filteredRegs = getScopedRegistrations(registrations, req.user);
@@ -165,7 +166,8 @@ router.get('/', auth, async (req, res) => {
             const monthDate = new Date(yearEntry.year, monthIndex, 1);
             if (!inRange(monthDate, range)) return;
           }
-          const m = yearEntry.months.get(monthName);
+          const months = yearEntry.months instanceof Map ? Object.fromEntries(yearEntry.months) : yearEntry.months;
+          const m = months?.[monthName];
           if (!m) return;
           totalSongs += Number(m.totalSongs || 0);
           totalBGMMovies += Number(m.totalBGMMovies || 0);
@@ -209,7 +211,7 @@ router.get('/society-report', auth, async (req, res) => {
     const selectedSociety = SOCIETY_KEYS.includes(req.query.society) ? req.query.society : SOCIETY_KEYS[0];
     const range = parseDateRange(startDate, endDate);
 
-    const registrations = await SocietyRegistration.find();
+    const registrations = await SocietyRegistration.find().lean();
     const filteredRegs = getScopedRegistrations(registrations, req.user).filter((r) => inRange(r.createdAt, range));
 
     res.json({

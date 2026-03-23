@@ -16,26 +16,28 @@ router.get('/', auth, async (req, res) => {
     if (!req.user.isFullAccess()) {
       filter.spoc = req.user.name;
     }
-    const members = await Member.find(filter).sort({ createdAt: -1 }).lean();
+    const [members, allRegs] = await Promise.all([
+      Member.find(filter).sort({ createdAt: -1 }).lean(),
+      SocietyRegistration.find().lean(),
+    ]);
 
-    // Compute live works & registrations counts for each member
-    const enriched = await Promise.all(
-      members.map(async (m) => {
-        const nameRegex = new RegExp(`^${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-        const regDocs = await SocietyRegistration.find({ name: nameRegex }).lean();
-        // Count societies with status 'Registered'
-        let regCount = 0;
-        regDocs.forEach((doc) => {
-          if (doc.societies) {
-            const entries = doc.societies instanceof Map ? doc.societies.values() : Object.values(doc.societies);
-            for (const entry of entries) {
-              if (entry && entry.status === 'Registered') regCount++;
-            }
-          }
-        });
-        return { ...m, registrations: regCount };
-      })
-    );
+    // Build a lookup: lowercase name → registration count (single pass, no N+1)
+    const regCountByName = new Map();
+    for (const doc of allRegs) {
+      if (!doc.societies) continue;
+      const key = doc.name.toLowerCase();
+      const entries = doc.societies instanceof Map ? doc.societies.values() : Object.values(doc.societies);
+      let count = 0;
+      for (const entry of entries) {
+        if (entry && entry.status === 'Registered') count++;
+      }
+      regCountByName.set(key, (regCountByName.get(key) || 0) + count);
+    }
+
+    const enriched = members.map((m) => ({
+      ...m,
+      registrations: regCountByName.get(m.name.toLowerCase()) || 0,
+    }));
 
     res.json({ members: enriched });
   } catch (err) {
@@ -90,10 +92,10 @@ router.get('/:id/profile', auth, async (req, res) => {
     const nameRegex = new RegExp(`^${member.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
     const [leads, onboarding, societyRegs, royalties] = await Promise.all([
-      Lead.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }),
-      OnboardingEntry.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }),
-      SocietyRegistration.find({ name: nameRegex }).sort({ createdAt: -1 }),
-      Royalty.find({ $or: [{ clientName: nameRegex }, { clientEmail: member.email }] }).sort({ createdAt: -1 }),
+      Lead.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }).lean(),
+      OnboardingEntry.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }).lean(),
+      SocietyRegistration.find({ name: nameRegex }).sort({ createdAt: -1 }).lean(),
+      Royalty.find({ $or: [{ clientName: nameRegex }, { clientEmail: member.email }] }).sort({ createdAt: -1 }).lean(),
     ]);
 
     res.json({ member, leads, onboarding, societyRegs, royalties });

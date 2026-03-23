@@ -4,6 +4,26 @@ const { auth } = require('../middleware/auth');
 
 const router = express.Router();
 
+// GET /api/notifications/unread-count (MUST be before /:id routes)
+router.get('/unread-count', auth, async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({ recipient: req.user._id, read: false });
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/notifications/read-all (MUST be before /:id routes)
+router.put('/read-all', auth, async (req, res) => {
+  try {
+    await Notification.updateMany({ recipient: req.user._id, read: false }, { read: true });
+    res.json({ message: 'All marked as read' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/notifications — list notifications for the logged-in user
 router.get('/', auth, async (req, res) => {
   try {
@@ -12,19 +32,10 @@ router.get('/', auth, async (req, res) => {
 
     const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
-      .limit(50);
+      .limit(50)
+      .lean();
 
     res.json({ notifications });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// GET /api/notifications/unread-count
-router.get('/unread-count', auth, async (req, res) => {
-  try {
-    const count = await Notification.countDocuments({ recipient: req.user._id, read: false });
-    res.json({ count });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -40,16 +51,6 @@ router.put('/:id/read', auth, async (req, res) => {
     );
     if (!notif) return res.status(404).json({ message: 'Not found' });
     res.json({ notification: notif });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// PUT /api/notifications/read-all — mark all as read
-router.put('/read-all', auth, async (req, res) => {
-  try {
-    await Notification.updateMany({ recipient: req.user._id, read: false }, { read: true });
-    res.json({ message: 'All marked as read' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

@@ -56,4 +56,9 @@ leadSchema.pre('save', function () {
   }
 });
 
+leadSchema.index({ spoc: 1 });
+leadSchema.index({ stage: 1 });
+leadSchema.index({ email: 1 });
+leadSchema.index({ createdAt: -1 });
+
 module.exports = mongoose.model('Lead', leadSchema);
