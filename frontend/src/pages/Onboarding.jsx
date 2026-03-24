@@ -415,8 +415,7 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
         <div style={{ marginBottom: '14px' }}>
           <label style={labelStyle}>Deadline</label>
           <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
-            min="2000-01-01" max="2099-12-31"
-            style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} />
+            style={{ ...inputStyle, colorScheme: 'dark' }} />
         </div>
         <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>Notes (optional)</label>
@@ -564,7 +563,6 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
             <label style={{ ...labelStyle, marginBottom: '8px' }}>Contract Start Date</label>
             <input
               type="date"
-              min="2000-01-01" max="2099-12-31"
               style={{ ...inputStyle, colorScheme: 'dark' }}
               value={startDate}
               onChange={(e) => saveDate('contractStartDate', e.target.value, setStartDate)}
@@ -574,7 +572,6 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
             <label style={{ ...labelStyle, marginBottom: '8px' }}>Contract Renewal Date</label>
             <input
               type="date"
-              min="2000-01-01" max="2099-12-31"
               style={{ ...inputStyle, colorScheme: 'dark' }}
               value={renewalDate}
               onChange={(e) => saveDate('contractRenewalDate', e.target.value, setRenewalDate)}
@@ -1062,7 +1059,7 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
           </select>
         </div>
         <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Deadline</label>
-          <input style={inputStyle} type="date" min="2000-01-01" max="2099-12-31" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
+          <input style={{ ...inputStyle, colorScheme: 'dark' }} type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} />
         </div>
         <div style={{ marginBottom: '28px' }}><label style={labelStyle}>Notes</label><textarea style={{ ...inputStyle, minHeight: '90px', resize: 'vertical' }} placeholder="Add any initial onboarding notes..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
 

@@ -242,12 +242,12 @@ const Analytics = () => {
       <div style={{ ...cardStyle, marginBottom: '18px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'end' }}>
         <div>
           <label style={labelStyle}>Start Date</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} min="2000-01-01" max="2099-12-31" style={dateInputStyle} />
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'dark' }} />
         </div>
 
         <div>
           <label style={labelStyle}>End Date</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} min="2000-01-01" max="2099-12-31" style={dateInputStyle} />
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'dark' }} />
         </div>
 
         <div>

@@ -599,7 +599,6 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             <input
                               type="date"
                               autoFocus
-                              min="2000-01-01" max="2099-12-31"
                               defaultValue={fmtDateISO(entryDeadline)}
                               onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
@@ -709,8 +708,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                         <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
                           <input type="date" value={assignForm.deadline} onChange={(e) => setAssignForm((p) => ({ ...p, deadline: e.target.value }))}
-                            min="2000-01-01" max="2099-12-31"
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }} />
                         </div>
                         <button disabled={!assignForm.spoc || isLoading} onClick={() => handleAssign(soc.key)}
                           style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: assignForm.spoc ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#2d3348', color: assignForm.spoc ? 'white' : '#6b7280', fontSize: '12px', fontWeight: 600, cursor: assignForm.spoc ? 'pointer' : 'not-allowed', marginTop: '18px' }}>

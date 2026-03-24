@@ -170,7 +170,7 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
           <div>
             <label style={labelStyle}>Date of First Contact</label>
-            <input type="date" min="2000-01-01" max="2099-12-31" style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'dark' }} value={form.dateOfFirstContact} onChange={(e) => h('dateOfFirstContact', e.target.value)} />
+            <input type="date" style={{ ...inputStyle, colorScheme: 'dark' }} value={form.dateOfFirstContact} onChange={(e) => h('dateOfFirstContact', e.target.value)} />
           </div>
         </div>
 

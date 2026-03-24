@@ -387,9 +387,8 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
         <div style={{ marginBottom: '20px' }}>
           <label style={LABEL}>Deadline</label>
           <input
-            style={INPUT}
+            style={{ ...INPUT, colorScheme: 'dark' }}
             type="date"
-            min="2000-01-01" max="2099-12-31"
             value={form.deadline}
             onChange={(e) => set('deadline', e.target.value)}
           />
