@@ -6,6 +6,9 @@ node_modules/
 .env.*
 !.env.example
 
+# CSV data files
+*.csv
+
 # Logs
 logs/
 *.log

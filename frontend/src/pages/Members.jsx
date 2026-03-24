@@ -100,7 +100,7 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
   const [form, setForm] = useState(
     initialData
       ? { ...initialData }
-      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', leadSource: '', priority: 'medium' },
+      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', leadSource: '', priority: 'medium', isReferred: false, referredBy: '', referralCommission: '' },
   );
 
   const h = (f, v) => setForm((p) => ({ ...p, [f]: v }));
@@ -193,6 +193,41 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
             </select>
           </div>
         </div>
+
+        {/* Referral Info */}
+        <div style={{ ...sectionStyle, marginTop: '24px' }}>Referral Information</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Is Referred?</label>
+          <button
+            type="button"
+            onClick={() => h('isReferred', !form.isReferred)}
+            style={{
+              width: '42px', height: '24px', borderRadius: '12px', border: 'none',
+              backgroundColor: form.isReferred ? '#22c55e' : '#374151',
+              position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s',
+            }}
+          >
+            <span style={{
+              position: 'absolute', top: '3px', left: form.isReferred ? '21px' : '3px',
+              width: '18px', height: '18px', borderRadius: '50%', backgroundColor: 'white', transition: 'left 0.2s',
+            }} />
+          </button>
+          <span style={{ fontSize: '12px', color: form.isReferred ? '#34d399' : '#9ca3af' }}>
+            {form.isReferred ? 'Yes' : 'No'}
+          </span>
+        </div>
+        {form.isReferred && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={labelStyle}>Referred By</label>
+              <input style={inputStyle} placeholder="e.g. John Doe" value={form.referredBy} onChange={(e) => h('referredBy', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Referral Commission</label>
+              <input style={inputStyle} placeholder="e.g. 10% or ₹5000" value={form.referralCommission} onChange={(e) => h('referralCommission', e.target.value)} />
+            </div>
+          </div>
+        )}
 
         {/* Buttons */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px' }}>
@@ -534,6 +569,8 @@ const Members = () => {
       _id: member._id, name: member.name, role: Array.isArray(member.role) ? member.role : [], email: member.email,
       phone: member.phone || '', genre: member.genre || '', languages: member.languages || '', bio: member.bio || '',
       panCard: member.panCard || '', aadhaar: member.aadhaar || '', dateOfFirstContact: member.dateOfFirstContact || '', spoc: member.spoc || '',
+      leadSource: member.leadSource || '', priority: member.priority || 'medium',
+      isReferred: member.isReferred || false, referredBy: member.referredBy || '', referralCommission: member.referralCommission || '',
     });
   };
 
@@ -638,15 +675,26 @@ const Members = () => {
                   </div>
                   <div style={{ color: '#8892b0', fontSize: '12px', marginTop: '2px' }}>{Array.isArray(m.role) ? m.role.join(', ') : m.role}</div>
                 </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(m._id); }}
-                  title="Delete member"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditMember(m); }}
+                    title="Edit member"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#3b82f6')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
+                  >
+                    <Edit3 size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(m._id); }}
+                    title="Delete member"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
               {/* Stats */}
               <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '13px', color: '#8892b0' }}>

@@ -49,7 +49,7 @@ router.get('/', auth, async (req, res) => {
 // POST /api/members
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline, leadSource, priority } = req.body;
+    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline, leadSource, priority, isReferred, referredBy, referralCommission } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
 
     const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
@@ -72,6 +72,9 @@ router.post('/', auth, async (req, res) => {
       dateOfFirstContact: dateOfFirstContact || '',
       leadSource: leadSource || '',
       priority: priority || 'medium',
+      isReferred: isReferred || false,
+      referredBy: referredBy || '',
+      referralCommission: referralCommission || '',
       joinDate: new Date().toISOString().split('T')[0],
     });
 
@@ -116,7 +119,7 @@ router.put('/:id', auth, async (req, res) => {
       member.assignedDate = req.body.spoc ? new Date() : null;
     }
 
-    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline'];
+    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline', 'isReferred', 'referredBy', 'referralCommission'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) member[f] = req.body[f];
     });

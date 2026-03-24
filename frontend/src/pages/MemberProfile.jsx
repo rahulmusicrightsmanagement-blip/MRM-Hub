@@ -186,6 +186,11 @@ const MemberProfile = () => {
         {member.bio && (
           <div style={{ ...infoBox, marginTop: '12px' }}><div style={infoLabel}>Bio</div><div style={infoVal}>{member.bio}</div></div>
         )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
+          <div style={infoBox}><div style={infoLabel}>Referred</div><div style={{ ...infoVal, color: member.isReferred ? '#34d399' : '#9ca3af' }}>{member.isReferred ? 'Yes' : 'No'}</div></div>
+          <div style={infoBox}><div style={infoLabel}>Referred By</div><div style={infoVal}>{member.referredBy || '—'}</div></div>
+          <div style={infoBox}><div style={infoLabel}>Referral Commission</div><div style={infoVal}>{member.referralCommission || '—'}</div></div>
+        </div>
       </div>
 
       {/* SPOC Summary */}
