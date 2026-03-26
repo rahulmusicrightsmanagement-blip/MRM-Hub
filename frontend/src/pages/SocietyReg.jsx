@@ -907,7 +907,7 @@ const SocietyReg = () => {
     // Text search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((m) => m.name.toLowerCase().includes(q));
+      result = result.filter((m) => m.name.toLowerCase().includes(q) || (m._id && m._id.toLowerCase().includes(q)));
     }
     // Status filters
     const activeFilters = Object.entries(filters).filter(([, v]) => v && v !== 'All');

@@ -540,6 +540,8 @@ const Members = () => {
     return members.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
+        (m._id && m._id.toLowerCase().includes(q)) ||
+        (m.clientNumber && m.clientNumber.toLowerCase().includes(q)) ||
         (m.email && m.email.toLowerCase().includes(q)) ||
         (Array.isArray(m.role) ? m.role.some((r) => r.toLowerCase().includes(q)) : (m.role || '').toLowerCase().includes(q)) ||
         (m.genre && m.genre.toLowerCase().includes(q)) ||
@@ -647,7 +649,7 @@ const Members = () => {
       {/* Search */}
       <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '24px' }}>
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-        <input placeholder="Search by name, role..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+        <input placeholder="Search by name, role, ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }} />
       </div>
 

@@ -333,7 +333,7 @@ const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
             value={contractType}
             onChange={(e) => setContractType(e.target.value)}
           >
-            {['Retainer', 'Royalty', 'Work-Based'].map((t) => (
+            {['Retainer', 'Royalty', 'Work-Based', 'Inhouse'].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -1168,6 +1168,7 @@ const SalesPipeline = () => {
     const q = searchQuery.toLowerCase();
     return leads.filter((l) =>
       l.name.toLowerCase().includes(q) ||
+      (l._id && l._id.toLowerCase().includes(q)) ||
       (l.email && l.email.toLowerCase().includes(q)) ||
       (l.phone && l.phone.includes(q)) ||
       (l.spoc && l.spoc.toLowerCase().includes(q)) ||
@@ -1186,7 +1187,7 @@ const SalesPipeline = () => {
             <div style={{ position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
               <input
-                placeholder="Search leads..."
+                placeholder="Search by name, ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ width: '220px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}

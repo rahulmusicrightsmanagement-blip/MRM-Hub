@@ -9,7 +9,7 @@ import SearchableSelect from '../components/SearchableSelect';
 const STAGES = ['Document Submission', 'KYC Verification', 'Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
 const stageDotColors = { 'Document Submission': '#3b82f6', 'KYC Verification': '#f97316', 'Contract Signing': '#a855f7', 'Active Member': '#10b981', 'Contact Made': '#06b6d4', 'Completed': '#22c55e' };
 const ROLE_OPTIONS = ['Singer-Songwriter', 'Music Composer', 'Lyricist', 'Producer', 'Publisher', 'Artist Manager'];
-const contractTypes = ['Retainer', 'Royalty', 'Work-Based'];
+const contractTypes = ['Retainer', 'Royalty', 'Work-Based', 'Inhouse'];
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -439,6 +439,8 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   const [uploading, setUploading] = useState(false);
   const [startDate, setStartDate] = useState(entry.contractStartDate ? entry.contractStartDate.slice(0, 10) : '');
   const [renewalDate, setRenewalDate] = useState(entry.contractRenewalDate ? entry.contractRenewalDate.slice(0, 10) : '');
+  const [renewalType, setRenewalType] = useState(entry.renewalType || '');
+  const [renewalRemarks, setRenewalRemarks] = useState(entry.renewalRemarks || '');
   const [assignModalSociety, setAssignModalSociety] = useState(null);
   const { authFetch, token } = useAuth();
   const { addToast } = useToast();
@@ -449,6 +451,8 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   useEffect(() => {
     setRenewalDate(entry.contractRenewalDate ? entry.contractRenewalDate.slice(0, 10) : '');
   }, [entry.contractRenewalDate]);
+  useEffect(() => { setRenewalType(entry.renewalType || ''); }, [entry.renewalType]);
+  useEffect(() => { setRenewalRemarks(entry.renewalRemarks || ''); }, [entry.renewalRemarks]);
 
   const selectedSocieties = entry.selectedSocieties || [];
 
@@ -575,6 +579,38 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
               style={{ ...inputStyle, colorScheme: 'dark' }}
               value={renewalDate}
               onChange={(e) => saveDate('contractRenewalDate', e.target.value, setRenewalDate)}
+            />
+          </div>
+        </div>
+
+        {/* Renewal Details */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+          <div>
+            <label style={{ ...labelStyle, marginBottom: '8px' }}>Renewal Type</label>
+            <select
+              style={{ ...inputStyle, cursor: 'pointer' }}
+              value={renewalType}
+              onChange={async (e) => {
+                setRenewalType(e.target.value);
+                try { await onUpdate({ renewalType: e.target.value }); } catch {}
+              }}
+            >
+              <option value="">Select...</option>
+              <option value="Auto Renewal">Auto Renewal</option>
+              <option value="Mutual Renewal">Mutual Renewal</option>
+              <option value="No Renewal">No Renewal</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ ...labelStyle, marginBottom: '8px' }}>Renewal Remarks</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: '38px', resize: 'vertical' }}
+              placeholder="Add remarks..."
+              value={renewalRemarks}
+              onChange={(e) => setRenewalRemarks(e.target.value)}
+              onBlur={async () => {
+                try { await onUpdate({ renewalRemarks }); } catch {}
+              }}
             />
           </div>
         </div>
@@ -765,10 +801,12 @@ const ContactMadeView = ({ entry, onUpdate }) => {
   const [groupName, setGroupName] = useState(entry.whatsAppGroupName || '');
   const [emailAddr, setEmailAddr] = useState(entry.createdEmailAddress || '');
   const [emailPass, setEmailPass] = useState(entry.createdEmailPassword || '');
+  const [clientNumber, setClientNumber] = useState(entry.clientNumber || '');
 
   useEffect(() => { setGroupName(entry.whatsAppGroupName || ''); }, [entry.whatsAppGroupName]);
   useEffect(() => { setEmailAddr(entry.createdEmailAddress || ''); }, [entry.createdEmailAddress]);
   useEffect(() => { setEmailPass(entry.createdEmailPassword || ''); }, [entry.createdEmailPassword]);
+  useEffect(() => { setClientNumber(entry.clientNumber || ''); }, [entry.clientNumber]);
 
   const toggleField = async (field, val) => {
     try {
@@ -840,6 +878,17 @@ const ContactMadeView = ({ entry, onUpdate }) => {
             </div>
           </div>
         )}
+      </div>
+
+      <div style={{ ...sectionStyle, padding: '14px 16px' }}>
+        <label style={labelStyle}>Client Number</label>
+        <input
+          style={inputStyle}
+          placeholder="Enter client number..."
+          value={clientNumber}
+          onChange={(e) => setClientNumber(e.target.value)}
+          onBlur={() => saveText('clientNumber', clientNumber)}
+        />
       </div>
     </div>
   );
@@ -938,6 +987,12 @@ const CompletedView = ({ entry }) => {
               {entry.contractRenewalDate && <span style={{ fontSize: '12px', color: '#9ca3af' }}>Renewal: <strong style={{ color: '#e5e7eb' }}>{fmtDate(entry.contractRenewalDate)}</strong></span>}
             </div>
           )}
+          {(entry.renewalType || entry.renewalRemarks) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px', paddingLeft: '22px' }}>
+              {entry.renewalType && <span style={{ fontSize: '12px', color: '#9ca3af' }}>Renewal Type: <strong style={{ color: '#e5e7eb' }}>{entry.renewalType}</strong></span>}
+              {entry.renewalRemarks && <span style={{ fontSize: '12px', color: '#9ca3af' }}>Remarks: <strong style={{ color: '#e5e7eb' }}>{entry.renewalRemarks}</strong></span>}
+            </div>
+          )}
           {selectedSocieties.length > 0 && (
             <div style={{ marginTop: '10px', paddingLeft: '22px' }}>
               <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px' }}>Societies Registered</p>
@@ -973,6 +1028,11 @@ const CompletedView = ({ entry }) => {
             <div style={{ marginTop: '6px', paddingLeft: '22px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>Email: <strong style={{ color: '#e5e7eb' }}>{entry.createdEmailAddress}</strong></span>
               {entry.createdEmailPassword && <span style={{ fontSize: '12px', color: '#9ca3af' }}>Password: <strong style={{ color: '#e5e7eb' }}>{entry.createdEmailPassword}</strong></span>}
+            </div>
+          )}
+          {entry.clientNumber && (
+            <div style={{ marginTop: '6px', paddingLeft: '22px' }}>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>Client Number: <strong style={{ color: '#e5e7eb' }}>{entry.clientNumber}</strong></span>
             </div>
           )}
         </div>
@@ -1441,6 +1501,8 @@ const Onboarding = () => {
     const q = searchQuery.toLowerCase();
     return entries.filter((e) =>
       e.name.toLowerCase().includes(q) ||
+      (e._id && e._id.toLowerCase().includes(q)) ||
+      (e.clientNumber && e.clientNumber.toLowerCase().includes(q)) ||
       (e.email && e.email.toLowerCase().includes(q)) ||
       (e.phone && e.phone.includes(q)) ||
       (e.spoc && e.spoc.toLowerCase().includes(q)) ||
@@ -1458,7 +1520,7 @@ const Onboarding = () => {
           <div style={{ position: 'relative' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
-              placeholder="Search by name, email, SPOC..."
+              placeholder="Search by name, email, ID, SPOC..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ width: '260px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}

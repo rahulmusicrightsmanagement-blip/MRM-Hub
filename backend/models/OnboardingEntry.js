@@ -57,6 +57,8 @@ const onboardingEntrySchema = new mongoose.Schema(
     contractGdriveFileId: { type: String, default: '' },
     contractStartDate: { type: Date, default: null },
     contractRenewalDate: { type: Date, default: null },
+    renewalType: { type: String, default: '', enum: ['', 'Auto Renewal', 'Mutual Renewal', 'No Renewal'] },
+    renewalRemarks: { type: String, default: '' },
     selectedSocieties: { type: [String], default: [] },
 
     /* ─── Contact Made (stage 5) ─── */
@@ -65,6 +67,7 @@ const onboardingEntrySchema = new mongoose.Schema(
     emailCreated: { type: Boolean, default: false },
     createdEmailAddress: { type: String, default: '' },
     createdEmailPassword: { type: String, default: '' },
+    clientNumber: { type: String, default: '' },
 
     /* ─── Legacy checklist (backward compat) ─── */
     checklist: {

@@ -852,6 +852,7 @@ const Tracker = () => {
     const q = searchQuery.toLowerCase();
     return tasks.filter((t) =>
       (t.title && t.title.toLowerCase().includes(q)) ||
+      (t._id && t._id.toLowerCase().includes(q)) ||
       (t.description && t.description.toLowerCase().includes(q)) ||
       (t.category && t.category.toLowerCase().includes(q)) ||
       (t.spoc && t.spoc.toLowerCase().includes(q))

@@ -175,7 +175,7 @@ const MemberProfile = () => {
       <div style={card}>
         <div style={sectionTitle}><User size={16} /> Basic Information</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-          <div style={infoBox}><div style={infoLabel}>Member ID</div><div style={infoVal}>{member._id?.slice(-6).toUpperCase()}</div></div>
+          <div style={infoBox}><div style={infoLabel}>Member ID</div><div style={infoVal}>{member.clientNumber || (onboarding.length > 0 && onboarding[0].clientNumber) || member._id?.slice(-6).toUpperCase()}</div></div>
           <div style={infoBox}><div style={infoLabel}>Email</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={13} color="#8892b0" />{member.email || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Phone</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={13} color="#8892b0" />{member.phone || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(member.role) ? member.role.join(', ') : member.role || '—'}</div></div>
@@ -191,6 +191,18 @@ const MemberProfile = () => {
           <div style={infoBox}><div style={infoLabel}>Referred By</div><div style={infoVal}>{member.referredBy || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Referral Commission</div><div style={infoVal}>{member.referralCommission || '—'}</div></div>
         </div>
+
+        {/* Renewal Details & Notes from Onboarding */}
+        {onboarding.length > 0 && (onboarding[0].renewalType || onboarding[0].renewalRemarks || onboarding[0].contractStartDate || onboarding[0].contractRenewalDate || onboarding[0].notes) && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
+            {onboarding[0].contractType && <div style={infoBox}><div style={infoLabel}>Contract Type</div><div style={infoVal}>{onboarding[0].contractType}</div></div>}
+            {onboarding[0].contractStartDate && <div style={infoBox}><div style={infoLabel}>Contract Start</div><div style={infoVal}>{fmtDate(onboarding[0].contractStartDate)}</div></div>}
+            {onboarding[0].contractRenewalDate && <div style={infoBox}><div style={infoLabel}>Contract Renewal</div><div style={infoVal}>{fmtDate(onboarding[0].contractRenewalDate)}</div></div>}
+            {onboarding[0].renewalType && <div style={infoBox}><div style={infoLabel}>Renewal Type</div><div style={{ ...infoVal, color: '#c4b5fd' }}>{onboarding[0].renewalType}</div></div>}
+            {onboarding[0].renewalRemarks && <div style={infoBox}><div style={infoLabel}>Renewal Remarks</div><div style={infoVal}>{onboarding[0].renewalRemarks}</div></div>}
+            {onboarding[0].notes && <div style={infoBox}><div style={infoLabel}>Notes</div><div style={infoVal}>{onboarding[0].notes}</div></div>}
+          </div>
+        )}
       </div>
 
       {/* SPOC Summary */}
@@ -534,6 +546,12 @@ const MemberProfile = () => {
                 {entry.contractRenewalDate && <span>Renewal: {fmtDate(entry.contractRenewalDate)}</span>}
               </div>
               {entry.contractFileName && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><FileText size={12} /> {entry.contractFileName}</div>}
+              {(entry.renewalType || entry.renewalRemarks) && (
+                <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
+                  {entry.renewalType && <span>Renewal Type: <strong style={{ color: '#c4b5fd' }}>{entry.renewalType}</strong></span>}
+                  {entry.renewalRemarks && <span>Remarks: <strong style={{ color: '#9ca3af' }}>{entry.renewalRemarks}</strong></span>}
+                </div>
+              )}
             </div>
           )}
 
@@ -556,6 +574,7 @@ const MemberProfile = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
                 {entry.addedToWhatsApp && <span>✓ Added to WhatsApp {entry.whatsAppGroupName ? `(${entry.whatsAppGroupName})` : ''}</span>}
                 {entry.emailCreated && <span>✓ Email Created: {entry.createdEmailAddress || '—'}</span>}
+                {entry.clientNumber && <span>Client Number: <strong>{entry.clientNumber}</strong></span>}
               </div>
             </div>
           )}

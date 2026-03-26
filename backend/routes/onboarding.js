@@ -173,8 +173,8 @@ router.put('/:id', auth, async (req, res) => {
 
     const fields = [
       'name', 'role', 'email', 'phone', 'contractType', 'stage', 'spoc', 'notes', 'priority', 'deadline',
-      'contractSent', 'contractReceived', 'contractFileUrl', 'contractFileName', 'contractStartDate', 'contractRenewalDate', 'selectedSocieties',
-      'addedToWhatsApp', 'whatsAppGroupName', 'emailCreated', 'createdEmailAddress', 'createdEmailPassword',
+      'contractSent', 'contractReceived', 'contractFileUrl', 'contractFileName', 'contractStartDate', 'contractRenewalDate', 'renewalType', 'renewalRemarks', 'selectedSocieties',
+      'addedToWhatsApp', 'whatsAppGroupName', 'emailCreated', 'createdEmailAddress', 'createdEmailPassword', 'clientNumber',
       'previousStage',
     ];
     fields.forEach((f) => {
@@ -192,15 +192,17 @@ router.put('/:id', auth, async (req, res) => {
 
     await entry.save();
 
-    // Sync contractType back to the Lead's onboardingContractType
-    if (req.body.contractType && entry.email) {
+    // Sync fields back to Lead and Member
+    if (entry.email) {
       try {
-        await Lead.updateMany(
-          { email: entry.email },
-          { onboardingContractType: req.body.contractType }
-        );
+        const syncToLead = {};
+        const syncToMember = {};
+        if (req.body.contractType) syncToLead.onboardingContractType = req.body.contractType;
+        if (req.body.clientNumber !== undefined) syncToMember.clientNumber = req.body.clientNumber;
+        if (Object.keys(syncToLead).length) await Lead.updateMany({ email: entry.email }, syncToLead);
+        if (Object.keys(syncToMember).length) await Member.updateMany({ email: entry.email }, syncToMember);
       } catch (syncErr) {
-        console.error('Sync contractType to lead error:', syncErr);
+        console.error('Sync to lead/member error:', syncErr);
       }
     }
 

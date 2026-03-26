@@ -30,6 +30,7 @@ const memberSchema = new mongoose.Schema(
     isReferred: { type: Boolean, default: false },
     referredBy: { type: String, default: '' },
     referralCommission: { type: String, default: '' },
+    clientNumber: { type: String, default: '' },
     priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },
     registrations: { type: Number, default: 0 },
     joinDate: { type: String, default: '' },
