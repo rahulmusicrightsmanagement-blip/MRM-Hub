@@ -3,10 +3,9 @@ import { withApiBase } from '../utils/api';
 
 const AuthContext = createContext(null);
 
-const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour
-const CHECK_INTERVAL = 10000; // check every 10 seconds
+const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours
+const CHECK_INTERVAL = 30000; // check every 30 seconds
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-const SESSION_KEY = 'mrmhub_session';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -20,17 +19,8 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('lastActivity');
-    sessionStorage.removeItem(SESSION_KEY);
     setToken(null);
     setUser(null);
-  }, []);
-
-  // On mount: if no session marker, tab was closed — force re-login
-  useEffect(() => {
-    if (token && !sessionStorage.getItem(SESSION_KEY)) {
-      setSessionExpired(true);
-      logout();
-    }
   }, []);
 
   // Inactivity tracker — only active when user is logged in
@@ -43,9 +33,10 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    sessionStorage.setItem(SESSION_KEY, '1');
-    lastActivityRef.current = Date.now();
-    localStorage.setItem('lastActivity', String(Date.now()));
+    // Restore last activity timestamp if available
+    const stored = parseInt(localStorage.getItem('lastActivity'), 10);
+    lastActivityRef.current = stored || Date.now();
+    localStorage.setItem('lastActivity', String(lastActivityRef.current));
 
     const recordActivity = () => {
       lastActivityRef.current = Date.now();
@@ -66,7 +57,7 @@ export const AuthProvider = ({ children }) => {
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-    ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, recordActivity));
+      ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, recordActivity));
     };
   }, [user, logout]);
 
@@ -76,6 +67,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
       return;
     }
+
+    // Check if inactivity timeout passed while app was closed
+    const stored = parseInt(localStorage.getItem('lastActivity'), 10);
+    if (stored && (Date.now() - stored) >= INACTIVITY_TIMEOUT) {
+      setSessionExpired(true);
+      logout();
+      setLoading(false);
+      return;
+    }
+
     fetch(withApiBase('/api/auth/me'), {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -107,7 +108,7 @@ export const AuthProvider = ({ children }) => {
     if (!res.ok) throw new Error(data.message || 'Login failed');
     if (data.requireOtp) return { requireOtp: true };
     localStorage.setItem('token', data.token);
-    sessionStorage.setItem(SESSION_KEY, '1');
+    localStorage.setItem('lastActivity', String(Date.now()));
     setToken(data.token);
     setUser(data.user);
     setSessionExpired(false);
