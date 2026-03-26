@@ -115,7 +115,7 @@ async function run() {
       meetingVerified: true,
       movedToOnboarding: true,
       onboardingSpoc: spoc,
-      onboardingContractType: 'Retailer',
+      onboardingContractType: 'Retainer',
       onboardedAt: now,
     });
 
@@ -126,7 +126,7 @@ async function run() {
       color,
       email,
       phone,
-      contractType: 'Retailer',
+      contractType: 'Retainer',
       stage: 'Document Submission',
       documents: [
         { docType: 'aadhaar', label: 'Aadhaar Card', requested: false, received: false },

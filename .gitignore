@@ -6,8 +6,12 @@ node_modules/
 .env.*
 !.env.example
 
-# CSV data files
+# Data files
 *.csv
+*.xlsx
+
+# One-off scripts
+generate-duplicate-report.js
 
 # Logs
 logs/

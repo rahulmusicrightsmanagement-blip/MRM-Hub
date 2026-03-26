@@ -9,7 +9,7 @@ import SearchableSelect from '../components/SearchableSelect';
 const STAGES = ['Document Submission', 'KYC Verification', 'Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
 const stageDotColors = { 'Document Submission': '#3b82f6', 'KYC Verification': '#f97316', 'Contract Signing': '#a855f7', 'Active Member': '#10b981', 'Contact Made': '#06b6d4', 'Completed': '#22c55e' };
 const ROLE_OPTIONS = ['Singer-Songwriter', 'Music Composer', 'Lyricist', 'Producer', 'Publisher', 'Artist Manager'];
-const contractTypes = ['Retailer', 'Royalty', 'Work-Based'];
+const contractTypes = ['Retainer', 'Royalty', 'Work-Based'];
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -1012,7 +1012,7 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
   const [form, setForm] = useState(
     initialData
       ? { ...initialData, deadline: initialData.deadline ? fmtDateISO(new Date(initialData.deadline)) : '' }
-      : { name: '', role: [], email: '', phone: '', contractType: 'Retailer', spoc: '', notes: '', priority: 'medium', deadline: '' },
+      : { name: '', role: [], email: '', phone: '', contractType: 'Retainer', spoc: '', notes: '', priority: 'medium', deadline: '' },
   );
 
   const handleMemberSelect = (memberName) => {
@@ -1381,7 +1381,7 @@ const Onboarding = () => {
     setSelectedMember(null);
     setEditingEntry({
       _id: entry._id, name: entry.name, role: Array.isArray(entry.role) ? entry.role : [], email: entry.email,
-      phone: entry.phone || '', contractType: entry.contractType || 'Retailer', spoc: entry.spoc || '',
+      phone: entry.phone || '', contractType: entry.contractType || 'Retainer', spoc: entry.spoc || '',
       notes: entry.notes || '', priority: entry.priority || 'medium',
     });
   };

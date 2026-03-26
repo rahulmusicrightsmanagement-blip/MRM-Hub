@@ -93,7 +93,7 @@ router.post('/', auth, async (req, res) => {
       color,
       role: role || [],
       phone: phone || '',
-      contractType: contractType || 'Retailer',
+      contractType: contractType || 'Retainer',
       spoc: spoc || '',
       assignedDate: spoc ? new Date() : null,
       deadline: deadline ? new Date(deadline) : null,
@@ -192,6 +192,18 @@ router.put('/:id', auth, async (req, res) => {
 
     await entry.save();
 
+    // Sync contractType back to the Lead's onboardingContractType
+    if (req.body.contractType && entry.email) {
+      try {
+        await Lead.updateMany(
+          { email: entry.email },
+          { onboardingContractType: req.body.contractType }
+        );
+      } catch (syncErr) {
+        console.error('Sync contractType to lead error:', syncErr);
+      }
+    }
+
     // Notify SPOC on stage change
     if (req.body.stage && req.body.stage !== oldStage && entry.spoc) {
       notify({
@@ -275,7 +287,7 @@ router.post('/restart/:leadId', auth, async (req, res) => {
       email: lead.email,
       color,
       phone: lead.phone || '',
-      contractType: lead.onboardingContractType || 'Retailer',
+      contractType: lead.onboardingContractType || 'Retainer',
       spoc: lead.onboardingSpoc || '',
       assignedDate: lead.onboardingSpoc ? new Date() : null,
       notes: lead.notes || '',

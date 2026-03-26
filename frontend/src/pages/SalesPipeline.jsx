@@ -291,7 +291,7 @@ const ViewDetailsToggle = ({ title, children }) => {
    ═══════════════════════════════════════════ */
 const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
   const [spoc, setSpoc] = useState(lead.spoc || '');
-  const [contractType, setContractType] = useState('Retailer');
+  const [contractType, setContractType] = useState('Retainer');
   const [deadline, setDeadline] = useState('');
 
   return (
@@ -333,7 +333,7 @@ const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
             value={contractType}
             onChange={(e) => setContractType(e.target.value)}
           >
-            {['Retailer', 'Royalty', 'Work-Based'].map((t) => (
+            {['Retainer', 'Royalty', 'Work-Based'].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -1090,7 +1090,7 @@ const SalesPipeline = () => {
           email: lead.email,
           phone: lead.phone || '',
           role: [],
-          contractType: opts.contractType || 'Retailer',
+          contractType: opts.contractType || 'Retainer',
           spoc: opts.spoc || lead.spoc || '',
           notes: lead.notes || '',
           priority: lead.priority || 'medium',
@@ -1104,7 +1104,7 @@ const SalesPipeline = () => {
           body: JSON.stringify({
             movedToOnboarding: true,
             onboardingSpoc: opts.spoc || lead.spoc || '',
-            onboardingContractType: opts.contractType || 'Retailer',
+            onboardingContractType: opts.contractType || 'Retainer',
             onboardedAt: new Date().toISOString(),
           }),
         });

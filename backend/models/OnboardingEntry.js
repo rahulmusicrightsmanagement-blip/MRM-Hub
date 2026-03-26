@@ -37,7 +37,7 @@ const onboardingEntrySchema = new mongoose.Schema(
     role: { type: [String], default: [] },
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, default: '' },
-    contractType: { type: String, default: 'Retailer' },
+    contractType: { type: String, default: 'Retainer' },
     stage: { type: String, default: 'Document Submission', enum: STAGES },
 
     /* ─── Documents (stages 1 & 2) ─── */
