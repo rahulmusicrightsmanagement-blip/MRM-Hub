@@ -2,24 +2,11 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { usePicklist } from '../context/PicklistContext';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
-/* ─── 12 Collecting Societies ─── */
-const SOCIETIES = [
-  { key: 'IPRS', name: 'Indian Performing Right Society', flag: '🇮🇳' },
-  { key: 'PRS', name: 'PRS for Music', flag: '🇬🇧' },
-  { key: 'ASCAP', name: 'American Society of Composers', flag: '🇺🇸' },
-  { key: 'PPL(INDIA)', name: 'Phonographic Performance Ltd (India)', flag: '🇮🇳' },
-  { key: 'PPL(UK)', name: 'Phonographic Performance Ltd (UK)', flag: '🇬🇧' },
-  { key: 'SOUND EXCHANGE', name: 'SoundExchange', flag: '🇺🇸' },
-  { key: 'ISAMRA', name: 'Indian Singers & Musicians Rights Association', flag: '🇮🇳' },
-  { key: 'BMI', name: 'Broadcast Music Inc.', flag: '🇺🇸' },
-  { key: 'GEMA', name: 'Gesellschaft für musikalische Aufführungs', flag: '🇩🇪' },
-  { key: 'MLC', name: 'The Mechanical Licensing Collective', flag: '🇺🇸' },
-  { key: 'IMRO', name: 'Irish Music Rights Organisation', flag: '🇮🇪' },
-  { key: 'SOCAN', name: 'Society of Composers, Authors', flag: '🇨🇦' },
-];
+// SOCIETIES is now loaded from picklist — see SocietyReg component
 
 /* ─── 10 tracking steps (plus remarks) ─── */
 const STEP_DEFINITIONS = [
@@ -363,6 +350,8 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
    Start Registration Modal
    ═══════════════════════════════════════════════════════ */
 const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
+  const { getItems } = usePicklist();
+  const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
   const [form, setForm] = useState({ member: '', society: '', ipi: '', spoc: '', notes: '' });
 
   const handleSubmit = () => {
@@ -432,6 +421,8 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
 const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUpdated, onDelete, onRename, teamMembers, authFetch, token }) => {
   const { user, isAdmin } = useAuth();
   const { addToast } = useToast();
+  const { getItems } = usePicklist();
+  const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
 
   const isAssignedToSoc = (socKey) => {
     if (isAdmin) return true;
@@ -767,6 +758,8 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 const SocietyReg = () => {
   const { authFetch, token } = useAuth();
   const { addToast } = useToast();
+  const { getItems } = usePicklist();
+  const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
   const [members, setMembers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [allMembers, setAllMembers] = useState([]);

@@ -9,6 +9,7 @@ import {
   ClipboardList,
   BarChart3,
   ShieldCheck,
+  List,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,14 +24,16 @@ const navItems = [
   { name: 'Tracker', path: '/tracker', icon: ClipboardList },
   { name: 'Reports', path: '/analytics', icon: BarChart3 },
   { name: 'SPOC Management', path: '/spoc-management', icon: ShieldCheck, fullAccessOnly: true },
+  { name: 'Picklist Manager', path: '/picklists', icon: List, adminOnly: true },
 ];
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user, logout, isFullAccess } = useAuth();
+  const { user, logout, isFullAccess, hasRole } = useAuth();
 
   const visibleItems = navItems.filter((item) => {
     if (item.fullAccessOnly) return isFullAccess;
+    if (item.adminOnly) return hasRole('admin');
     return true;
   });
 

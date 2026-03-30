@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { PicklistProvider } from './context/PicklistContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import SalesPipeline from './pages/SalesPipeline';
@@ -13,6 +14,7 @@ import Tracker from './pages/Tracker';
 import Analytics from './pages/Analytics';
 import Login from './pages/Login';
 import SpocManagement from './pages/SpocManagement';
+import PicklistManager from './pages/PicklistManager';
 
 const ProtectedRoutes = () => {
   const { user, loading, isFullAccess, hasRole } = useAuth();
@@ -47,6 +49,7 @@ const ProtectedRoutes = () => {
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/spoc-management" element={<Gate fullOnly><SpocManagement /></Gate>} />
+        <Route path="/picklists" element={<Gate roles={['admin']}><PicklistManager /></Gate>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
@@ -136,13 +139,15 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <ToastProvider>
-          <SessionTimeoutModal />
-          <Routes>
-            <Route path="/login" element={<LoginGuard />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
-        </ToastProvider>
+        <PicklistProvider>
+          <ToastProvider>
+            <SessionTimeoutModal />
+            <Routes>
+              <Route path="/login" element={<LoginGuard />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </ToastProvider>
+        </PicklistProvider>
       </AuthProvider>
     </Router>
   );

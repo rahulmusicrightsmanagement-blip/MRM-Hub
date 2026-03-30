@@ -5,13 +5,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { usePicklist } from '../context/PicklistContext';
 
 /* ═══════════════════════════════════════════
    CONSTANTS & HELPERS
    ═══════════════════════════════════════════ */
 const API = '/api';
-const CATEGORIES = ['All Categories', 'Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'];
-const TASK_CATEGORIES = ['Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
@@ -23,6 +22,14 @@ const CATEGORY_COLORS = {
   Internal: { bg: 'rgba(168,85,247,0.18)', border: '#a855f7', text: '#d8b4fe' },
   Members: { bg: 'rgba(251,146,60,0.18)', border: '#fb923c', text: '#fdba74' },
 };
+const FALLBACK_CAT_COLORS = [
+  { bg: 'rgba(99,102,241,0.18)', border: '#6366f1', text: '#a5b4fc' },
+  { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b', text: '#fcd34d' },
+  { bg: 'rgba(16,185,129,0.18)', border: '#10b981', text: '#6ee7b7' },
+  { bg: 'rgba(236,72,153,0.18)', border: '#ec4899', text: '#f9a8d4' },
+  { bg: 'rgba(6,182,212,0.18)', border: '#06b6d4', text: '#67e8f9' },
+];
+const getCategoryColor = (cat, allCats) => CATEGORY_COLORS[cat] || FALLBACK_CAT_COLORS[allCats.indexOf(cat) % FALLBACK_CAT_COLORS.length] || FALLBACK_CAT_COLORS[0];
 
 const PRIORITY_COLORS = {
   High: { bg: '#991b1b', color: '#fca5a5', label: 'HIGH' },
@@ -198,7 +205,7 @@ const FilterDropdown = ({ value, options, onChange, width = 170 }) => {
    TASK CARD (on calendar)
    ═══════════════════════════════════════════ */
 const TaskCard = ({ task, onClick }) => {
-  const cat = CATEGORY_COLORS[task.category] || CATEGORY_COLORS.Pipeline;
+  const cat = getCategoryColor(task.category, []);
   const pri = PRIORITY_COLORS[task.priority];
   const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
   const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
@@ -266,6 +273,8 @@ const TaskCard = ({ task, onClick }) => {
    SCHEDULE TASK MODAL
    ═══════════════════════════════════════════ */
 const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }) => {
+  const { getOptions } = usePicklist();
+  const TASK_CATEGORIES = getOptions('task_category');
   const isEdit = !!initialData;
   const [form, setForm] = useState(
     initialData
@@ -441,7 +450,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
    ═══════════════════════════════════════════ */
 const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
   if (!task) return null;
-  const cat = CATEGORY_COLORS[task.category] || CATEGORY_COLORS.Pipeline;
+  const cat = getCategoryColor(task.category, []);
   const pri = PRIORITY_COLORS[task.priority];
   const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
   const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
@@ -610,7 +619,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {dayTasks.map((t) => {
-                  const cat = CATEGORY_COLORS[t.category] || CATEGORY_COLORS.Pipeline;
+                  const cat = getCategoryColor(t.category, []);
                   const pri = PRIORITY_COLORS[t.priority];
                   const tdlStatus = t.completed ? null : getDeadlineStatus(t.deadline, t.assignedDate);
                   const tdlColor = tdlStatus ? DEADLINE_COLORS[tdlStatus] : null;
@@ -678,6 +687,9 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
 const Tracker = () => {
   const { authFetch } = useAuth();
   const toast = useToast();
+  const { getOptions } = usePicklist();
+  const TASK_CATEGORIES = getOptions('task_category');
+  const CATEGORIES = ['All Categories', ...TASK_CATEGORIES];
 
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState({ thisWeek: 0, today: 0, highPriority: 0, completed: 0 });

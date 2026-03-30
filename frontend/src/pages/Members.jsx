@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { usePicklist } from '../context/PicklistContext';
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -44,9 +45,9 @@ const StatusBadge = ({ status, colors: colorMap }) => {
 };
 
 /* ────────── Add Member Modal ────────── */
-const ROLE_OPTIONS = ['Singer-Songwriter', 'Playback Singer', 'Composer', 'Lyricist', 'Music Producer', 'Instrumentalist'];
-
 const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
+  const { getOptions } = usePicklist();
+  const roleOptions = getOptions('member_roles');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const toggle = (role) => {
@@ -79,7 +80,7 @@ const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
       </div>
       {open && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '8px', marginTop: '4px', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
-          {ROLE_OPTIONS.map((role) => (
+          {roleOptions.map((role) => (
             <div key={role} onClick={() => toggle(role)} style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '13px', background: selected.includes(role) ? '#2a3050' : 'transparent' }}
               onMouseEnter={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = '#1e2540'; }}
               onMouseLeave={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = 'transparent'; }}>
@@ -96,6 +97,8 @@ const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
 };
 
 const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
+  const { getOptions } = usePicklist();
+  const sourceList = getOptions('lead_source');
   const isEdit = !!initialData;
   const [form, setForm] = useState(
     initialData
@@ -181,7 +184,7 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
             <label style={labelStyle}>Lead Source</label>
             <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.leadSource} onChange={(e) => h('leadSource', e.target.value)}>
               <option value="">Select source...</option>
-              {['Website Form', 'LinkedIn Outreach', 'Instagram DM', 'Industry Event', 'Referral', 'Direct Outreach'].map((s) => <option key={s} value={s}>{s}</option>)}
+              {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>

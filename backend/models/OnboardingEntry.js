@@ -38,7 +38,7 @@ const onboardingEntrySchema = new mongoose.Schema(
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, default: '' },
     contractType: { type: String, default: 'Retainer' },
-    stage: { type: String, default: 'Document Submission', enum: STAGES },
+    stage: { type: String, default: 'Document Submission' },
 
     /* ─── Documents (stages 1 & 2) ─── */
     documents: {
@@ -57,7 +57,7 @@ const onboardingEntrySchema = new mongoose.Schema(
     contractGdriveFileId: { type: String, default: '' },
     contractStartDate: { type: Date, default: null },
     contractRenewalDate: { type: Date, default: null },
-    renewalType: { type: String, default: '', enum: ['', 'Auto Renewal', 'Mutual Renewal', 'No Renewal'] },
+    renewalType: { type: String, default: '' },
     renewalRemarks: { type: String, default: '' },
     selectedSocieties: { type: [String], default: [] },
 

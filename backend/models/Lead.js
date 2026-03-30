@@ -16,7 +16,7 @@ const leadSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     source: { type: String, default: '' },
     priority: { type: String, default: 'medium', enum: ['high', 'medium', 'low'] },
-    stage: { type: String, default: 'New Enquiry', enum: ['New Enquiry', 'Meeting Set', 'Qualified Lead', 'Not Qualified'] },
+    stage: { type: String, default: 'New Enquiry' },
     spoc: { type: String, default: '' },
     assignedDate: { type: Date, default: null },
     deadline: { type: Date, default: null },

@@ -6,11 +6,7 @@ const taskSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     startTime: { type: String, required: true },       // e.g. "09:00"
     duration: { type: Number, default: 60 },            // minutes
-    category: {
-      type: String,
-      default: 'Pipeline',
-      enum: ['Pipeline', 'Onboarding', 'Registration', 'Internal', 'Members'],
-    },
+    category: { type: String, default: 'Pipeline' },
     priority: {
       type: String,
       default: 'Medium',

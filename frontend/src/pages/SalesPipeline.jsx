@@ -6,11 +6,16 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { usePicklist } from '../context/PicklistContext';
 import SearchableSelect from '../components/SearchableSelect';
 
-const STAGES = ['New Enquiry', 'Meeting Set', 'Qualified Lead', 'Not Qualified'];
-const STAGE_COLORS = { 'New Enquiry': '#3b82f6', 'Meeting Set': '#6366f1', 'Qualified Lead': '#10b981', 'Not Qualified': '#ef4444' };
-const SOURCE_LIST = ['Website Form', 'LinkedIn Outreach', 'Instagram DM', 'Industry Event', 'Referral', 'Direct Outreach'];
+const DEFAULT_STAGE_COLORS = { 'New Enquiry': '#3b82f6', 'Meeting Set': '#6366f1', 'Qualified Lead': '#10b981', 'Not Qualified': '#ef4444' };
+const STAGE_COLOR_PALETTE = ['#3b82f6', '#6366f1', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
+const getStageColor = (stage, stages) => {
+  if (DEFAULT_STAGE_COLORS[stage]) return DEFAULT_STAGE_COLORS[stage];
+  const idx = stages.indexOf(stage);
+  return STAGE_COLOR_PALETTE[idx % STAGE_COLOR_PALETTE.length];
+};
 
 /* ──────── shared styles ──────── */
 const INPUT = {
@@ -80,6 +85,8 @@ const PriorityBadge = ({ priority }) => {
    ADD / EDIT LEAD MODAL
    ═══════════════════════════════════════════ */
 const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData }) => {
+  const { getOptions } = usePicklist();
+  const sourceList = getOptions('lead_source');
   const isEdit = !!initialData;
   const [form, setForm] = useState(
     initialData
@@ -129,7 +136,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
               <div>
                 <label style={LABEL}>Lead Source</label>
                 <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
-                  {SOURCE_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
@@ -169,7 +176,7 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
                 <label style={LABEL}>Lead Source</label>
                 <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
                   <option value="">Select source...</option>
-                  {SOURCE_LIST.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
@@ -410,6 +417,8 @@ const LeadDetailModal = ({
   onAddSubtask, teamMembers, onMoveToOnboarding, onMarkNotQualified, onRevertLead, onRestartOnboarding,
 }) => {
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const STAGES = getOptions('lead_stage');
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
   const [newTaskAssignee, setNewTaskAssignee] = useState('');
@@ -990,6 +999,8 @@ const LeadCard = ({ lead, onClick }) => {
 const SalesPipeline = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const STAGES = getOptions('lead_stage');
   const [leads, setLeads] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1208,7 +1219,7 @@ const SalesPipeline = () => {
             <div key={stage} style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: STAGE_COLORS[stage] }} />
+                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: getStageColor(stage, STAGES) }} />
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{stage}</span>
                 </div>
                 <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#1e2540', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>{stageLeads.length}</span>

@@ -2,14 +2,14 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { usePicklist } from '../context/PicklistContext';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 /* ─── Constants ─── */
-const STAGES = ['Document Submission', 'KYC Verification', 'Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
 const stageDotColors = { 'Document Submission': '#3b82f6', 'KYC Verification': '#f97316', 'Contract Signing': '#a855f7', 'Active Member': '#10b981', 'Contact Made': '#06b6d4', 'Completed': '#22c55e' };
-const ROLE_OPTIONS = ['Singer-Songwriter', 'Music Composer', 'Lyricist', 'Producer', 'Publisher', 'Artist Manager'];
-const contractTypes = ['Retainer', 'Royalty', 'Work-Based', 'Inhouse'];
+const STAGE_COLOR_PALETTE = ['#3b82f6', '#f97316', '#a855f7', '#10b981', '#06b6d4', '#22c55e', '#6366f1', '#ec4899'];
+const getStageDotColor = (stage, stages) => stageDotColors[stage] || STAGE_COLOR_PALETTE[stages.indexOf(stage) % STAGE_COLOR_PALETTE.length] || '#6b7280';
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -61,6 +61,8 @@ const PriorityBadge = ({ priority }) => {
 
 /* ─── Multi-Role Select ─── */
 const MultiRoleSelect = ({ selected, onChange }) => {
+  const { getOptions } = usePicklist();
+  const roleOptions = getOptions('onboarding_roles');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const toggle = (role) => onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
@@ -91,7 +93,7 @@ const MultiRoleSelect = ({ selected, onChange }) => {
       </div>
       {open && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1e2e', border: '1px solid #2d3348', borderRadius: '8px', marginTop: '4px', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
-          {ROLE_OPTIONS.map((role) => (
+          {roleOptions.map((role) => (
             <div key={role} onClick={() => toggle(role)} style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '13px', background: selected.includes(role) ? '#2d3348' : 'transparent' }}
               onMouseEnter={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = '#1e2540'; }}
               onMouseLeave={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = 'transparent'; }}>
@@ -156,8 +158,11 @@ const FileUploadBtn = ({ onUpload, uploading, existingFile, existingUrl }) => {
 const DocumentSubmissionView = ({ entry, onUpdate }) => {
   const [newDocName, setNewDocName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const docTypeSuggestions = getOptions('document_types');
   const docs = entry.documents || [];
 
   const toggleRequested = async (docId, val) => {
@@ -212,13 +217,36 @@ const DocumentSubmissionView = ({ entry, onUpdate }) => {
       </div>
 
       {adding ? (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-          <input autoFocus style={{ ...inputStyle, flex: 1 }} placeholder="Document name..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addDocument()} />
-          <button onClick={addDocument} style={{ ...toggleBtnBase, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', padding: '8px 16px' }}>Add</button>
-          <button onClick={() => { setAdding(false); setNewDocName(''); }} style={{ ...toggleBtnBase, background: 'transparent', color: '#9ca3af', border: '1px solid #2d3348', padding: '8px 16px' }}>Cancel</button>
+        <div style={{ marginTop: '12px' }}>
+          {/* Quick-add from picklist */}
+          {showSuggestions && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+              {docTypeSuggestions
+                .filter((s) => !docs.some((d) => d.label.toLowerCase() === s.toLowerCase()))
+                .map((s) => (
+                  <button key={s} onClick={() => { setNewDocName(s); setShowSuggestions(false); }}
+                    style={{ padding: '4px 12px', borderRadius: '20px', border: '1px solid #3a3f60', background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}>
+                    + {s}
+                  </button>
+                ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input autoFocus style={{ ...inputStyle, flex: 1 }} placeholder="Document name..." value={newDocName}
+              onChange={(e) => setNewDocName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addDocument()}
+            />
+            <button onClick={() => setShowSuggestions((p) => !p)}
+              style={{ ...toggleBtnBase, background: 'transparent', color: '#818cf8', border: '1px solid #3a3f60', padding: '8px 12px', fontSize: '12px' }}>
+              Suggestions
+            </button>
+            <button onClick={addDocument} style={{ ...toggleBtnBase, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', padding: '8px 16px' }}>Add</button>
+            <button onClick={() => { setAdding(false); setNewDocName(''); setShowSuggestions(false); }}
+              style={{ ...toggleBtnBase, background: 'transparent', color: '#9ca3af', border: '1px solid #2d3348', padding: '8px 16px' }}>Cancel</button>
+          </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', background: 'none', border: '1px dashed #3a3f60', borderRadius: '8px', padding: '10px 16px', color: '#6366f1', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
+        <button onClick={() => { setAdding(true); setShowSuggestions(true); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', background: 'none', border: '1px dashed #3a3f60', borderRadius: '8px', padding: '10px 16px', color: '#6366f1', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
           <Plus style={{ width: '14px', height: '14px' }} /> Add More Documents
         </button>
       )}
@@ -377,20 +405,7 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
    ═══════════════════════════════════════════════════════ */
 
 /* ─── 12 Collecting Societies ─── */
-const SOCIETIES = [
-  { key: 'IPRS', name: 'Indian Performing Right Society', flag: '🇮🇳' },
-  { key: 'PRS', name: 'PRS for Music', flag: '🇬🇧' },
-  { key: 'ASCAP', name: 'American Society of Composers', flag: '🇺🇸' },
-  { key: 'PPL(INDIA)', name: 'Phonographic Performance Ltd (India)', flag: '🇮🇳' },
-  { key: 'PPL(UK)', name: 'Phonographic Performance Ltd (UK)', flag: '🇬🇧' },
-  { key: 'SOUND EXCHANGE', name: 'SoundExchange', flag: '🇺🇸' },
-  { key: 'ISAMRA', name: 'Indian Singers & Musicians Rights Association', flag: '🇮🇳' },
-  { key: 'BMI', name: 'Broadcast Music Inc.', flag: '🇺🇸' },
-  { key: 'GEMA', name: 'Gesellschaft für musikalische Aufführungs', flag: '🇩🇪' },
-  { key: 'MLC', name: 'The Mechanical Licensing Collective', flag: '🇺🇸' },
-  { key: 'IMRO', name: 'Irish Music Rights Organisation', flag: '🇮🇪' },
-  { key: 'SOCAN', name: 'Society of Composers, Authors', flag: '🇨🇦' },
-];
+// SOCIETIES is now loaded from picklist — see ContractSigningView
 
 /* ─── Society Assign Modal ─── */
 const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfirm }) => {
@@ -436,6 +451,9 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
 };
 
 const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
+  const { getOptions, getItems } = usePicklist();
+  const renewalOptions = getOptions('renewal_type');
+  const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
   const [uploading, setUploading] = useState(false);
   const [startDate, setStartDate] = useState(entry.contractStartDate ? entry.contractStartDate.slice(0, 10) : '');
   const [renewalDate, setRenewalDate] = useState(entry.contractRenewalDate ? entry.contractRenewalDate.slice(0, 10) : '');
@@ -596,9 +614,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
               }}
             >
               <option value="">Select...</option>
-              <option value="Auto Renewal">Auto Renewal</option>
-              <option value="Mutual Renewal">Mutual Renewal</option>
-              <option value="No Renewal">No Renewal</option>
+              {renewalOptions.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
@@ -1068,6 +1084,8 @@ const StageContent = ({ entry, onUpdate, teamMembers }) => {
    Add / Edit Modal
    ═══════════════════════════════════════════════════════ */
 const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData }) => {
+  const { getOptions } = usePicklist();
+  const contractTypes = getOptions('contract_type');
   const isEdit = !!initialData;
   const [form, setForm] = useState(
     initialData
@@ -1140,6 +1158,8 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
 const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, onMoveStage, onNotQualified, teamMembers }) => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const STAGES = getOptions('onboarding_stage');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showMoveStage, setShowMoveStage] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -1219,7 +1239,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
           <div style={{ display: 'flex', gap: '4px' }}>
             {STAGES.map((s, i) => (
               <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-                <div style={{ width: '100%', height: '4px', borderRadius: '2px', backgroundColor: i <= currentStageIdx ? (stageDotColors[STAGES[currentStageIdx]] || '#6366f1') : '#2d3348' }} />
+                <div style={{ width: '100%', height: '4px', borderRadius: '2px', backgroundColor: i <= currentStageIdx ? getStageDotColor(STAGES[currentStageIdx], STAGES) : '#2d3348' }} />
                 <span style={{ fontSize: '9px', color: i <= currentStageIdx ? '#e5e7eb' : '#6b7280', fontWeight: i === currentStageIdx ? 700 : 400, textAlign: 'center', lineHeight: '1.2' }}>{s}</span>
               </div>
             ))}
@@ -1229,7 +1249,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
         {/* Current stage badge */}
         <div style={{ padding: '0 28px', marginBottom: '16px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#1a2440', border: '1px solid #2d3a5a', borderRadius: '8px', padding: '8px 14px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: stageDotColors[member.stage] || '#6366f1' }} />
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStageDotColor(member.stage, STAGES) }} />
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#e5e7eb' }}>Current Stage: {member.stage}</span>
           </div>
           {member.spoc && (
@@ -1319,7 +1339,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
                     <div key={s} onClick={() => { onMoveStage(member._id, s); setShowMoveStage(false); }}
                       style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '13px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#1e2540')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: stageDotColors[s] }} />
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStageDotColor(s, STAGES) }} />
                       {s}
                     </div>
                   ))}
@@ -1403,6 +1423,8 @@ const MemberCard = ({ member, onClick }) => {
 const Onboarding = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const STAGES = getOptions('onboarding_stage');
   const [entries, setEntries] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1531,14 +1553,14 @@ const Onboarding = () => {
       </div>
 
       {/* Kanban columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STAGES.length}, 1fr)`, gap: '20px', flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${STAGES.length}, minmax(280px, 1fr))`, gap: '20px', flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden', paddingBottom: '8px' }}>
         {STAGES.map((stage) => {
           const stageEntries = filteredEntries.filter((e) => e.stage === stage);
           return (
             <div key={stage} style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: stageDotColors[stage] }} />
+                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: getStageDotColor(stage, STAGES) }} />
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{stage}</span>
                 </div>
                 <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#1e2540', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>{stageEntries.length}</span>
