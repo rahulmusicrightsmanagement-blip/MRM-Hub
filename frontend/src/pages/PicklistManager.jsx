@@ -202,9 +202,6 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-          <button style={{ ...BTN('#1a1e2e'), border: '1px solid #2d3348', fontSize: '12px', padding: '6px 12px' }} onClick={handleSeedDefaults} disabled={loading}>
-            <RefreshCw style={{ width: '13px', height: '13px' }} /> Init Defaults
-          </button>
           <button style={{ ...BTN('#3b82f6'), fontSize: '12px', padding: '6px 12px' }} onClick={() => { setAdding(true); setExpanded(true); }}>
             <Plus style={{ width: '13px', height: '13px' }} /> Add
           </button>
