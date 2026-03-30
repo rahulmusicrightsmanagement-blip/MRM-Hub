@@ -261,9 +261,12 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
   const [uploading, setUploading] = useState({});
   const [newDocName, setNewDocName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [docNumbers, setDocNumbers] = useState({});
   const { authFetch, token } = useAuth();
   const { addToast } = useToast();
+  const { getOptions } = usePicklist();
+  const docTypeSuggestions = getOptions('document_types');
   const docs = entry.documents || [];
 
   /* initialise local doc-number state from entry */
@@ -386,13 +389,31 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
       </div>
 
       {adding ? (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-          <input autoFocus style={{ ...inputStyle, flex: 1 }} placeholder="Document name..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addDocument()} />
-          <button onClick={addDocument} style={{ ...toggleBtnBase, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', padding: '8px 16px' }}>Add</button>
-          <button onClick={() => { setAdding(false); setNewDocName(''); }} style={{ ...toggleBtnBase, background: 'transparent', color: '#9ca3af', border: '1px solid #2d3348', padding: '8px 16px' }}>Cancel</button>
+        <div style={{ marginTop: '12px' }}>
+          {showSuggestions && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+              {docTypeSuggestions
+                .filter((s) => !docs.some((d) => d.label.toLowerCase() === s.toLowerCase()))
+                .map((s) => (
+                  <button key={s} onClick={() => { setNewDocName(s); setShowSuggestions(false); }}
+                    style={{ padding: '4px 12px', borderRadius: '20px', border: '1px solid #3a3f60', background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontSize: '12px', cursor: 'pointer', fontWeight: 500 }}>
+                    + {s}
+                  </button>
+                ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input autoFocus style={{ ...inputStyle, flex: 1 }} placeholder="Document name..." value={newDocName} onChange={(e) => setNewDocName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addDocument()} />
+            <button onClick={() => setShowSuggestions((p) => !p)}
+              style={{ ...toggleBtnBase, background: 'transparent', color: '#818cf8', border: '1px solid #3a3f60', padding: '8px 12px', fontSize: '12px' }}>
+              Suggestions
+            </button>
+            <button onClick={addDocument} style={{ ...toggleBtnBase, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', padding: '8px 16px' }}>Add</button>
+            <button onClick={() => { setAdding(false); setNewDocName(''); setShowSuggestions(false); }} style={{ ...toggleBtnBase, background: 'transparent', color: '#9ca3af', border: '1px solid #2d3348', padding: '8px 16px' }}>Cancel</button>
+          </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', background: 'none', border: '1px dashed #3a3f60', borderRadius: '8px', padding: '10px 16px', color: '#6366f1', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
+        <button onClick={() => { setAdding(true); setShowSuggestions(true); }} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '12px', background: 'none', border: '1px dashed #3a3f60', borderRadius: '8px', padding: '10px 16px', color: '#6366f1', fontSize: '13px', fontWeight: 600, cursor: 'pointer', width: '100%', justifyContent: 'center' }}>
           <Plus style={{ width: '14px', height: '14px' }} /> Add Other Documents
         </button>
       )}
