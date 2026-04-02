@@ -69,9 +69,9 @@ app.use(cors({
 // Gzip compression
 app.use(compression());
 
-// Rate limiting
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true, legacyHeaders: false }));
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false }));
+// Rate limiting — 20 concurrent users, possibly behind shared office IP
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please wait a moment and try again.' } }));
+app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 3000, standardHeaders: true, legacyHeaders: false, message: { message: 'Too many requests. Please wait a moment and try again.' } }));
 
 // Body parser
 app.use(express.json());
