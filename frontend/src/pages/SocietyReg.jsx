@@ -432,6 +432,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
   const [assigningKey, setAssigningKey] = useState(null);
   const [expandedKey, setExpandedKey] = useState(null);
+  const [editingRegistered, setEditingRegistered] = useState(null); // socKey being edited in Registered state
   const [confirmDone, setConfirmDone] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -557,6 +558,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
               const socEntry = getSocietyEntry(soc.key);
               const isAssigning = assigningKey === soc.key;
               const isExpanded = expandedKey === soc.key;
+              const isEditingRegistered = editingRegistered === soc.key;
               const isConfirmingDone = confirmDone === soc.key;
               const isLoading = actionLoading === soc.key;
               const entryDeadline = socEntry?.deadline;
@@ -674,9 +676,13 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
                       {status === 'Registered' && (
                         <>
-                          <button onClick={() => { setExpandedKey(isExpanded ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
+                          <button onClick={() => { setExpandedKey(isExpanded ? null : soc.key); setEditingRegistered(null); setAssigningKey(null); setConfirmDone(null); }}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
-                            {isExpanded ? 'Close' : 'View'}
+                            {isExpanded && !isEditingRegistered ? 'Close' : 'View'}
+                          </button>
+                          <button onClick={() => { setExpandedKey(soc.key); setEditingRegistered(isEditingRegistered ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
+                            style={{ fontSize: '12px', fontWeight: 600, color: isEditingRegistered ? '#f97316' : '#818cf8', background: isEditingRegistered ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${isEditingRegistered ? 'rgba(249,115,22,0.3)' : 'rgba(99,102,241,0.3)'}`, borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            {isEditingRegistered ? 'Done Editing' : 'Edit'}
                           </button>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>✓</span>
                         </>
@@ -720,7 +726,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       onUpdated={onUpdated}
                       authFetch={authFetch}
                       token={token}
-                      readOnly={status === 'Registered' || !isAssignedToSoc(soc.key)}
+                      readOnly={(status === 'Registered' && !isEditingRegistered) || (status !== 'Registered' && !isAssignedToSoc(soc.key))}
                       notAssigned={status !== 'Registered' && !isAssignedToSoc(soc.key)}
                     />
                   )}
