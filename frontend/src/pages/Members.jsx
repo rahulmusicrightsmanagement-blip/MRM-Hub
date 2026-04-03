@@ -438,7 +438,7 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
         {activeTab === 'General Info' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div style={infoBox}><div style={infoLabel}>Member ID</div><div style={infoVal}>{member._id?.slice(-6).toUpperCase() || '—'}</div></div>
+              <div style={infoBox}><div style={infoLabel}>MRM Membership ID</div><div style={infoVal}>{member.clientNumber || '—'}</div></div>
               <div style={infoBox}><div style={infoLabel}>Email</div><div style={infoVal}>{member.email || '—'}</div></div>
               <div style={infoBox}><div style={infoLabel}>Phone</div><div style={infoVal}>{member.phone || '—'}</div></div>
               <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(member.role) ? member.role.join(', ') : member.role}</div></div>

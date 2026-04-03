@@ -918,10 +918,10 @@ const ContactMadeView = ({ entry, onUpdate }) => {
       </div>
 
       <div style={{ ...sectionStyle, padding: '14px 16px' }}>
-        <label style={labelStyle}>Client Number</label>
+        <label style={labelStyle}>MRM Membership ID</label>
         <input
           style={inputStyle}
-          placeholder="Enter client number..."
+          placeholder="Enter MRM Membership ID..."
           value={clientNumber}
           onChange={(e) => setClientNumber(e.target.value)}
           onBlur={() => saveText('clientNumber', clientNumber)}
@@ -1069,7 +1069,7 @@ const CompletedView = ({ entry }) => {
           )}
           {entry.clientNumber && (
             <div style={{ marginTop: '6px', paddingLeft: '22px' }}>
-              <span style={{ fontSize: '12px', color: '#9ca3af' }}>Client Number: <strong style={{ color: '#e5e7eb' }}>{entry.clientNumber}</strong></span>
+              <span style={{ fontSize: '12px', color: '#9ca3af' }}>MRM Membership ID: <strong style={{ color: '#e5e7eb' }}>{entry.clientNumber}</strong></span>
             </div>
           )}
         </div>
