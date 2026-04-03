@@ -175,7 +175,7 @@ const MemberProfile = () => {
       <div style={card}>
         <div style={sectionTitle}><User size={16} /> Basic Information</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-          <div style={infoBox}><div style={infoLabel}>MRM Membership ID</div><div style={infoVal}>{member.clientNumber || (onboarding.length > 0 && onboarding[0].clientNumber) || '—'}</div></div>
+          <div style={infoBox}><div style={infoLabel}>MRM Membership ID</div><div style={infoVal}>{member.clientNumber || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Email</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={13} color="#8892b0" />{member.email || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Phone</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={13} color="#8892b0" />{member.phone || '—'}</div></div>
           <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(member.role) ? member.role.join(', ') : member.role || '—'}</div></div>

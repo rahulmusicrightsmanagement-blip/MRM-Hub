@@ -67,7 +67,7 @@ const onboardingEntrySchema = new mongoose.Schema(
     emailCreated: { type: Boolean, default: false },
     createdEmailAddress: { type: String, default: '' },
     createdEmailPassword: { type: String, default: '' },
-    clientNumber: { type: String, default: '' },
+    clientNumber: { type: String, default: '', trim: true },
 
     /* ─── Legacy checklist (backward compat) ─── */
     checklist: {
@@ -101,6 +101,8 @@ onboardingEntrySchema.pre('save', function () {
 });
 
 onboardingEntrySchema.index({ spoc: 1 });
+// Sparse unique index — enforces uniqueness at DB level, ignores empty/null values
+onboardingEntrySchema.index({ clientNumber: 1 }, { unique: true, sparse: true, partialFilterExpression: { clientNumber: { $gt: '' } } });
 onboardingEntrySchema.index({ email: 1 });
 onboardingEntrySchema.index({ stage: 1 });
 onboardingEntrySchema.index({ createdAt: -1 });

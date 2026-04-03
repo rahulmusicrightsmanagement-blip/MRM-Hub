@@ -859,7 +859,7 @@ const ContactMadeView = ({ entry, onUpdate }) => {
       const res = await authFetch(`/api/onboarding/${entry._id}`, { method: 'PUT', body: JSON.stringify({ [field]: val }) });
       const data = await res.json();
       if (res.ok) onUpdate(data.entry);
-      else addToast('Failed to save', 'error');
+      else addToast(data.message || 'Failed to save', 'error');
     } catch (err) { console.error(err); addToast('Failed to save', 'error'); }
   };
 
@@ -924,7 +924,13 @@ const ContactMadeView = ({ entry, onUpdate }) => {
           placeholder="Enter MRM Membership ID..."
           value={clientNumber}
           onChange={(e) => setClientNumber(e.target.value)}
-          onBlur={() => saveText('clientNumber', clientNumber)}
+          onBlur={async () => {
+            const prev = entry.clientNumber || '';
+            const res = await authFetch(`/api/onboarding/${entry._id}`, { method: 'PUT', body: JSON.stringify({ clientNumber }) });
+            const data = await res.json();
+            if (res.ok) onUpdate(data.entry);
+            else { addToast(data.message || 'Failed to save', 'error'); setClientNumber(prev); }
+          }}
         />
       </div>
     </div>
@@ -1201,6 +1207,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
           whatsAppGroupName: member.whatsAppGroupName,
           emailCreated: member.emailCreated,
           createdEmailAddress: member.createdEmailAddress,
+          clientNumber: member.clientNumber,
           notes: member.notes,
           spoc: member.spoc,
           priority: member.priority,

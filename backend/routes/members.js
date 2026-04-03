@@ -96,7 +96,7 @@ router.get('/:id/profile', auth, async (req, res) => {
 
     const [leads, onboarding, societyRegs, royalties] = await Promise.all([
       Lead.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }).lean(),
-      OnboardingEntry.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }).lean(),
+      OnboardingEntry.find({ name: nameRegex }).sort({ createdAt: -1 }).lean(),
       SocietyRegistration.find({ name: nameRegex }).sort({ createdAt: -1 }).lean(),
       Royalty.find({ $or: [{ clientName: nameRegex }, { clientEmail: member.email }] }).sort({ createdAt: -1 }).lean(),
     ]);
@@ -119,7 +119,7 @@ router.put('/:id', auth, async (req, res) => {
       member.assignedDate = req.body.spoc ? new Date() : null;
     }
 
-    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline', 'isReferred', 'referredBy', 'referralCommission'];
+    const fields = ['name', 'role', 'email', 'phone', 'genre', 'languages', 'bio', 'status', 'kycStatus', 'panCard', 'panVerified', 'aadhaar', 'aadhaarVerified', 'ipiNumber', 'isni', 'territories', 'leadSource', 'priority', 'registrations', 'joinDate', 'dateOfFirstContact', 'spoc', 'deadline', 'isReferred', 'referredBy', 'referralCommission', 'clientNumber'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) member[f] = req.body[f];
     });

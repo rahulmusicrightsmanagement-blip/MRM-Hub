@@ -169,6 +169,21 @@ router.put('/:id', auth, async (req, res) => {
       }
     }
 
+    // Uniqueness check for MRM Membership ID
+    if (req.body.clientNumber && req.body.clientNumber.trim()) {
+      const duplicate = await OnboardingEntry.findOne({
+        clientNumber: req.body.clientNumber.trim(),
+        _id: { $ne: entry._id },
+      });
+      if (duplicate) {
+        return res.status(409).json({ message: `MRM Membership ID "${req.body.clientNumber.trim()}" is already assigned to ${duplicate.name}` });
+      }
+      const dupMember = await Member.findOne({ clientNumber: req.body.clientNumber.trim() });
+      if (dupMember && dupMember.email !== entry.email) {
+        return res.status(409).json({ message: `MRM Membership ID "${req.body.clientNumber.trim()}" is already assigned to member ${dupMember.name}` });
+      }
+    }
+
     const oldStage = entry.stage;
 
     const fields = [
@@ -193,17 +208,23 @@ router.put('/:id', auth, async (req, res) => {
     await entry.save();
 
     // Sync fields back to Lead and Member
-    if (entry.email) {
-      try {
-        const syncToLead = {};
-        const syncToMember = {};
-        if (req.body.contractType) syncToLead.onboardingContractType = req.body.contractType;
-        if (req.body.clientNumber !== undefined) syncToMember.clientNumber = req.body.clientNumber;
-        if (Object.keys(syncToLead).length) await Lead.updateMany({ email: entry.email }, syncToLead);
-        if (Object.keys(syncToMember).length) await Member.updateMany({ email: entry.email }, syncToMember);
-      } catch (syncErr) {
-        console.error('Sync to lead/member error:', syncErr);
+    try {
+      const syncToLead = {};
+      const syncToMember = {};
+      if (req.body.contractType) syncToLead.onboardingContractType = req.body.contractType;
+      if (req.body.clientNumber !== undefined) syncToMember.clientNumber = req.body.clientNumber;
+
+      if (Object.keys(syncToLead).length && entry.email) {
+        await Lead.updateOne({ email: entry.email }, syncToLead);
       }
+
+      if (Object.keys(syncToMember).length && entry.name) {
+        // Match by name (case-insensitive exact) — more reliable than email when multiple members share an email
+        const nameRegex = new RegExp(`^${entry.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        await Member.updateOne({ name: nameRegex }, syncToMember);
+      }
+    } catch (syncErr) {
+      console.error('Sync to lead/member error:', syncErr);
     }
 
     // Notify SPOC on stage change
@@ -225,6 +246,9 @@ router.put('/:id', auth, async (req, res) => {
 
     res.json({ entry });
   } catch (err) {
+    if (err.code === 11000 && err.keyPattern?.clientNumber) {
+      return res.status(409).json({ message: 'This MRM Membership ID is already assigned to another member.' });
+    }
     console.error('Update onboarding error:', err);
     res.status(500).json({ message: err.message || 'Server error' });
   }

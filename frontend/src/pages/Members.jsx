@@ -160,6 +160,11 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
         <div style={{ ...sectionStyle, marginTop: '24px' }}>KYC Information</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
+            <label style={labelStyle}>MRM Membership ID</label>
+            <input style={inputStyle} placeholder="e.g. MRM-176" value={form.clientNumber || ''} onChange={(e) => h('clientNumber', e.target.value)} />
+          </div>
+          <div />
+          <div>
             <label style={labelStyle}>PAN Card Number</label>
             <input style={inputStyle} placeholder="e.g. ABCPK1234A" value={form.panCard} onChange={(e) => h('panCard', e.target.value)} />
           </div>
