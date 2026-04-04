@@ -64,8 +64,20 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   const [newRemark, setNewRemark] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileRefs = useRef({});
+  const dirtyFieldsRef = useRef(new Set());
 
-  useEffect(() => { setLocalSteps(steps || {}); }, [steps]);
+  useEffect(() => {
+    setLocalSteps((prev) => {
+      const incoming = steps || {};
+      if (dirtyFieldsRef.current.size === 0) return incoming;
+      // Preserve locally-modified fields that haven't been saved yet
+      const merged = { ...incoming };
+      for (const field of dirtyFieldsRef.current) {
+        if (prev[field] !== undefined) merged[field] = prev[field];
+      }
+      return merged;
+    });
+  }, [steps]);
 
   const saveStep = async (key, value) => {
     const updated = { ...localSteps, [key]: value };
@@ -81,6 +93,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   const saveLoginField = async (field, value) => {
     const updated = { ...localSteps, [field]: value };
     setLocalSteps(updated);
+    dirtyFieldsRef.current.delete(field);
     try {
       const res = await authFetch(`/api/societyregs/${regId}/steps`, { method: 'PUT', body: JSON.stringify({ society: societyKey, steps: { [field]: value } }) });
       const data = await res.json();
@@ -214,7 +227,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter primary login ID..."
                         value={localSteps.loginId || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, loginId: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('loginId'); setLocalSteps((p) => ({ ...p, loginId: e.target.value })); }}
                         onBlur={(e) => saveLoginField('loginId', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginId', e.target.value)}
                       />
@@ -228,7 +241,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter primary password..."
                         value={localSteps.loginPassword || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, loginPassword: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('loginPassword'); setLocalSteps((p) => ({ ...p, loginPassword: e.target.value })); }}
                         onBlur={(e) => saveLoginField('loginPassword', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('loginPassword', e.target.value)}
                       />
@@ -245,7 +258,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter secondary login ID..."
                         value={localSteps.secondaryLoginId || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, secondaryLoginId: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('secondaryLoginId'); setLocalSteps((p) => ({ ...p, secondaryLoginId: e.target.value })); }}
                         onBlur={(e) => saveLoginField('secondaryLoginId', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('secondaryLoginId', e.target.value)}
                       />
@@ -259,7 +272,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter secondary password..."
                         value={localSteps.secondaryLoginPassword || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, secondaryLoginPassword: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('secondaryLoginPassword'); setLocalSteps((p) => ({ ...p, secondaryLoginPassword: e.target.value })); }}
                         onBlur={(e) => saveLoginField('secondaryLoginPassword', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('secondaryLoginPassword', e.target.value)}
                       />
@@ -276,7 +289,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter CAE number..."
                         value={localSteps.caeNumber || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, caeNumber: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('caeNumber'); setLocalSteps((p) => ({ ...p, caeNumber: e.target.value })); }}
                         onBlur={(e) => saveLoginField('caeNumber', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('caeNumber', e.target.value)}
                       />
@@ -290,7 +303,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="e.g. 15%"
                         value={localSteps.commissionRate || ''}
-                        onChange={(e) => setLocalSteps((p) => ({ ...p, commissionRate: e.target.value }))}
+                        onChange={(e) => { dirtyFieldsRef.current.add('commissionRate'); setLocalSteps((p) => ({ ...p, commissionRate: e.target.value })); }}
                         onBlur={(e) => saveLoginField('commissionRate', e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && saveLoginField('commissionRate', e.target.value)}
                       />
@@ -438,6 +451,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(member.name || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeleteSoc, setConfirmDeleteSoc] = useState(null); // socKey to confirm delete
   const [saving, setSaving] = useState(false);
   const [assignForm, setAssignForm] = useState({ spoc: '', deadline: '' });
   const [editingDeadline, setEditingDeadline] = useState(null); // socKey being edited
@@ -492,6 +506,21 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
     setActionLoading(socKey);
     await onMarkDone(member._id || member.name, socKey);
     setConfirmDone(null);
+    setActionLoading(null);
+  };
+
+  const handleDeleteSoc = async (socKey) => {
+    setActionLoading(socKey);
+    try {
+      const res = await authFetch(`/api/societyregs/${member._id}/society`, {
+        method: 'DELETE',
+        body: JSON.stringify({ society: socKey }),
+      });
+      const data = await res.json();
+      if (res.ok) { onUpdated(data.registration); addToast(`${socKey} registration deleted`); }
+      else addToast(data.message || 'Failed to delete', 'error');
+    } catch (err) { console.error(err); addToast('Failed to delete society', 'error'); }
+    setConfirmDeleteSoc(null);
     setActionLoading(null);
   };
 
@@ -652,10 +681,12 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       <StatusBadge status={status} isOverdue={status === 'In Progress' && dlColor && dlColor.label === 'Overdue'} />
 
                       {(status === 'Not Started' || status === 'N/A') && (
-                        <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
-                          style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
-                          Assign
-                        </button>
+                        <>
+                          <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            Assign
+                          </button>
+                        </>
                       )}
 
                       {status === 'In Progress' && (
@@ -671,6 +702,10 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             style={{ fontSize: '12px', fontWeight: 600, color: '#34d399', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             Done
                           </button>
+                          <button onClick={() => { setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
+                            ✕
+                          </button>
                         </>
                       )}
 
@@ -685,6 +720,10 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             {isEditingRegistered ? 'Done Editing' : 'Edit'}
                           </button>
                           <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>✓</span>
+                          <button onClick={() => { setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
+                            ✕
+                          </button>
                         </>
                       )}
                     </div>
@@ -743,6 +782,24 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                           <button onClick={() => handleDone(soc.key)} disabled={isLoading}
                             style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#059669', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
                             {isLoading ? 'Saving...' : 'Confirm Done'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delete society confirmation */}
+                  {confirmDeleteSoc === soc.key && (
+                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid #1e2540' }}>
+                      <div style={{ marginTop: '12px', padding: '14px 16px', backgroundColor: 'rgba(239,68,68,0.06)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <p style={{ fontSize: '13px', color: '#fca5a5', marginBottom: '12px', fontWeight: 500 }}>
+                          Delete <strong>{soc.key}</strong> registration for <strong>{member.name}</strong>? This cannot be undone.
+                        </p>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button onClick={() => setConfirmDeleteSoc(null)} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                          <button onClick={() => handleDeleteSoc(soc.key)} disabled={isLoading}
+                            style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#dc2626', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                            {isLoading ? 'Deleting...' : 'Confirm Delete'}
                           </button>
                         </div>
                       </div>

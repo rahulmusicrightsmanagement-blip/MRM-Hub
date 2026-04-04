@@ -454,6 +454,35 @@ router.put('/:id/rename', auth, async (req, res) => {
   }
 });
 
+// DELETE /api/societyregs/:id/society — remove a single society from a member's registration
+router.delete('/:id/society', auth, async (req, res) => {
+  try {
+    const reg = await SocietyRegistration.findById(req.params.id);
+    if (!reg) return res.status(404).json({ message: 'Registration not found' });
+
+    const { society } = req.body;
+    if (!society) return res.status(400).json({ message: 'Society is required' });
+
+    if (!reg.societies.has(society)) return res.status(404).json({ message: 'Society entry not found' });
+
+    reg.societies.delete(society);
+    reg.assignees.delete(society);
+    await reg.save();
+
+    // Remove linked Tracker tasks for this society
+    const escapedSociety = society.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await Task.deleteMany({ sourceType: 'societyreg', sourceId: String(reg._id), title: { $regex: escapedSociety, $options: 'i' } });
+
+    // Sync registration count → Member
+    syncRegistrationsToMember(reg.name);
+
+    res.json({ registration: reg });
+  } catch (err) {
+    console.error('Delete society error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // DELETE /api/societyregs/:id
 router.delete('/:id', auth, async (req, res) => {
   try {
