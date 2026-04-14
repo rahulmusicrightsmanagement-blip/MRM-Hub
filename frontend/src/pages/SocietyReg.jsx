@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown, Search } from 'lucide-react';
+import { Plus, X, ArrowRight, Upload, FileText, Eye, Trash2, MessageSquarePlus, Edit3, Filter, ChevronDown, Search, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
@@ -989,6 +990,76 @@ const SocietyReg = () => {
 
   const clearAllFilters = () => setFilters({});
 
+  const handleExportExcel = () => {
+    try {
+      const rows = filteredMembers;
+      if (rows.length === 0) {
+        addToast('No registrations to export', 'error');
+        return;
+      }
+
+      // Row 1: blank | Society name (merged across 2 cols) | ... | blank
+      // Row 2: "Client Name" | Primary | Secondary | Primary | Secondary | ...
+      // Data rows: client name + Yes/No for primary & secondary per society
+      const header1 = ['Client Name'];
+      const header2 = [''];
+      SOCIETIES.forEach((soc) => {
+        header1.push(soc.key, '');
+        header2.push('Primary', 'Secondary');
+      });
+
+      const aoa = [header1, header2];
+      rows.forEach((m) => {
+        const row = [m.name];
+        SOCIETIES.forEach((soc) => {
+          const entry = m.societies?.[soc.key];
+          const status = getSocStatus(m, soc.key);
+          if (!entry || status === 'N/A') {
+            row.push('NA', 'NA');
+          } else {
+            const steps = (typeof entry !== 'string') ? (entry.steps || {}) : {};
+            row.push(steps.loginId ? 'Yes' : 'No');
+            row.push(steps.secondaryLoginId ? 'Yes' : 'No');
+          }
+        });
+        aoa.push(row);
+      });
+
+      const sheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Merge society name across its 2 columns in header row 1
+      sheet['!merges'] = SOCIETIES.map((_, i) => {
+        const start = 1 + i * 2;
+        return { s: { r: 0, c: start }, e: { r: 0, c: start + 1 } };
+      });
+
+      sheet['!cols'] = [{ wch: 28 }, ...SOCIETIES.flatMap(() => [{ wch: 12 }, { wch: 12 }])];
+
+      // Center-align the society header + sub-headers + data cells for cleaner look
+      const range = XLSX.utils.decode_range(sheet['!ref']);
+      for (let r = 0; r <= range.e.r; r++) {
+        for (let c = 0; c <= range.e.c; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!sheet[addr]) continue;
+          sheet[addr].s = {
+            alignment: { horizontal: c === 0 && r > 1 ? 'left' : 'center', vertical: 'center' },
+            font: r <= 1 ? { bold: true } : {},
+          };
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Registrations');
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Society_Registrations_${stamp}.xlsx`);
+      addToast(`Exported ${rows.length} client${rows.length === 1 ? '' : 's'} to Excel`, 'success');
+    } catch (err) {
+      console.error('Export error:', err);
+      addToast('Failed to export Excel', 'error');
+    }
+  };
+
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading registrations...</div>;
 
   return (
@@ -996,14 +1067,37 @@ const SocietyReg = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Collecting Society Registrations</h1>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-            <input
-              placeholder="Search members..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '240px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={handleExportExcel}
+              title="Download all registrations as Excel"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #059669, #10b981)',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(16,185,129,0.25)',
+              }}
+            >
+              <Download size={15} />
+              Export Excel
+            </button>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input
+                placeholder="Search members..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '240px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+              />
+            </div>
           </div>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Manage member registrations across 12 collecting societies</p>

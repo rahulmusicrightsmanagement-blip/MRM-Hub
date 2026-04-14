@@ -15,6 +15,7 @@ import Analytics from './pages/Analytics';
 import Login from './pages/Login';
 import SpocManagement from './pages/SpocManagement';
 import PicklistManager from './pages/PicklistManager';
+import ClientChat from './pages/ClientChat';
 
 const ProtectedRoutes = () => {
   const { user, loading, isFullAccess, hasRole } = useAuth();
@@ -47,6 +48,7 @@ const ProtectedRoutes = () => {
         <Route path="/members" element={<Members />} />
         <Route path="/members/:id" element={<MemberProfile />} />
         <Route path="/tracker" element={<Tracker />} />
+        <Route path="/client-chat" element={<ClientChat />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/spoc-management" element={<Gate fullOnly><SpocManagement /></Gate>} />
         <Route path="/picklists" element={<Gate roles={['admin']}><PicklistManager /></Gate>} />
