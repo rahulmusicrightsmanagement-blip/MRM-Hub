@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle, Search } from 'lucide-react';
+import { Plus, X, ArrowRight, CheckCircle, Clock, Trash2, Edit3, Upload, FileText, Eye, RefreshCw, ChevronDown, ChevronUp, Save, XCircle, Search, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
@@ -1560,6 +1561,29 @@ const Onboarding = () => {
     );
   }, [entries, searchQuery]);
 
+  const handleExportExcel = () => {
+    try {
+      const rows = filteredEntries.map((e) => ({
+        'Client Name': e.name || '',
+        'MRM ID': e.clientNumber || '',
+        'WhatsApp Group Name': e.whatsAppGroupName || '',
+        'Email ID': e.createdEmailAddress || '',
+        'Password': e.createdEmailPassword || '',
+      }));
+      if (!rows.length) { addToast('Nothing to export', 'error'); return; }
+      const sheet = XLSX.utils.json_to_sheet(rows);
+      sheet['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 28 }, { wch: 30 }, { wch: 18 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Onboarding');
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Onboarding_${stamp}.xlsx`);
+      addToast(`Exported ${rows.length} record${rows.length === 1 ? '' : 's'}`, 'success');
+    } catch (err) {
+      console.error('Export error:', err);
+      addToast('Failed to export Excel', 'error');
+    }
+  };
+
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading onboarding...</div>;
 
   return (
@@ -1567,14 +1591,23 @@ const Onboarding = () => {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Onboarding</h1>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-            <input
-              placeholder="Search by name, email, ID, SPOC..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '260px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input
+                placeholder="Search by name, email, ID, SPOC..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ width: '260px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+              />
+            </div>
+            <button
+              onClick={handleExportExcel}
+              title="Export to Excel"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              <Download size={14} /> Export Excel
+            </button>
           </div>
         </div>
         <p style={{ fontSize: '14px', color: '#9ca3af' }}>Track client onboarding from document submission to active membership</p>

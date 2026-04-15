@@ -514,6 +514,9 @@ const Members = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const [members, setMembers] = useState([]);
+  const [contractMap, setContractMap] = useState({});
+  const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
+  const getContractColor = (t) => CONTRACT_COLORS[t] || '';
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -525,12 +528,20 @@ const Members = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [membersRes, usersRes] = await Promise.all([
+        const [membersRes, usersRes, onboardingRes] = await Promise.all([
           authFetch('/api/members'),
           authFetch('/api/users/team'),
+          authFetch('/api/onboarding'),
         ]);
         const membersData = await membersRes.json();
         const usersData = await usersRes.json();
+        const onboardingData = await onboardingRes.json();
+        const map = {};
+        (onboardingData.entries || []).forEach((e) => {
+          if (e.clientNumber) map[e.clientNumber] = e.contractType || '';
+          if (e.name) map[`name:${e.name.toLowerCase()}`] = e.contractType || '';
+        });
+        setContractMap(map);
         setMembers(membersData.members || []);
         setTeamMembers(usersData.users || []);
       } catch (err) {
@@ -654,6 +665,17 @@ const Members = () => {
         </button>
       </div>
 
+      {/* Contract color legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '16px', padding: '10px 14px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px' }}>
+        <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600 }}>Contract Type:</span>
+        {Object.entries(CONTRACT_COLORS).map(([label, col]) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col }} />
+            <span style={{ color: '#e5e7eb', fontSize: '12px' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Search */}
       <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '24px' }}>
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
@@ -675,7 +697,7 @@ const Members = () => {
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#1e2540')}>
               {/* Top row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: getContractColor(contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`]) || m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                   {m.initials}
                 </div>
                 <div style={{ flex: 1 }}>
