@@ -454,7 +454,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDeleteSoc, setConfirmDeleteSoc] = useState(null); // socKey to confirm delete
   const [saving, setSaving] = useState(false);
-  const [assignForm, setAssignForm] = useState({ spoc: '', deadline: '' });
+  const [assignForm, setAssignForm] = useState({ spoc: '', startDate: '', deadline: '' });
   const [editingDeadline, setEditingDeadline] = useState(null); // socKey being edited
 
   const fmtDateISO = (d) => {
@@ -497,9 +497,9 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
     const tm = teamMembers.find((m) => m.name === assignForm.spoc);
     if (!tm) return;
     setActionLoading(socKey);
-    await onAssignAndStart(member._id || member.name, socKey, tm, assignForm.deadline || null);
+    await onAssignAndStart(member._id || member.name, socKey, tm, assignForm.deadline || null, assignForm.startDate || null);
     setAssigningKey(null);
-    setAssignForm({ spoc: '', deadline: '' });
+    setAssignForm({ spoc: '', startDate: '', deadline: '' });
     setActionLoading(null);
   };
 
@@ -592,6 +592,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
               const isConfirmingDone = confirmDone === soc.key;
               const isLoading = actionLoading === soc.key;
               const entryDeadline = socEntry?.deadline;
+              const entryStartDate = socEntry?.startDate;
 
               const fmtDeadline = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
               const getDeadlineColor = (d) => {
@@ -606,88 +607,24 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
               const dlColor = getDeadlineColor(entryDeadline);
 
               return (
-                <div key={soc.key} style={{ backgroundColor: cardBg, border: dlColor && dlColor.label === 'Overdue' ? '1px solid #991b1b' : cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
-                  {/* Main row */}
-                  <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div key={soc.key} style={{ backgroundColor: cardBg, border: (status === 'In Progress' && dlColor && dlColor.label === 'Overdue') ? '1px solid #991b1b' : cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
+                  {/* Top row — identity + status + actions */}
+                  <div style={{ padding: '14px 18px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: '20px', flexShrink: 0 }}>{soc.flag}</span>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{soc.key}</p>
                         <p style={{ fontSize: '11px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soc.name}</p>
                       </div>
-                      {/* Inline deadline display for In Progress */}
-                      {status === 'In Progress' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginRight: '8px' }}>
-                          {editingDeadline === soc.key ? (
-                            <input
-                              type="date"
-                              autoFocus
-                              defaultValue={fmtDateISO(entryDeadline)}
-                              onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
-                              style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #6366f1', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '12px', outline: 'none' }}
-                            />
-                          ) : entryDeadline ? (
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
-                                setEditingDeadline(soc.key);
-                              }}
-                              style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#1e2540', color: dlColor?.color || '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              title={`Deadline: ${fmtDeadline(entryDeadline)} — ${dlColor?.label || ''} (click to edit)`}
-                            >
-                              📅 {fmtDeadline(entryDeadline)} — {dlColor?.label}
-                            </span>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
-                                setEditingDeadline(soc.key);
-                              }}
-                              style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', background: 'rgba(99,102,241,0.06)', border: '1px dashed #2d3348', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                            >
-                              + Set Deadline
-                            </button>
-                          )}
-                        </div>
-                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                      {assignee && assignee.name ? (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '3px 10px 3px 3px',
-                            borderRadius: '999px',
-                            border: '1px solid rgba(99,102,241,0.28)',
-                            backgroundColor: 'rgba(99,102,241,0.12)',
-                            maxWidth: '180px',
-                          }}
-                          title={assignee.name}
-                        >
-                          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: assignee.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
-                            {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                          </div>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#c7d2fe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {assignee.name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Unassigned</span>
-                      )}
                       <StatusBadge status={status} isOverdue={status === 'In Progress' && dlColor && dlColor.label === 'Overdue'} />
 
                       {(status === 'Not Started' || status === 'N/A') && (
-                        <>
-                          <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
-                            Assign
-                          </button>
-                        </>
+                        <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
+                          style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                          Assign
+                        </button>
                       )}
 
                       {status === 'In Progress' && (
@@ -720,7 +657,6 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             style={{ fontSize: '12px', fontWeight: 600, color: isEditingRegistered ? '#f97316' : '#818cf8', background: isEditingRegistered ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${isEditingRegistered ? 'rgba(249,115,22,0.3)' : 'rgba(99,102,241,0.3)'}`, borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isEditingRegistered ? 'Done Editing' : 'Edit'}
                           </button>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: '#10b981' }}>✓</span>
                           <button onClick={() => { setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
                             ✕
@@ -729,6 +665,67 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       )}
                     </div>
                   </div>
+
+                  {/* Meta row — assignee + deadline (only when relevant) */}
+                  {(status === 'In Progress' || status === 'Registered' || (assignee && assignee.name)) && (
+                    <div style={{ padding: '0 18px 12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: '32px' }}>
+                      {assignee && assignee.name ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px 3px 3px', borderRadius: '999px', border: '1px solid rgba(99,102,241,0.28)', backgroundColor: 'rgba(99,102,241,0.12)', maxWidth: '200px' }} title={assignee.name}>
+                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: assignee.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+                            {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                          </div>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#c7d2fe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {assignee.name}
+                          </span>
+                        </div>
+                      ) : status === 'In Progress' ? (
+                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Unassigned</span>
+                      ) : null}
+
+                      {entryStartDate && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: 'rgba(99,102,241,0.12)', color: '#a5b4fc', whiteSpace: 'nowrap' }}
+                          title={`Start: ${fmtDeadline(entryStartDate)}`}>
+                          ▶ Start {fmtDeadline(entryStartDate)}
+                        </span>
+                      )}
+
+                      {status === 'In Progress' && (
+                        editingDeadline === soc.key ? (
+                          <input
+                            type="date"
+                            autoFocus
+                            defaultValue={fmtDateISO(entryDeadline)}
+                            onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
+                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #6366f1', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '12px', outline: 'none' }}
+                          />
+                        ) : entryDeadline ? (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
+                              setEditingDeadline(soc.key);
+                            }}
+                            style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#1e2540', color: dlColor?.color || '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            title={`Deadline: ${fmtDeadline(entryDeadline)} — ${dlColor?.label || ''} (click to edit)`}
+                          >
+                            📅 {fmtDeadline(entryDeadline)} — {dlColor?.label}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
+                              setEditingDeadline(soc.key);
+                            }}
+                            style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', background: 'rgba(99,102,241,0.06)', border: '1px dashed #2d3348', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            + Set Deadline
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
 
                   {/* Assign dropdown */}
                   {isAssigning && (
@@ -743,6 +740,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Start Date</label>
+                          <input type="date" value={assignForm.startDate} onChange={(e) => setAssignForm((p) => ({ ...p, startDate: e.target.value }))}
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
                           <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
                           <input type="date" value={assignForm.deadline} onChange={(e) => setAssignForm((p) => ({ ...p, deadline: e.target.value }))}
                             style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }} />
@@ -751,7 +753,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                           style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: assignForm.spoc ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#2d3348', color: assignForm.spoc ? 'white' : '#6b7280', fontSize: '12px', fontWeight: 600, cursor: assignForm.spoc ? 'pointer' : 'not-allowed', marginTop: '18px' }}>
                           {isLoading ? 'Assigning...' : 'Assign & Start'}
                         </button>
-                        <button onClick={() => { setAssigningKey(null); setAssignForm({ spoc: '', deadline: '' }); }} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer', marginTop: '18px' }}>Cancel</button>
+                        <button onClick={() => { setAssigningKey(null); setAssignForm({ spoc: '', startDate: '', deadline: '' }); }} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer', marginTop: '18px' }}>Cancel</button>
                       </div>
                     </div>
                   )}
@@ -907,7 +909,7 @@ const SocietyReg = () => {
     setSelectedMember((prev) => (prev && prev._id === norm._id ? norm : prev));
   };
 
-  const handleAssignAndStart = async (memberId, societyKey, teamMember, deadline) => {
+  const handleAssignAndStart = async (memberId, societyKey, teamMember, deadline, startDate) => {
     try {
       const reg = members.find((m) => m._id === memberId || m.name === memberId);
       if (!reg) return;
@@ -916,7 +918,7 @@ const SocietyReg = () => {
         initials: teamMember.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
         color: '#6366f1',
       };
-      const res = await authFetch(`/api/societyregs/${reg._id}`, { method: 'PUT', body: JSON.stringify({ society: societyKey, status: 'In Progress', assignee, deadline: deadline || null }) });
+      const res = await authFetch(`/api/societyregs/${reg._id}`, { method: 'PUT', body: JSON.stringify({ society: societyKey, status: 'In Progress', assignee, deadline: deadline || null, startDate: startDate || null }) });
       const data = await res.json();
       if (res.ok) { refreshReg(data.registration); addToast(`Assigned to ${teamMember.name}`); }
       else addToast('Failed to assign registration', 'error');

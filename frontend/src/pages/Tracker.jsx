@@ -88,7 +88,7 @@ const getInitials = (name) => {
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 };
 
-// Returns 'green' (new/far from deadline), 'yellow' (half time passed), 'red' (overdue)
+// Returns 'green' (far from deadline), 'yellow' (near/half time passed), 'red' (overdue)
 const getDeadlineStatus = (deadline, assignedDate) => {
   if (!deadline) return 'green';
   const now = new Date();
@@ -97,17 +97,15 @@ const getDeadlineStatus = (deadline, assignedDate) => {
   dl.setHours(0, 0, 0, 0);
   const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
   if (diffDays < 0) return 'red';
-  // If we have an assignedDate, use half the total time as the threshold
+  // Always flag "near deadline" when within 2 days — matches SocietyReg pill logic
+  if (diffDays <= 2) return 'yellow';
+  // Also flag yellow once half the assigned window has elapsed
   if (assignedDate) {
     const ad = new Date(assignedDate);
     ad.setHours(0, 0, 0, 0);
     const totalDays = (dl - ad) / (1000 * 60 * 60 * 24);
-    const halfDays = totalDays / 2;
     const elapsed = (now - ad) / (1000 * 60 * 60 * 24);
-    if (totalDays > 0 && elapsed >= halfDays) return 'yellow';
-  } else {
-    // Fallback: within 2 days of deadline
-    if (diffDays <= 2) return 'yellow';
+    if (totalDays > 0 && elapsed >= totalDays / 2) return 'yellow';
   }
   return 'green';
 };

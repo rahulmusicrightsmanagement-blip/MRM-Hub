@@ -1,10 +1,69 @@
 const express = require('express');
 const Task = require('../models/Task');
 const User = require('../models/User');
+const SocietyRegistration = require('../models/SocietyRegistration');
 const { auth } = require('../middleware/auth');
 const notify = require('../utils/notify');
 
 const router = express.Router();
+
+// Reconcile society-linked tasks against current registration status.
+// Ensures stale 'incomplete' tasks flip to completed once the society is Registered,
+// and vice versa. Runs opportunistically on GET so existing data self-heals.
+const reconcileSocietyTasks = async (tasks) => {
+  try {
+    const socTasks = tasks.filter((t) => t.sourceType === 'societyreg' && t.sourceId);
+    if (!socTasks.length) return;
+    const regIds = [...new Set(socTasks.map((t) => t.sourceId))];
+    const regs = await SocietyRegistration.find({ _id: { $in: regIds } }).lean();
+    const regMap = new Map(regs.map((r) => [String(r._id), r]));
+
+    const sameDay = (a, b) => {
+      if (!a || !b) return false;
+      const d1 = new Date(a), d2 = new Date(b);
+      return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+    };
+
+    // Word-boundary matcher — avoids "PRS" accidentally matching "IPRS"
+    const matchSocKey = (title, keys) => {
+      if (!title) return null;
+      const titleLower = title.toLowerCase();
+      // Prefer trailing `— KEY` suffix (the canonical title format)
+      const suffixHit = keys.find((k) => titleLower.endsWith(`— ${k.toLowerCase()}`) || titleLower.endsWith(`- ${k.toLowerCase()}`));
+      if (suffixHit) return suffixHit;
+      // Fallback: longest key that matches on word boundaries
+      const sorted = [...keys].sort((a, b) => b.length - a.length);
+      return sorted.find((k) => {
+        const esc = k.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(^|[^A-Za-z0-9])${esc}([^A-Za-z0-9]|$)`).test(titleLower);
+      }) || null;
+    };
+
+    const bulkOps = [];
+    for (const t of socTasks) {
+      const reg = regMap.get(String(t.sourceId));
+      if (!reg) continue;
+      const socs = reg.societies || {};
+      const socKey = matchSocKey(t.title, Object.keys(socs));
+      if (!socKey) continue;
+      const entry = socs[socKey];
+      const set = {};
+      const shouldBeCompleted = entry?.status === 'Registered';
+      if (!!t.completed !== shouldBeCompleted) { set.completed = shouldBeCompleted; t.completed = shouldBeCompleted; }
+
+      // task.date follows startDate only — deadline drives colour, not placement
+      if (entry?.startDate && !sameDay(t.date, entry.startDate)) {
+        set.date = new Date(entry.startDate); t.date = new Date(entry.startDate);
+      }
+      if (entry?.deadline && (!t.deadline || !sameDay(t.deadline, entry.deadline))) {
+        set.deadline = new Date(entry.deadline); t.deadline = new Date(entry.deadline);
+      }
+
+      if (Object.keys(set).length) bulkOps.push({ updateOne: { filter: { _id: t._id }, update: { $set: set } } });
+    }
+    if (bulkOps.length) await Task.bulkWrite(bulkOps);
+  } catch (err) { console.error('reconcileSocietyTasks error:', err); }
+};
 
 // GET /api/tasks — list tasks with optional date range & filters
 router.get('/', auth, async (req, res) => {
@@ -28,6 +87,7 @@ router.get('/', auth, async (req, res) => {
     }
 
     const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 }).lean();
+    await reconcileSocietyTasks(tasks);
     res.json({ tasks });
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -50,6 +110,7 @@ router.get('/stats', auth, async (req, res) => {
     }
 
     const tasks = await Task.find(filter).lean();
+    await reconcileSocietyTasks(tasks);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

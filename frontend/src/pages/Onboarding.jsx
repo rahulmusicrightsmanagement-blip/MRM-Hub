@@ -433,6 +433,7 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
 const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfirm }) => {
   const [spoc, setSpoc] = useState('');
   const [notes, setNotes] = useState('');
+  const [startDate, setStartDate] = useState('');
   const [deadline, setDeadline] = useState('');
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
@@ -449,10 +450,17 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
             {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
           </select>
         </div>
-        <div style={{ marginBottom: '14px' }}>
-          <label style={labelStyle}>Deadline</label>
-          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
-            style={{ ...inputStyle, colorScheme: 'dark' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <label style={labelStyle}>Start Date</label>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+              style={{ ...inputStyle, colorScheme: 'dark' }} />
+          </div>
+          <div>
+            <label style={labelStyle}>Deadline</label>
+            <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+              style={{ ...inputStyle, colorScheme: 'dark' }} />
+          </div>
         </div>
         <div style={{ marginBottom: '20px' }}>
           <label style={labelStyle}>Notes (optional)</label>
@@ -462,7 +470,7 @@ const SocietyAssignModal = ({ society, entryName, teamMembers, onClose, onConfir
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #2d3348', paddingTop: '18px', marginTop: '4px' }}>
           <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onConfirm({ spoc, notes, deadline })}
+          <button onClick={() => onConfirm({ spoc, notes, startDate, deadline })}
             style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <CheckCircle style={{ width: '15px', height: '15px' }} /> Assign & Register
           </button>
@@ -540,7 +548,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   };
 
   /* Confirm assign → save society selection + create society registration */
-  const handleAssignConfirm = async ({ spoc, notes, deadline }) => {
+  const handleAssignConfirm = async ({ spoc, notes, startDate, deadline }) => {
     const soc = assignModalSociety;
     setAssignModalSociety(null);
     try {
@@ -558,6 +566,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
           society: soc.key,
           spoc: spoc || entry.spoc || '',
           notes: notes || '',
+          startDate: startDate || '',
           deadline: deadline || '',
         }),
       });

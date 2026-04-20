@@ -157,6 +157,16 @@ router.put('/:id', auth, async (req, res) => {
 
     await lead.save();
 
+    // Sync deadline / spoc changes → linked Tracker tasks
+    try {
+      const taskUpdate = {};
+      if (req.body.deadline !== undefined) taskUpdate.deadline = req.body.deadline ? new Date(req.body.deadline) : null;
+      if (req.body.spoc !== undefined) taskUpdate.spoc = req.body.spoc || '';
+      if (Object.keys(taskUpdate).length) {
+        await Task.updateMany({ sourceType: 'lead', sourceId: String(lead._id) }, { $set: taskUpdate });
+      }
+    } catch (syncErr) { console.error('Lead→Task sync error:', syncErr); }
+
     // Notify SPOC on stage change
     if (req.body.stage && req.body.stage !== oldStage && lead.spoc) {
       notify({

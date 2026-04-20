@@ -21,15 +21,37 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 /* ─── Sync helpers ─── */
 
-// Sync deadline from society entry → matching tracker task(s)
-const syncDeadlineToTracker = async (regId, society, deadline) => {
+// Build a regex that matches a society key at a word boundary (so "PRS" doesn't match "IPRS")
+const societyTitleRegex = (society) => {
+  const esc = society.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^A-Za-z0-9])${esc}([^A-Za-z0-9]|$)`, 'i');
+};
+
+// Sync deadline/startDate from society entry → matching tracker task(s).
+// task.date always follows startDate (the day work begins) so the Tracker
+// stacks tasks on the day they were scheduled to start. deadline drives the
+// colour/overdue badge separately.
+const syncDeadlineToTracker = async (regId, society, deadline, startDate) => {
   try {
-    const escapedSociety = society.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const update = {};
+    if (deadline !== undefined) update.deadline = deadline ? new Date(deadline) : null;
+    if (startDate !== undefined && startDate) update.date = new Date(startDate);
+    if (!Object.keys(update).length) return;
     await Task.updateMany(
-      { sourceType: 'societyreg', sourceId: regId, title: { $regex: escapedSociety, $options: 'i' } },
-      { $set: { deadline: deadline ? new Date(deadline) : null } }
+      { sourceType: 'societyreg', sourceId: String(regId), title: societyTitleRegex(society) },
+      { $set: update }
     );
   } catch (err) { console.error('syncDeadlineToTracker error:', err); }
+};
+
+// Mark tracker task(s) completed/pending based on society status
+const syncTaskCompletion = async (regId, society, completed) => {
+  try {
+    await Task.updateMany(
+      { sourceType: 'societyreg', sourceId: String(regId), title: societyTitleRegex(society) },
+      { $set: { completed: !!completed } }
+    );
+  } catch (err) { console.error('syncTaskCompletion error:', err); }
 };
 
 // Add society to onboarding entry's selectedSocieties (if entry exists)
@@ -41,6 +63,28 @@ const syncSocietyToOnboarding = async (memberName, society) => {
       await entry.save();
     }
   } catch (err) { console.error('syncSocietyToOnboarding error:', err); }
+};
+
+// Remove society from onboarding entry's selectedSocieties (if entry exists)
+const removeSocietyFromOnboarding = async (memberName, society) => {
+  try {
+    const entry = await OnboardingEntry.findOne({ name: memberName });
+    if (entry && entry.selectedSocieties.includes(society)) {
+      entry.selectedSocieties = entry.selectedSocieties.filter((s) => s !== society);
+      await entry.save();
+    }
+  } catch (err) { console.error('removeSocietyFromOnboarding error:', err); }
+};
+
+// Clear all selectedSocieties on onboarding entry (used when whole reg is deleted)
+const clearOnboardingSocieties = async (memberName) => {
+  try {
+    const entry = await OnboardingEntry.findOne({ name: memberName });
+    if (entry && entry.selectedSocieties.length) {
+      entry.selectedSocieties = [];
+      await entry.save();
+    }
+  } catch (err) { console.error('clearOnboardingSocieties error:', err); }
 };
 
 // Sync society registration count to Member model
@@ -73,7 +117,7 @@ router.get('/', auth, async (req, res) => {
 // POST /api/societyregs — start a new registration for a member+society
 router.post('/', auth, async (req, res) => {
   try {
-    const { member, society, ipi, spoc, notes, deadline } = req.body;
+    const { member, society, ipi, spoc, notes, deadline, startDate } = req.body;
     if (!member || !society) return res.status(400).json({ message: 'Member and society are required' });
 
     let reg = await SocietyRegistration.findOne({ name: member });
@@ -90,6 +134,7 @@ router.post('/', auth, async (req, res) => {
     reg.societies.set(society, {
       status: 'In Progress',
       assignee: assigneeObj,
+      startDate: startDate ? new Date(startDate) : null,
       deadline: deadline ? new Date(deadline) : null,
       steps: {},
       remarks: [],
@@ -115,11 +160,12 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    // Auto-create a Tracker task for the new registration
+    // Auto-create a Tracker task for the new registration.
+    // task.date = startDate (preferred) or creation date — deadline drives colour only, not placement.
     try {
       await Task.create({
-        title: `Society registration — ${member} — ${society}`,
-        date: new Date(),
+        title: `Society Reg — ${member} — ${society}`,
+        date: startDate ? new Date(startDate) : new Date(),
         startTime: nowHHmm(),
         duration: 45,
         category: 'Registration',
@@ -154,7 +200,7 @@ router.put('/:id', auth, async (req, res) => {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
 
-    const { society, status, assignee, deadline } = req.body;
+    const { society, status, assignee, deadline, startDate } = req.body;
 
     if (society && status) {
       const existing = reg.societies.get(society);
@@ -162,17 +208,22 @@ router.put('/:id', auth, async (req, res) => {
       reg.societies.set(society, {
         status,
         assignee: assignee || existingObj.assignee || {},
+        startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : existingObj.startDate || null,
         deadline: deadline ? new Date(deadline) : existingObj.deadline || null,
         steps: existingObj.steps || {},
         remarks: existingObj.remarks || [],
       });
     } else {
-      // Update deadline or assignee without changing status
-      if (society && deadline !== undefined) {
+      // Update deadline / startDate / assignee without changing status
+      if (society && (deadline !== undefined || startDate !== undefined)) {
         const existing = reg.societies.get(society);
         if (existing) {
           const existingObj = existing.toObject();
-          reg.societies.set(society, { ...existingObj, deadline: deadline ? new Date(deadline) : null });
+          reg.societies.set(society, {
+            ...existingObj,
+            ...(deadline !== undefined ? { deadline: deadline ? new Date(deadline) : null } : {}),
+            ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
+          });
         }
       }
     }
@@ -182,11 +233,18 @@ router.put('/:id', auth, async (req, res) => {
 
     await reg.save();
 
-    // Sync deadline changes → tracker task(s)
-    if (society && deadline !== undefined) {
+    // Sync deadline/startDate changes → tracker task(s) (also repositions task.date)
+    if (society && (deadline !== undefined || startDate !== undefined)) {
       const entry = reg.societies.get(society);
-      const dl = entry ? (entry.toObject ? entry.toObject() : entry).deadline : (deadline || null);
-      syncDeadlineToTracker(reg._id, society, dl);
+      const entryObj = entry ? (entry.toObject ? entry.toObject() : entry) : {};
+      const dl = deadline !== undefined ? (deadline || null) : (entryObj.deadline || null);
+      const sd = startDate !== undefined ? (startDate || null) : (entryObj.startDate || null);
+      syncDeadlineToTracker(reg._id, society, dl, sd);
+    }
+
+    // Sync status → tracker task completion (Registered = done, others = pending)
+    if (society && status) {
+      syncTaskCompletion(reg._id, society, status === 'Registered');
     }
 
     // Sync new society → onboarding selectedSocieties
@@ -231,9 +289,11 @@ router.put('/:id', auth, async (req, res) => {
       });
 
       try {
+        const entrySnap = reg.societies.get(society);
+        const effStart = startDate !== undefined ? startDate : (entrySnap?.startDate || null);
         await Task.create({
           title: `Society Reg — ${reg.name} — ${society}`,
-          date: new Date(),
+          date: effStart ? new Date(effStart) : new Date(),
           startTime: nowHHmm(),
           duration: 45,
           category: 'Registration',
@@ -469,12 +529,14 @@ router.delete('/:id/society', auth, async (req, res) => {
     reg.assignees.delete(society);
     await reg.save();
 
-    // Remove linked Tracker tasks for this society
-    const escapedSociety = society.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    await Task.deleteMany({ sourceType: 'societyreg', sourceId: String(reg._id), title: { $regex: escapedSociety, $options: 'i' } });
+    // Remove linked Tracker tasks for this society (word-boundary match to avoid PRS/IPRS collision)
+    await Task.deleteMany({ sourceType: 'societyreg', sourceId: String(reg._id), title: societyTitleRegex(society) });
 
     // Sync registration count → Member
     syncRegistrationsToMember(reg.name);
+
+    // Sync removal → onboarding selectedSocieties
+    removeSocietyFromOnboarding(reg.name, society);
 
     res.json({ registration: reg });
   } catch (err) {
@@ -491,6 +553,12 @@ router.delete('/:id', auth, async (req, res) => {
 
     // Remove linked Tracker tasks
     await Task.deleteMany({ sourceType: 'societyreg', sourceId: String(reg._id) });
+
+    // Clear onboarding selectedSocieties for this member
+    clearOnboardingSocieties(reg.name);
+
+    // Sync registration count → Member
+    syncRegistrationsToMember(reg.name);
 
     res.json({ message: 'Registration deleted' });
   } catch (err) {

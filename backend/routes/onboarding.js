@@ -4,10 +4,28 @@ const OnboardingEntry = require('../models/OnboardingEntry');
 const Lead = require('../models/Lead');
 const Member = require('../models/Member');
 const Task = require('../models/Task');
+const SocietyRegistration = require('../models/SocietyRegistration');
 const { auth } = require('../middleware/auth');
 const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFile, deleteFile } = require('../utils/gdrive');
 const notify = require('../utils/notify');
+
+// Reconcile onboarding selectedSocieties against actual SocietyRegistration entries
+const reconcileSelectedSocieties = async (entry) => {
+  try {
+    if (!entry || !Array.isArray(entry.selectedSocieties) || entry.selectedSocieties.length === 0) return entry;
+    const reg = await SocietyRegistration.findOne({ name: entry.name });
+    const validKeys = reg
+      ? (reg.societies instanceof Map ? Array.from(reg.societies.keys()) : Object.keys(reg.societies || {}))
+      : [];
+    const filtered = entry.selectedSocieties.filter((k) => validKeys.includes(k));
+    if (filtered.length !== entry.selectedSocieties.length) {
+      await OnboardingEntry.updateOne({ _id: entry._id }, { $set: { selectedSocieties: filtered } });
+      entry.selectedSocieties = filtered;
+    }
+    return entry;
+  } catch (err) { console.error('reconcileSelectedSocieties error:', err); return entry; }
+};
 
 // Helper: sync KYC status from onboarding entry to linked Member
 const syncKycToMember = async (entry) => {
@@ -68,8 +86,11 @@ router.get('/', auth, async (req, res) => {
     const filter = req.user.hasRole('admin') ? {} : { spoc: req.user.name };
     const filtered = await OnboardingEntry.find(filter).sort({ createdAt: -1 }).lean();
 
-    // Sync KYC status in parallel instead of sequentially
-    await Promise.all(filtered.map((entry) => syncKycToMember(entry)));
+    // Sync KYC + reconcile selectedSocieties against SocietyRegistration in parallel
+    await Promise.all(filtered.map(async (entry) => {
+      await syncKycToMember(entry);
+      await reconcileSelectedSocieties(entry);
+    }));
 
     res.json({ entries: filtered });
   } catch (err) {
@@ -206,6 +227,16 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     await entry.save();
+
+    // Sync deadline / spoc changes → linked Tracker tasks
+    try {
+      const taskUpdate = {};
+      if (req.body.deadline !== undefined) taskUpdate.deadline = req.body.deadline ? new Date(req.body.deadline) : null;
+      if (req.body.spoc !== undefined) taskUpdate.spoc = req.body.spoc || '';
+      if (Object.keys(taskUpdate).length) {
+        await Task.updateMany({ sourceType: 'onboarding', sourceId: String(entry._id) }, { $set: taskUpdate });
+      }
+    } catch (syncErr) { console.error('Onboarding→Task sync error:', syncErr); }
 
     // Sync fields back to Lead and Member
     try {
