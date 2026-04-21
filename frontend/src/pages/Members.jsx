@@ -519,6 +519,7 @@ const Members = () => {
   const getContractColor = (t) => CONTRACT_COLORS[t] || '';
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [contractFilter, setContractFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
@@ -553,11 +554,25 @@ const Members = () => {
     fetchData();
   }, [authFetch]);
 
+  const getMemberContract = (m) =>
+    contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`] || '';
+
+  const contractCounts = useMemo(() => {
+    const counts = { All: members.length, Royalty: 0, Retainer: 0, 'Work-Based': 0, Inhouse: 0 };
+    members.forEach((m) => {
+      const c = getMemberContract(m);
+      if (counts[c] !== undefined) counts[c] += 1;
+    });
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, contractMap]);
+
   const filteredMembers = useMemo(() => {
-    if (!searchQuery.trim()) return members;
-    const q = searchQuery.toLowerCase();
-    return members.filter(
-      (m) =>
+    const q = searchQuery.trim().toLowerCase();
+    return members.filter((m) => {
+      if (contractFilter !== 'All' && getMemberContract(m) !== contractFilter) return false;
+      if (!q) return true;
+      return (
         m.name.toLowerCase().includes(q) ||
         (m._id && m._id.toLowerCase().includes(q)) ||
         (m.clientNumber && m.clientNumber.toLowerCase().includes(q)) ||
@@ -566,8 +581,9 @@ const Members = () => {
         (m.genre && m.genre.toLowerCase().includes(q)) ||
         (m.status && m.status.toLowerCase().includes(q)) ||
         (m.spoc && m.spoc.toLowerCase().includes(q))
-    );
-  }, [members, searchQuery]);
+      );
+    });
+  }, [members, searchQuery, contractFilter, contractMap]);
 
   const handleAddMember = async (form) => {
     try {
@@ -676,11 +692,43 @@ const Members = () => {
         ))}
       </div>
 
-      {/* Search */}
-      <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '24px' }}>
-        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-        <input placeholder="Search by name, role, ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+      {/* Search + Contract Filter */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: '240px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+          <input placeholder="Search by name, role, ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {['All', ...Object.keys(CONTRACT_COLORS)].map((label) => {
+            const active = contractFilter === label;
+            const accent = label === 'All' ? '#6366f1' : CONTRACT_COLORS[label];
+            const count = contractCounts[label] ?? 0;
+            return (
+              <button key={label} onClick={() => setContractFilter(label)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 14px', borderRadius: '9999px',
+                  background: active ? accent : '#141720',
+                  border: `1px solid ${active ? accent : '#1e2540'}`,
+                  color: active ? '#fff' : '#e5e7eb',
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}>
+                {label !== 'All' && (
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: active ? '#fff' : accent }} />
+                )}
+                {label}
+                <span style={{
+                  fontSize: '11px', fontWeight: 700,
+                  padding: '1px 7px', borderRadius: '9999px',
+                  background: active ? 'rgba(255,255,255,0.22)' : '#1e2540',
+                  color: active ? '#fff' : '#9ca3af',
+                }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Members Grid */}
@@ -697,7 +745,7 @@ const Members = () => {
               onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#1e2540')}>
               {/* Top row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: getContractColor(contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`]) || m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: getContractColor(getMemberContract(m)) || m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                   {m.initials}
                 </div>
                 <div style={{ flex: 1 }}>

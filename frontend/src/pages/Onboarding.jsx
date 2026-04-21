@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
+import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 /* ─── Constants ─── */
 const stageDotColors = { 'Document Submission': '#3b82f6', 'KYC Verification': '#f97316', 'Contract Signing': '#a855f7', 'Active Member': '#10b981', 'Contact Made': '#06b6d4', 'Completed': '#22c55e' };
@@ -1486,6 +1487,14 @@ const Onboarding = () => {
     };
     fetchData();
   }, [authFetch]);
+
+  useNotificationDeeplink({
+    expectedType: 'onboarding',
+    records: entries,
+    isReady: !loading,
+    onOpen: (entry) => setSelectedMember(entry),
+    onMissing: () => addToast('This onboarding entry is no longer available (deleted or archived).', 'error'),
+  });
 
   /* CRUD helpers */
   const handleAddEntry = async (form) => {

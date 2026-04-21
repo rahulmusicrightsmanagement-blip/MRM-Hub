@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { withApiBase } from '../utils/api';
+import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -619,6 +620,7 @@ const Royalty = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -651,10 +653,20 @@ const Royalty = () => {
       setCompletedOnboarding(completed);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoaded(true);
     }
   }, [authFetch]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useNotificationDeeplink({
+    expectedType: ['royalty', 'music'],
+    records: clients,
+    isReady: loaded,
+    onOpen: (c) => setSelectedClient(c),
+    onMissing: () => addToast('This music works client is no longer available.', 'error'),
+  });
 
   const handleAddClient = async (entry) => {
     try {

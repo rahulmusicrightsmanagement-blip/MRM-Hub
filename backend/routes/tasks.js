@@ -133,6 +133,21 @@ router.get('/stats', auth, async (req, res) => {
   }
 });
 
+// GET /api/tasks/:id — single task (used for notification deep-links)
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const task = await Task.findById(req.params.id).lean();
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (!req.user.isFullAccess() && task.spoc !== req.user.name) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+    res.json({ task });
+  } catch (err) {
+    console.error('Get task error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // POST /api/tasks — create a new task
 router.post('/', auth, async (req, res) => {
   try {

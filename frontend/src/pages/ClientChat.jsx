@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, Plus, Archive, Inbox, Filter, Trash2, Edit3, X, Clock, CheckCircle2, Loader2, AlertCircle, ChevronDown, Check, Send, UserCheck } from 'lucide-react';
+import { MessageSquare, Plus, Archive, Inbox, Filter, Trash2, Edit3, X, Clock, CheckCircle2, Loader2, AlertCircle, ChevronDown, Check, Send, UserCheck, XCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from '../components/SearchableSelect';
 import DateTimePicker from '../components/DateTimePicker';
+import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 const STATUS = {
   NEW: 'New',
   IN_PROGRESS: 'In Progress',
   COMPLETED: 'Completed',
+  NOT_COMPLETED: 'Not Completed',
 };
 
 const statusColors = {
   [STATUS.NEW]: { bg: 'rgba(59,130,246,0.14)', fg: '#60a5fa', border: 'rgba(59,130,246,0.3)' },
   [STATUS.IN_PROGRESS]: { bg: 'rgba(245,158,11,0.14)', fg: '#fbbf24', border: 'rgba(245,158,11,0.3)' },
   [STATUS.COMPLETED]: { bg: 'rgba(16,185,129,0.14)', fg: '#34d399', border: 'rgba(16,185,129,0.3)' },
+  [STATUS.NOT_COMPLETED]: { bg: 'rgba(239,68,68,0.14)', fg: '#f87171', border: 'rgba(239,68,68,0.3)' },
 };
 
 const toLocalInput = (iso) => {
@@ -73,7 +76,7 @@ const ClientChat = () => {
       setTeamMembers(teamData.users || []);
     } catch (err) {
       console.error(err);
-      addToast?.('Failed to load chat data', 'error');
+      addToast?.('Failed to load tasks', 'error');
     } finally {
       setLoading(false);
     }
@@ -82,6 +85,14 @@ const ClientChat = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useNotificationDeeplink({
+    expectedType: ['clienttask', 'clientmessage', 'client_message'],
+    records: messages,
+    isReady: !loading,
+    onOpen: (msg) => { setEditing(msg); setModalOpen(true); },
+    onMissing: () => addToast?.('This client task is no longer available (deleted).', 'error'),
+  });
 
   const openNew = () => {
     setEditing(null);
@@ -111,10 +122,10 @@ const ClientChat = () => {
       const saved = body.message;
       if (editing) {
         setMessages((prev) => prev.map((m) => (m._id === saved._id ? saved : m)));
-        addToast?.('Message updated', 'success');
+        addToast?.('Task updated', 'success');
       } else {
         setMessages((prev) => [saved, ...prev]);
-        addToast?.('Message added', 'success');
+        addToast?.('Task added', 'success');
       }
       closeModal();
     } catch (err) {
@@ -128,7 +139,7 @@ const ClientChat = () => {
       const res = await authFetch(`/api/client-messages/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
       setMessages((prev) => prev.filter((m) => m._id !== id));
-      addToast?.('Message deleted', 'success');
+      addToast?.('Task deleted', 'success');
     } catch (err) {
       addToast?.(err.message, 'error');
     }
@@ -183,22 +194,29 @@ const ClientChat = () => {
   const filtered = useMemo(() => {
     let list = [...messages];
     if (view === 'archive') {
-      list = list.filter((t) => t.status === STATUS.COMPLETED);
+      list = list.filter((t) => t.status === STATUS.COMPLETED || t.status === STATUS.NOT_COMPLETED);
     } else {
-      if (filter === 'all') list = list.filter((t) => t.status !== STATUS.COMPLETED);
+      if (filter === 'all') list = list.filter((t) => t.status !== STATUS.COMPLETED && t.status !== STATUS.NOT_COMPLETED);
       else if (filter === 'new') list = list.filter((t) => t.status === STATUS.NEW);
       else if (filter === 'progress') list = list.filter((t) => t.status === STATUS.IN_PROGRESS);
       else if (filter === 'completed') list = list.filter((t) => t.status === STATUS.COMPLETED);
+      else if (filter === 'not_completed') list = list.filter((t) => t.status === STATUS.NOT_COMPLETED);
     }
-    list.sort((a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime());
+    list.sort((a, b) => {
+      const ad = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const bd = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      if (ad !== bd) return ad - bd;
+      return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
+    });
     return list;
   }, [messages, filter, view]);
 
   const counts = useMemo(() => ({
-    all: messages.filter((t) => t.status !== STATUS.COMPLETED).length,
+    all: messages.filter((t) => t.status !== STATUS.COMPLETED && t.status !== STATUS.NOT_COMPLETED).length,
     new: messages.filter((t) => t.status === STATUS.NEW).length,
     progress: messages.filter((t) => t.status === STATUS.IN_PROGRESS).length,
     completed: messages.filter((t) => t.status === STATUS.COMPLETED).length,
+    not_completed: messages.filter((t) => t.status === STATUS.NOT_COMPLETED).length,
   }), [messages]);
 
   return (
@@ -208,10 +226,10 @@ const ClientChat = () => {
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <MessageSquare style={{ width: '26px', height: '26px', color: '#60a5fa' }} />
-            Client Chat
+            Client Task
           </h1>
           <p style={{ color: '#9ca3af', fontSize: '14px' }}>
-            Track WhatsApp messages, deadlines, and task progress from clients
+            Track client tasks, deadlines, and progress with SPOC remarks
           </p>
         </div>
         <button
@@ -231,15 +249,16 @@ const ClientChat = () => {
           }}
         >
           <Plus style={{ width: '16px', height: '16px' }} />
-          New Message
+          New Task
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <StatCard label="Active Tasks" value={counts.all} icon={<Inbox size={18} />} color="#60a5fa" />
         <StatCard label="New" value={counts.new} icon={<AlertCircle size={18} />} color="#60a5fa" />
         <StatCard label="In Progress" value={counts.progress} icon={<Loader2 size={18} />} color="#fbbf24" />
         <StatCard label="Completed" value={counts.completed} icon={<CheckCircle2 size={18} />} color="#34d399" />
+        <StatCard label="Not Completed" value={counts.not_completed} icon={<XCircle size={18} />} color="#f87171" />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -259,13 +278,14 @@ const ClientChat = () => {
             <FilterBtn active={filter === 'new'} onClick={() => setFilter('new')}>New</FilterBtn>
             <FilterBtn active={filter === 'progress'} onClick={() => setFilter('progress')}>In Progress</FilterBtn>
             <FilterBtn active={filter === 'completed'} onClick={() => setFilter('completed')}>Completed</FilterBtn>
+            <FilterBtn active={filter === 'not_completed'} onClick={() => setFilter('not_completed')}>Not Completed</FilterBtn>
           </div>
         )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {loading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading messages...</div>
+          <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading tasks...</div>
         ) : filtered.length === 0 ? (
           <EmptyState view={view} onNew={openNew} />
         ) : (
@@ -351,6 +371,7 @@ const STATUS_OPTIONS = [
   { value: STATUS.NEW, label: 'New', dot: '#60a5fa', icon: AlertCircle },
   { value: STATUS.IN_PROGRESS, label: 'In Progress', dot: '#fbbf24', icon: Loader2 },
   { value: STATUS.COMPLETED, label: 'Completed', dot: '#34d399', icon: CheckCircle2 },
+  { value: STATUS.NOT_COMPLETED, label: 'Not Completed', dot: '#f87171', icon: XCircle },
 ];
 
 const StatusMenu = ({ value, onChange }) => {
@@ -528,7 +549,7 @@ const TaskCard = ({ task, onEdit, onDelete, onStatusChange }) => {
           {Array.isArray(task.responses) && task.responses.length > 0 && (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#60a5fa' }}>
               <Send size={12} />
-              {task.responses.length} {task.responses.length === 1 ? 'reply' : 'replies'}
+              {task.responses.length} {task.responses.length === 1 ? 'remark' : 'remarks'}
             </span>
           )}
           <StatusMenu value={task.status} onChange={onStatusChange} />
@@ -581,12 +602,12 @@ const EmptyState = ({ view, onNew }) => (
       {view === 'archive' ? <Archive size={28} color="#60a5fa" /> : <MessageSquare size={28} color="#60a5fa" />}
     </div>
     <h3 style={{ color: 'white', fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
-      {view === 'archive' ? 'No archived tasks yet' : 'No messages yet'}
+      {view === 'archive' ? 'No archived tasks yet' : 'No tasks yet'}
     </h3>
     <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '20px' }}>
       {view === 'archive'
         ? 'Completed tasks will appear here for reference.'
-        : 'Log your first WhatsApp client message to get started.'}
+        : 'Log your first client task to get started.'}
     </p>
     {view === 'active' && (
       <button
@@ -647,28 +668,34 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
   const validate = () => {
     const errs = {};
     if (!clientName.trim()) errs.clientName = 'Select a client';
-    if (!message.trim()) errs.message = 'Message is required';
-    else if (message.trim().length < 2) errs.message = 'Message is too short';
+    if (!message.trim()) errs.message = 'Task description is required';
+    else if (message.trim().length < 2) errs.message = 'Task description is too short';
 
     const rcvd = receivedAt ? new Date(receivedAt) : null;
     if (!rcvd || isNaN(rcvd.getTime())) {
-      errs.receivedAt = 'Pick a valid date';
+      errs.receivedAt = 'Pick a valid start date';
     } else {
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
-      if (rcvd > todayEnd) errs.receivedAt = 'Received date cannot be in the future';
+      if (rcvd > todayEnd) errs.receivedAt = 'Start date cannot be in the future';
       if (rcvd.getFullYear() < 2000) errs.receivedAt = 'Invalid year';
     }
 
-    if (deadline) {
+    if (!deadline) {
+      errs.deadline = 'End date is required';
+    } else {
       const dl = new Date(deadline);
-      if (isNaN(dl.getTime())) errs.deadline = 'Pick a valid date';
+      if (isNaN(dl.getTime())) errs.deadline = 'Pick a valid end date';
       else if (rcvd) {
         const rcvdDay = new Date(rcvd.getFullYear(), rcvd.getMonth(), rcvd.getDate()).getTime();
         const dlDay = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate()).getTime();
-        if (dlDay < rcvdDay) errs.deadline = 'Deadline must be on or after received date';
+        if (dlDay < rcvdDay) errs.deadline = 'End date must be on or after start date';
       }
     }
+
+    if (!status) errs.status = 'Status is required';
+    if (!assignedTo.trim()) errs.assignedTo = 'Assign task to a team member';
+
     return errs;
   };
 
@@ -740,10 +767,10 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
         }}>
           <div>
             <h2 style={{ color: 'white', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
-              {initial ? 'Edit Message' : 'New Client Message'}
+              {initial ? 'Edit Task' : 'New Client Task'}
             </h2>
             <p style={{ color: '#6b7280', fontSize: '12px' }}>
-              {initial ? 'Update the task details below' : 'Log a new WhatsApp message from a client'}
+              {initial ? 'Update the task details below' : 'Log a new task from a client'}
             </p>
           </div>
           <button
@@ -785,13 +812,13 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
 
         <div>
           <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-            Message Received <span style={{ color: '#ef4444' }}>*</span>
+            Task from Client <span style={{ color: '#ef4444' }}>*</span>
           </label>
           <textarea
             value={message}
             onChange={(e) => { setMessage(e.target.value); if (errors.message) setErrors((p) => ({ ...p, message: undefined })); }}
             rows={4}
-            placeholder="Paste or type the WhatsApp message..."
+            placeholder="Describe the task received from the client..."
             style={{
               ...inputStyle,
               resize: 'vertical',
@@ -804,14 +831,15 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <DateTimePicker
-            label="Date Received"
+            label="Start Date"
             required
             value={receivedAt}
             onChange={(v) => { setReceivedAt(v); if (errors.receivedAt) setErrors((p) => ({ ...p, receivedAt: undefined })); }}
             error={errors.receivedAt}
           />
           <DateTimePicker
-            label="Deadline"
+            label="End Date"
+            required
             value={deadline}
             onChange={(v) => { setDeadline(v); if (errors.deadline) setErrors((p) => ({ ...p, deadline: undefined })); }}
             minDate={receivedAt}
@@ -822,22 +850,28 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Status
+              Status <span style={{ color: '#ef4444' }}>*</span>
             </label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+            <select value={status} onChange={(e) => { setStatus(e.target.value); if (errors.status) setErrors((p) => ({ ...p, status: undefined })); }} style={{ ...inputStyle, borderColor: errors.status ? '#ef4444' : '#1e2540' }}>
               <option value={STATUS.NEW}>New</option>
               <option value={STATUS.IN_PROGRESS}>In Progress</option>
               <option value={STATUS.COMPLETED}>Completed</option>
+              <option value={STATUS.NOT_COMPLETED}>Not Completed</option>
             </select>
+            {errors.status && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
           </div>
-          <SearchableSelect
-            label="Assign Task To"
-            options={teamOptions}
-            value={assignedTo}
-            onChange={setAssignedTo}
-            placeholder="Select team member..."
-            emptyMessage="No team members"
-          />
+          <div>
+            <SearchableSelect
+              label="Assign Task To"
+              required
+              options={teamOptions}
+              value={assignedTo}
+              onChange={(v) => { setAssignedTo(v); if (errors.assignedTo) setErrors((p) => ({ ...p, assignedTo: undefined })); }}
+              placeholder="Select team member..."
+              emptyMessage="No team members"
+            />
+            {errors.assignedTo && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.assignedTo}</div>}
+          </div>
         </div>
 
         {initial?._id && (
@@ -850,10 +884,10 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
               <Send size={14} style={{ color: '#60a5fa' }} />
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                Responses Sent to Client
+                Remarks by SPOC
               </span>
               <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#6b7280' }}>
-                {responses.length} {responses.length === 1 ? 'reply' : 'replies'}
+                {responses.length} {responses.length === 1 ? 'remark' : 'remarks'}
               </span>
             </div>
 
@@ -884,7 +918,7 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
                     <button
                       type="button"
                       onClick={() => onRemoveResponse(initial._id, r._id)}
-                      title="Delete response"
+                      title="Delete remark"
                       style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
                     >
                       <Trash2 size={13} />
@@ -898,7 +932,7 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
               <textarea
                 value={responseText}
                 onChange={(e) => setResponseText(e.target.value)}
-                placeholder="Type the response you sent to the client..."
+                placeholder="Add a remark from SPOC about this task..."
                 rows={2}
                 style={{
                   flex: 1,

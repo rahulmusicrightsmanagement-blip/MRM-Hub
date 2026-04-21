@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import SearchableSelect from '../components/SearchableSelect';
+import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 const DEFAULT_STAGE_COLORS = { 'New Enquiry': '#3b82f6', 'Meeting Set': '#6366f1', 'Qualified Lead': '#10b981', 'Not Qualified': '#ef4444' };
 const STAGE_COLOR_PALETTE = ['#3b82f6', '#6366f1', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
@@ -1026,6 +1027,14 @@ const SalesPipeline = () => {
     };
     load();
   }, [authFetch]);
+
+  useNotificationDeeplink({
+    expectedType: 'lead',
+    records: leads,
+    isReady: !loading,
+    onOpen: (lead) => setSelectedLead(lead),
+    onMissing: () => addToast('This lead is no longer in the pipeline (deleted or moved to onboarding).', 'error'),
+  });
 
   const handleAddLead = async (form) => {
     try {

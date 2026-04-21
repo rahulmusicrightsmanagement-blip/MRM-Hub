@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
+import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 // SOCIETIES is now loaded from picklist — see SocietyReg component
 
@@ -834,6 +835,8 @@ const SocietyReg = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({}); // { 'IPRS': 'In Progress', 'PRS': 'Registered', ... }
   const [searchQuery, setSearchQuery] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportMode, setExportMode] = useState('login'); // 'login' | 'nocReceived' | 'applicationSentToSociety' | 'thirdPartyAuthorization' | 'bankMandateUpdate'
 
   useEffect(() => {
     const fetchData = async () => {
@@ -864,6 +867,14 @@ const SocietyReg = () => {
     };
     fetchData();
   }, [authFetch]);
+
+  useNotificationDeeplink({
+    expectedType: ['societyreg', 'society'],
+    records: members,
+    isReady: !loading,
+    onOpen: (m) => setSelectedMember(m),
+    onMissing: () => addToast('This society registration is no longer available.', 'error'),
+  });
 
   const getSocStatus = (member, socKey) => {
     const entry = member.societies?.[socKey];
@@ -992,7 +1003,14 @@ const SocietyReg = () => {
 
   const clearAllFilters = () => setFilters({});
 
-  const handleExportExcel = () => {
+  const DOC_EXPORT_MODES = {
+    nocReceived: { label: 'NOC Received', prefix: 'nocReceived' },
+    applicationSentToSociety: { label: 'Application Sent to Society', prefix: 'applicationSent' },
+    thirdPartyAuthorization: { label: 'Third Party Authorization Done', prefix: 'thirdPartyAuth' },
+    bankMandateUpdate: { label: 'Bank Mandate Update', prefix: 'bankMandate' },
+  };
+
+  const handleExportExcel = (mode = 'login') => {
     try {
       const rows = filteredMembers;
       if (rows.length === 0) {
@@ -1000,61 +1018,97 @@ const SocietyReg = () => {
         return;
       }
 
-      // Row 1: blank | Society name (merged across 2 cols) | ... | blank
-      // Row 2: "Client Name" | Primary | Secondary | Primary | Secondary | ...
-      // Data rows: client name + Yes/No for primary & secondary per society
-      const header1 = ['Client Name'];
-      const header2 = [''];
-      SOCIETIES.forEach((soc) => {
-        header1.push(soc.key, '');
-        header2.push('Primary', 'Secondary');
-      });
+      let aoa;
+      let sheetName;
+      let fileSuffix;
+      let merges = [];
+      let colWidths;
 
-      const aoa = [header1, header2];
-      rows.forEach((m) => {
-        const row = [m.name];
+      if (mode === 'login') {
+        // Row 1: blank | Society name (merged across 2 cols) | ... | blank
+        // Row 2: "Client Name" | Primary | Secondary | Primary | Secondary | ...
+        // Data rows: client name + Yes/No for primary & secondary per society
+        const header1 = ['Client Name'];
+        const header2 = [''];
         SOCIETIES.forEach((soc) => {
-          const entry = m.societies?.[soc.key];
-          const status = getSocStatus(m, soc.key);
-          if (!entry || status === 'N/A') {
-            row.push('NA', 'NA');
-          } else {
-            const steps = (typeof entry !== 'string') ? (entry.steps || {}) : {};
-            row.push(steps.loginId ? 'Yes' : 'No');
-            row.push(steps.secondaryLoginId ? 'Yes' : 'No');
-          }
+          header1.push(soc.key, '');
+          header2.push('Primary', 'Secondary');
         });
-        aoa.push(row);
-      });
+        aoa = [header1, header2];
+        rows.forEach((m) => {
+          const row = [m.name];
+          SOCIETIES.forEach((soc) => {
+            const entry = m.societies?.[soc.key];
+            const status = getSocStatus(m, soc.key);
+            if (!entry || status === 'N/A') {
+              row.push('-', '-');
+            } else {
+              const steps = (typeof entry !== 'string') ? (entry.steps || {}) : {};
+              row.push(steps.loginId ? 'Yes' : 'No');
+              row.push(steps.secondaryLoginId ? 'Yes' : 'No');
+            }
+          });
+          aoa.push(row);
+        });
+        merges = SOCIETIES.map((_, i) => {
+          const start = 1 + i * 2;
+          return { s: { r: 0, c: start }, e: { r: 0, c: start + 1 } };
+        });
+        colWidths = [{ wch: 28 }, ...SOCIETIES.flatMap(() => [{ wch: 12 }, { wch: 12 }])];
+        sheetName = 'Login IDs';
+        fileSuffix = 'LoginIDs';
+      } else {
+        const def = DOC_EXPORT_MODES[mode];
+        if (!def) {
+          addToast('Invalid export mode', 'error');
+          return;
+        }
+        // Single row header: Client Name | IPRS | PRS | ...
+        const header = ['Client Name', ...SOCIETIES.map((s) => s.key)];
+        aoa = [header];
+        rows.forEach((m) => {
+          const row = [m.name];
+          SOCIETIES.forEach((soc) => {
+            const entry = m.societies?.[soc.key];
+            const status = getSocStatus(m, soc.key);
+            if (!entry || status === 'N/A') {
+              row.push('-');
+            } else {
+              const steps = (typeof entry !== 'string') ? (entry.steps || {}) : {};
+              const fileUrl = steps[`${def.prefix}FileUrl`];
+              const fileName = steps[`${def.prefix}FileName`];
+              row.push((fileUrl || fileName) ? 'Yes' : 'No');
+            }
+          });
+          aoa.push(row);
+        });
+        colWidths = [{ wch: 28 }, ...SOCIETIES.map(() => ({ wch: 10 }))];
+        sheetName = def.label.slice(0, 31);
+        fileSuffix = def.label.replace(/\s+/g, '_');
+      }
 
       const sheet = XLSX.utils.aoa_to_sheet(aoa);
+      if (merges.length) sheet['!merges'] = merges;
+      sheet['!cols'] = colWidths;
 
-      // Merge society name across its 2 columns in header row 1
-      sheet['!merges'] = SOCIETIES.map((_, i) => {
-        const start = 1 + i * 2;
-        return { s: { r: 0, c: start }, e: { r: 0, c: start + 1 } };
-      });
-
-      sheet['!cols'] = [{ wch: 28 }, ...SOCIETIES.flatMap(() => [{ wch: 12 }, { wch: 12 }])];
-
-      // Center-align the society header + sub-headers + data cells for cleaner look
+      const headerRowCount = mode === 'login' ? 2 : 1;
       const range = XLSX.utils.decode_range(sheet['!ref']);
       for (let r = 0; r <= range.e.r; r++) {
         for (let c = 0; c <= range.e.c; c++) {
           const addr = XLSX.utils.encode_cell({ r, c });
           if (!sheet[addr]) continue;
           sheet[addr].s = {
-            alignment: { horizontal: c === 0 && r > 1 ? 'left' : 'center', vertical: 'center' },
-            font: r <= 1 ? { bold: true } : {},
+            alignment: { horizontal: c === 0 && r >= headerRowCount ? 'left' : 'center', vertical: 'center' },
+            font: r < headerRowCount ? { bold: true } : {},
           };
         }
       }
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, sheet, 'Registrations');
+      XLSX.utils.book_append_sheet(wb, sheet, sheetName);
 
       const stamp = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(wb, `Society_Registrations_${stamp}.xlsx`);
+      XLSX.writeFile(wb, `Society_${fileSuffix}_${stamp}.xlsx`);
       addToast(`Exported ${rows.length} client${rows.length === 1 ? '' : 's'} to Excel`, 'success');
     } catch (err) {
       console.error('Export error:', err);
@@ -1071,7 +1125,7 @@ const SocietyReg = () => {
           <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Collecting Society Registrations</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
-              onClick={handleExportExcel}
+              onClick={() => { setExportMode('login'); setShowExportModal(true); }}
               title="Download all registrations as Excel"
               style={{
                 display: 'flex',
@@ -1239,6 +1293,65 @@ const SocietyReg = () => {
           authFetch={authFetch}
           token={token}
         />
+      )}
+
+      {showExportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}
+          onClick={() => setShowExportModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1a1e2e', border: '1px solid #2d3348', borderRadius: '14px', width: '460px', maxWidth: '92vw', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={{ color: '#fff', fontSize: '17px', fontWeight: 700 }}>Export to Excel</h2>
+              <button onClick={() => setShowExportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <p style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '14px' }}>
+              Choose what data to export. {Object.keys(filters).length > 0 || searchQuery ? 'Active search/filters will apply.' : 'All registrations included.'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {[
+                { key: 'login', label: 'Login IDs (Primary / Secondary)', hint: 'Current default — Yes/No per society login' },
+                { key: 'nocReceived', label: 'NOC Received', hint: 'Yes/No per society (document in Google Drive)' },
+                { key: 'applicationSentToSociety', label: 'Application Sent to Society', hint: 'Yes/No per society (document in Google Drive)' },
+                { key: 'thirdPartyAuthorization', label: 'Third Party Authorization Done', hint: 'Yes/No per society (document in Google Drive)' },
+                { key: 'bankMandateUpdate', label: 'Bank Mandate Update', hint: 'Yes/No per society (document in Google Drive)' },
+              ].map((opt) => {
+                const active = exportMode === opt.key;
+                return (
+                  <button key={opt.key} onClick={() => setExportMode(opt.key)}
+                    style={{
+                      textAlign: 'left', cursor: 'pointer',
+                      padding: '12px 14px', borderRadius: '9px',
+                      background: active ? 'rgba(16,185,129,0.12)' : '#141720',
+                      border: active ? '1px solid #10b981' : '1px solid #1e2540',
+                      color: '#e5e7eb',
+                      display: 'flex', alignItems: 'flex-start', gap: '10px',
+                    }}>
+                    <span style={{
+                      width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
+                      border: active ? '5px solid #10b981' : '2px solid #3a4060',
+                      background: active ? '#0b1a1a' : 'transparent',
+                    }} />
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{opt.label}</span>
+                      <span style={{ display: 'block', fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{opt.hint}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowExportModal(false)}
+                style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#cbd5e1', fontSize: '13px', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={() => { handleExportExcel(exportMode); setShowExportModal(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #059669, #10b981)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                <Download size={14} /> Download
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

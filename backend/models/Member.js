@@ -39,6 +39,7 @@ const memberSchema = new mongoose.Schema(
     assignedDate: { type: Date, default: null },
     deadline: { type: Date, default: null },
     subTasks: [subTaskSchema],
+    previousNames: { type: [String], default: [] },
   },
   { timestamps: true, collection: 'members' }
 );

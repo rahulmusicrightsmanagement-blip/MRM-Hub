@@ -102,6 +102,7 @@ const NotificationPanel = () => {
     if (key.includes('society')) return '/society-reg';
     if (key.includes('onboarding')) return '/onboarding';
     if (key.includes('lead')) return '/sales-pipeline';
+    if (key.includes('client')) return '/client-chat';
     if (key.includes('task')) return '/tracker';
     if (key.includes('royalty') || key.includes('music')) return '/royalty';
     if (key.includes('member')) return '/members';

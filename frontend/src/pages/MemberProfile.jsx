@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Music, FileText, Shield, Copy, Check,
-  ExternalLink, Calendar, User, Globe, Hash, Edit3, ChevronDown, ChevronUp,
+  ExternalLink, Calendar, User, Globe, Hash, Edit3, ChevronDown, ChevronUp, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -86,6 +86,42 @@ const MemberProfile = () => {
   const [royalties, setRoyalties] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [copiedField, setCopiedField] = useState('');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncName = async () => {
+    const previousName = window.prompt(
+      `Sync "${member?.name}" across Sales, Onboarding, Society Reg, Music Works, and Client Tasks.\n\nOptional: enter the PREVIOUS name if records still show an older value (e.g. "Rahul Jadhav"). Leave blank to sync using current name only.`,
+      '',
+    );
+    if (previousName === null) return;
+    setSyncing(true);
+    try {
+      const res = await authFetch(`/api/members/${id}/sync-name`, {
+        method: 'POST',
+        body: JSON.stringify({ previousName: previousName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Sync failed');
+      const s = data.synced || {};
+      const total = (s.leads || 0) + (s.onboarding || 0) + (s.societyRegs || 0) + (s.royalties || 0) + (s.clientMessages || 0);
+      const breakdown = `Sales:${s.leads || 0} · Onboarding:${s.onboarding || 0} · Society Reg:${s.societyRegs || 0} · Music Works:${s.royalties || 0} · Tasks:${s.clientMessages || 0}`;
+      addToast(total > 0 ? `Synced ${total} record${total === 1 ? '' : 's'} — ${breakdown}` : `No records matched — ${breakdown}`, total > 0 ? 'success' : 'info');
+      if (total > 0) {
+        const refreshed = await authFetch(`/api/members/${id}/profile`);
+        const fresh = await refreshed.json();
+        setMember(fresh.member);
+        setLeads(fresh.leads || []);
+        setOnboarding(fresh.onboarding || []);
+        setSocietyRegs(fresh.societyRegs || []);
+        setRoyalties(fresh.royalties || []);
+      }
+    } catch (err) {
+      console.error(err);
+      addToast('Failed to sync name', 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -665,7 +701,7 @@ const MemberProfile = () => {
 
       {/* Profile Header */}
       <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px', padding: '24px 28px' }}>
-        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: member.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: ({ Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' }[onboarding[0]?.contractType]) || member.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
           {member.initials}
         </div>
         <div style={{ flex: 1 }}>
@@ -673,6 +709,21 @@ const MemberProfile = () => {
             <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>{member.name}</h1>
             <Badge label={member.status} colorMap={statusColors} />
             <Badge label={`KYC: ${member.kycStatus}`} colorMap={{ 'KYC: Verified': kycColors.Verified, 'KYC: Pending': kycColors.Pending, 'KYC: Rejected': kycColors.Rejected }} />
+            <button
+              onClick={handleSyncName}
+              disabled={syncing}
+              title="Sync this member's name across Sales, Onboarding, Society Reg, Music Works & Client Tasks"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '5px 12px', borderRadius: '9999px',
+                border: '1px solid #2d3348', background: '#141720', color: '#cbd5e1',
+                fontSize: '11px', fontWeight: 600, cursor: syncing ? 'not-allowed' : 'pointer',
+                opacity: syncing ? 0.6 : 1,
+              }}
+            >
+              <RefreshCw size={12} style={syncing ? { animation: 'spin 1s linear infinite' } : {}} />
+              {syncing ? 'Syncing...' : 'Sync name'}
+            </button>
           </div>
           <div style={{ color: '#8892b0', fontSize: '14px' }}>
             {Array.isArray(member.role) ? member.role.join(', ') : member.role} {member.genre ? `· ${member.genre}` : ''}

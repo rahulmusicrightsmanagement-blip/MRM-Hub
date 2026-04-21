@@ -23,6 +23,7 @@ const taskRoutes = require('./routes/tasks');
 const notificationRoutes = require('./routes/notifications');
 const picklistRoutes = require('./routes/picklists');
 const clientMessageRoutes = require('./routes/clientMessages');
+const { startTaskEmailCron } = require('./utils/taskEmailCron');
 
 const app = express();
 
@@ -102,6 +103,7 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB');
+    startTaskEmailCron();
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => {

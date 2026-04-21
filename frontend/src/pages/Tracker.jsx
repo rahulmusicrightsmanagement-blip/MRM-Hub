@@ -3,6 +3,7 @@ import {
   Plus, ChevronLeft, ChevronRight, Clock, X, Calendar, CheckCircle,
   AlertTriangle, Zap, ListTodo, Trash2, Check, Search,
 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
@@ -684,7 +685,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
    ═══════════════════════════════════════════ */
 const Tracker = () => {
   const { authFetch } = useAuth();
-  const toast = useToast();
+  const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const TASK_CATEGORIES = getOptions('task_category');
   const CATEGORIES = ['All Categories', ...TASK_CATEGORIES];
@@ -781,6 +782,64 @@ const Tracker = () => {
     fetchStats();
   }, [fetchTasks, fetchStats]);
 
+  /* ── Notification deep-link: open the referenced task ── */
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const type = (params.get('notifType') || '').toLowerCase();
+    const id = params.get('notifId');
+    if (!id || !type.includes('task')) return;
+
+    let cancelled = false;
+    (async () => {
+      const clearUrl = () => {
+        const clean = new URLSearchParams(location.search);
+        clean.delete('notifType');
+        clean.delete('notifId');
+        const qs = clean.toString();
+        navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+      };
+
+      const hit = tasks.find((t) => t._id === id);
+      if (hit) {
+        clearUrl();
+        setEditingTask(hit);
+        return;
+      }
+
+      try {
+        const res = await authFetch(`${API}/tasks/${id}`);
+        if (cancelled) return;
+        if (res.status === 404) {
+          clearUrl();
+          addToast('This task was deleted and is no longer available.', 'error');
+          return;
+        }
+        if (res.status === 403) {
+          clearUrl();
+          addToast('You do not have access to this task.', 'error');
+          return;
+        }
+        if (!res.ok) {
+          clearUrl();
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && data.task) {
+          clearUrl();
+          const taskDate = new Date(data.task.date);
+          setWeekStart(getMonday(taskDate));
+          setEditingTask(data.task);
+        }
+      } catch (err) {
+        console.error('Notif task fetch failed:', err);
+        if (!cancelled) clearUrl();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [location.search, location.key, tasks, authFetch, location.pathname, navigate]);
+
   /* ── Create / Update task ── */
   const handleSaveTask = async (form) => {
     try {
@@ -791,7 +850,7 @@ const Tracker = () => {
           body: JSON.stringify(form),
         });
         if (!res.ok) throw new Error('Failed to update task');
-        toast.success('Task updated');
+        addToast('Task updated');
       } else {
         // Create
         const res = await authFetch(`${API}/tasks`, {
@@ -799,12 +858,12 @@ const Tracker = () => {
           body: JSON.stringify(form),
         });
         if (!res.ok) throw new Error('Failed to create task');
-        toast.success('Task scheduled');
+        addToast('Task scheduled');
       }
       fetchTasks();
       fetchStats();
     } catch (err) {
-      toast.error(err.message);
+      addToast(err.message, 'error');
     }
   };
 
@@ -816,9 +875,9 @@ const Tracker = () => {
       setSelectedTask(null);
       fetchTasks();
       fetchStats();
-      toast.success('Task status updated');
+      addToast('Task status updated');
     } catch (err) {
-      toast.error(err.message);
+      addToast(err.message, 'error');
     }
   };
 
@@ -830,9 +889,9 @@ const Tracker = () => {
       setSelectedTask(null);
       fetchTasks();
       fetchStats();
-      toast.success('Task deleted');
+      addToast('Task deleted');
     } catch (err) {
-      toast.error(err.message);
+      addToast(err.message, 'error');
     }
   };
 

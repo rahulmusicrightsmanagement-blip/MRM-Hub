@@ -1,10 +1,13 @@
 const express = require('express');
 const ClientMessage = require('../models/ClientMessage');
+const User = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { sendTaskEmail } = require('../utils/mailer');
+const { ADMIN_EMAILS, resolveSpocEmail } = require('../utils/taskEmailConfig');
 
 const router = express.Router();
 
-const VALID_STATUSES = ['New', 'In Progress', 'Completed'];
+const VALID_STATUSES = ['New', 'In Progress', 'Completed', 'Not Completed'];
 
 // GET /api/client-messages — list, optional ?status=
 router.get('/', auth, async (req, res) => {
@@ -14,7 +17,13 @@ router.get('/', auth, async (req, res) => {
     if (status && VALID_STATUSES.includes(status)) {
       filter.status = status;
     }
-    const messages = await ClientMessage.find(filter).sort({ receivedAt: -1 }).lean();
+    const messages = await ClientMessage.find(filter).lean();
+    messages.sort((a, b) => {
+      const ad = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const bd = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      if (ad !== bd) return ad - bd;
+      return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
+    });
     res.json({ messages });
   } catch (err) {
     console.error('Get client messages error:', err);
@@ -131,6 +140,44 @@ router.delete('/:id/responses/:rid', auth, async (req, res) => {
   } catch (err) {
     console.error('Delete response error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/client-messages/send-email — admin gets all, others get own tasks
+router.post('/send-email', auth, async (req, res) => {
+  try {
+    const user = req.user;
+    const isAdmin = (user.roles || []).includes('admin') || (user.roles || []).includes('lead');
+
+    if (isAdmin) {
+      const tasks = await ClientMessage.find({}).lean();
+      const sentTo = [];
+      for (const adminEmail of ADMIN_EMAILS) {
+        try {
+          await sendTaskEmail({ to: adminEmail, recipientLabel: `Admin · ${user.name}`, tasks, mode: 'admin' });
+          sentTo.push(adminEmail);
+        } catch (e) {
+          console.error(`admin email failed for ${adminEmail}:`, e.message);
+        }
+      }
+      return res.json({ message: 'Email sent', to: sentTo, count: tasks.length, mode: 'admin' });
+    }
+
+    const nameRegex = new RegExp(`^${(user.name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    const tasks = await ClientMessage.find({
+      $or: [
+        { assignedToId: user._id },
+        { assignedTo: nameRegex },
+      ],
+    }).lean();
+    const to = resolveSpocEmail(user);
+    if (!to) return res.status(400).json({ message: 'Recipient email not configured for this user' });
+
+    await sendTaskEmail({ to, recipientLabel: user.name, tasks, mode: 'spoc' });
+    res.json({ message: 'Email sent', to, count: tasks.length, mode: 'spoc' });
+  } catch (err) {
+    console.error('Send task email error:', err);
+    res.status(500).json({ message: err.message || 'Failed to send email' });
   }
 });
 

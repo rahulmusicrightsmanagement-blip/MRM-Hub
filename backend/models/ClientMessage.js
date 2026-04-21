@@ -19,7 +19,7 @@ const clientMessageSchema = new mongoose.Schema(
     status: {
       type: String,
       default: 'New',
-      enum: ['New', 'In Progress', 'Completed'],
+      enum: ['New', 'In Progress', 'Completed', 'Not Completed'],
     },
     assignedTo: { type: String, default: '' },
     assignedToId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
