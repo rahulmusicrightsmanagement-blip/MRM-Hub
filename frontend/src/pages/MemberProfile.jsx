@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Mail, Phone, Music, FileText, Shield, Copy, Check,
-  ExternalLink, Calendar, User, Globe, Hash, Edit3, ChevronDown, ChevronUp, RefreshCw,
+  ExternalLink, Calendar, User, Globe, Hash, Edit3, ChevronDown, ChevronUp, RefreshCw, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useDataCache } from '../context/DataCacheContext';
 
 /* ─── Helpers ─── */
 const fmtDate = (d) => {
@@ -63,6 +64,30 @@ const DocLinkBtn = ({ url, title = 'Open document', compact = false }) => {
   );
 };
 
+const SourceRecordLink = ({ label, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      padding: '6px 10px',
+      borderRadius: '7px',
+      border: '1px solid #1e3a5f',
+      background: 'rgba(59,130,246,0.12)',
+      color: '#60a5fa',
+      fontSize: '11px',
+      fontWeight: 700,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    }}
+    title={label}
+  >
+    <ExternalLink size={12} /> {label}
+  </button>
+);
+
 const stageColors = {
   'New Enquiry': { bg: '#1e3a5f', text: '#60a5fa' },
   'Meeting Set': { bg: '#713f12', text: '#fbbf24' },
@@ -107,6 +132,7 @@ const MemberProfile = () => {
   const navigate = useNavigate();
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { invalidate } = useDataCache();
 
   const [loading, setLoading] = useState(true);
   const [member, setMember] = useState(null);
@@ -177,6 +203,28 @@ const MemberProfile = () => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(''), 1500);
+  };
+
+  const openSourceRecord = (path, type, recordId) => {
+    if (!recordId) return;
+    navigate(`${path}?notifType=${type}&notifId=${recordId}`);
+  };
+
+  const handleDeleteRoyalty = async (royaltyId, royaltyName) => {
+    if (!royaltyId || !window.confirm(`Delete Music Works entry for ${royaltyName || 'this client'}?`)) return;
+    try {
+      const res = await authFetch(`/api/royalty/${royaltyId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete');
+      }
+      setRoyalties((prev) => prev.filter((r) => r._id !== royaltyId));
+      invalidate('royalty:list');
+      addToast('Music Works entry deleted');
+    } catch (err) {
+      console.error(err);
+      addToast('Failed to delete Music Works entry', 'error');
+    }
   };
 
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading profile...</div>;
@@ -513,7 +561,10 @@ const MemberProfile = () => {
                 <div style={{ color: '#8892b0', fontSize: '12px' }}>{lead.email}</div>
               </div>
             </div>
-            <Badge label={lead.stage} colorMap={stageColors} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <SourceRecordLink label="Open Sales Modal" onClick={() => openSourceRecord('/sales-pipeline', 'lead', lead._id)} />
+              <Badge label={lead.stage} colorMap={stageColors} />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
@@ -582,7 +633,10 @@ const MemberProfile = () => {
               <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{entry.name}</div>
               <div style={{ color: '#8892b0', fontSize: '12px' }}>{entry.email} · {entry.contractType}</div>
             </div>
-            <Badge label={entry.stage} colorMap={stageColors} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <SourceRecordLink label="Open Onboarding Modal" onClick={() => openSourceRecord('/onboarding', 'onboarding', entry._id)} />
+              <Badge label={entry.stage} colorMap={stageColors} />
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
@@ -694,7 +748,10 @@ const MemberProfile = () => {
         <div style={{ ...card, ...emptyState }}>No society registration entries found for this member.</div>
       ) : societyRegs.map((reg) => (
         <div key={reg._id} style={card}>
-          <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600, marginBottom: '14px' }}>{reg.name}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+            <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{reg.name}</div>
+            <SourceRecordLink label="Open Society Modal" onClick={() => openSourceRecord('/society-reg', 'societyreg', reg._id)} />
+          </div>
 
           {/* Society grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
@@ -720,8 +777,30 @@ const MemberProfile = () => {
               <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{royalty.clientName}</div>
               <div style={{ color: '#8892b0', fontSize: '12px' }}>{royalty.clientEmail || '—'}</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: royalty.documentsReceived ? '#34d399' : '#f87171' }}>
-              <FileText size={13} /> {royalty.documentsReceived ? 'Documents Received' : 'Documents Pending'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <SourceRecordLink label="Open Royalty Modal" onClick={() => openSourceRecord('/royalty', 'royalty', royalty._id)} />
+              <button
+                type="button"
+                onClick={() => handleDeleteRoyalty(royalty._id, royalty.clientName)}
+                title="Delete Music Works entry"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '7px',
+                  border: '1px solid rgba(239,68,68,0.35)',
+                  background: 'rgba(239,68,68,0.08)',
+                  color: '#f87171',
+                  cursor: 'pointer',
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: royalty.documentsReceived ? '#34d399' : '#f87171' }}>
+                <FileText size={13} /> {royalty.documentsReceived ? 'Documents Received' : 'Documents Pending'}
+              </div>
             </div>
           </div>
 

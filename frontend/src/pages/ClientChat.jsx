@@ -20,14 +20,6 @@ const statusColors = {
   [STATUS.NOT_COMPLETED]: { bg: 'rgba(239,68,68,0.14)', fg: '#f87171', border: 'rgba(239,68,68,0.3)' },
 };
 
-const toLocalInput = (iso) => {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const off = d.getTimezoneOffset();
-  const local = new Date(d.getTime() - off * 60000);
-  return local.toISOString().slice(0, 16);
-};
-
 const fmt = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -672,12 +664,11 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
     else if (message.trim().length < 2) errs.message = 'Task description is too short';
 
     const rcvd = receivedAt ? new Date(receivedAt) : null;
+    let validReceivedAt = false;
     if (!rcvd || isNaN(rcvd.getTime())) {
       errs.receivedAt = 'Pick a valid start date';
     } else {
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      if (rcvd > todayEnd) errs.receivedAt = 'Start date cannot be in the future';
+      validReceivedAt = true;
       if (rcvd.getFullYear() < 2000) errs.receivedAt = 'Invalid year';
     }
 
@@ -686,10 +677,10 @@ const TaskModal = ({ initial, members, teamMembers, onClose, onSave, onAddRespon
     } else {
       const dl = new Date(deadline);
       if (isNaN(dl.getTime())) errs.deadline = 'Pick a valid end date';
-      else if (rcvd) {
+      else if (validReceivedAt) {
         const rcvdDay = new Date(rcvd.getFullYear(), rcvd.getMonth(), rcvd.getDate()).getTime();
         const dlDay = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate()).getTime();
-        if (dlDay < rcvdDay) errs.deadline = 'End date must be on or after start date';
+        if (rcvdDay > dlDay) errs.receivedAt = 'Start date must be on or before end date';
       }
     }
 

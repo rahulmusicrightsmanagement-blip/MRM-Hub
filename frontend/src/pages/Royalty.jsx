@@ -13,6 +13,18 @@ import Pagination from '../components/Pagination';
 
 const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
 const FALLBACK_AVATAR_COLORS = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
+const normalizeLookupId = (value) => String(value?._id || value || '');
+const setUniqueLookup = (map, key, value, identity = value) => {
+  if (!key || !value) return;
+  const id = String(identity || value);
+  const existing = map[key];
+  if (!existing) {
+    map[key] = { value, id };
+  } else if (existing.id !== id) {
+    map[key] = { value: null, id: '__ambiguous__' };
+  }
+};
+const getUniqueLookup = (map, key) => (key ? map[key]?.value || null : null);
 const pickFallbackColor = (seed) => {
   const s = String(seed || '');
   let h = 0;
@@ -677,33 +689,44 @@ const Royalty = () => {
     );
   }, [clients, onboardingEntries]);
 
-  // Lookup maps: contractType by name/clientNumber + Member by email/name (for color + initials)
-  const contractByKey = useMemo(() => {
-    const map = {};
+  const contractLookup = useMemo(() => {
+    const byOnboardingId = {};
+    const byMemberId = {};
+    const byName = {};
+    const byEmail = {};
     onboardingEntries.forEach((e) => {
-      if (e.clientNumber) map[`num:${e.clientNumber}`] = e.contractType || '';
-      if (e.name) map[`name:${e.name.toLowerCase()}`] = e.contractType || '';
-      if (e.email) map[`email:${e.email.toLowerCase()}`] = e.contractType || '';
+      const contractType = e.contractType || '';
+      if (e._id) byOnboardingId[normalizeLookupId(e._id)] = contractType;
+      if (e.memberId) byMemberId[normalizeLookupId(e.memberId)] = contractType;
+      if (e.name) byName[e.name.toLowerCase()] = contractType;
+      if (e.email) setUniqueLookup(byEmail, e.email.toLowerCase(), contractType);
     });
-    return map;
+    return { byOnboardingId, byMemberId, byName, byEmail };
   }, [onboardingEntries]);
 
-  const memberByKey = useMemo(() => {
-    const map = {};
+  const memberLookup = useMemo(() => {
+    const byId = {};
+    const byName = {};
+    const byEmail = {};
     membersList.forEach((m) => {
-      if (m.email) map[`email:${m.email.toLowerCase()}`] = m;
-      if (m.name) map[`name:${m.name.toLowerCase()}`] = m;
+      const memberId = normalizeLookupId(m._id);
+      if (memberId) byId[memberId] = m;
+      if (m.name) byName[m.name.toLowerCase()] = m;
+      if (m.email) setUniqueLookup(byEmail, m.email.toLowerCase(), m, memberId || m.name);
     });
-    return map;
+    return { byId, byName, byEmail };
   }, [membersList]);
 
   const getClientContract = (c) =>
-    contractByKey[`email:${(c.clientEmail || '').toLowerCase()}`] ||
-    contractByKey[`name:${(c.clientName || '').toLowerCase()}`] || '';
+    contractLookup.byOnboardingId[normalizeLookupId(c.onboardingId)] ||
+    contractLookup.byMemberId[normalizeLookupId(c.memberId)] ||
+    contractLookup.byName[(c.clientName || '').toLowerCase()] ||
+    getUniqueLookup(contractLookup.byEmail, (c.clientEmail || '').toLowerCase()) || '';
 
   const getClientMember = (c) =>
-    memberByKey[`email:${(c.clientEmail || '').toLowerCase()}`] ||
-    memberByKey[`name:${(c.clientName || '').toLowerCase()}`] || null;
+    memberLookup.byId[normalizeLookupId(c.memberId)] ||
+    memberLookup.byName[(c.clientName || '').toLowerCase()] ||
+    getUniqueLookup(memberLookup.byEmail, (c.clientEmail || '').toLowerCase()) || null;
 
   useNotificationDeeplink({
     expectedType: ['royalty', 'music'],
@@ -761,7 +784,7 @@ const Royalty = () => {
     });
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clients, contractByKey]);
+  }, [clients, contractLookup]);
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -774,7 +797,7 @@ const Royalty = () => {
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clients, debouncedSearch, contractFilter, contractByKey]);
+  }, [clients, debouncedSearch, contractFilter, contractLookup]);
 
   useEffect(() => { setPage(1); }, [debouncedSearch, contractFilter, pageSize]);
 
