@@ -12,6 +12,7 @@ node_modules/
 
 # One-off scripts
 generate-duplicate-report.js
+backend/scripts/
 
 # Logs
 logs/

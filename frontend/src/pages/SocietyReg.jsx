@@ -4,8 +4,11 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
+import Pagination from '../components/Pagination';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
 // SOCIETIES is now loaded from picklist — see SocietyReg component
@@ -450,11 +453,8 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   const [editingRegistered, setEditingRegistered] = useState(null); // socKey being edited in Registered state
   const [confirmDone, setConfirmDone] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(member.name || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDeleteSoc, setConfirmDeleteSoc] = useState(null); // socKey to confirm delete
-  const [saving, setSaving] = useState(false);
   const [assignForm, setAssignForm] = useState({ spoc: '', startDate: '', deadline: '' });
   const [editingDeadline, setEditingDeadline] = useState(null); // socKey being edited
 
@@ -531,41 +531,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
       <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '0', width: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
         <div style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #2d3348', position: 'sticky', top: 0, backgroundColor: '#1e2235', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-            {isEditing ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                <input
-                  autoFocus
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter' && editName.trim()) {
-                      setSaving(true);
-                      await onRename(member._id, editName.trim());
-                      setIsEditing(false);
-                      setSaving(false);
-                    } else if (e.key === 'Escape') {
-                      setEditName(member.name);
-                      setIsEditing(false);
-                    }
-                  }}
-                  style={{ ...inputStyle, fontSize: '18px', fontWeight: 700, padding: '4px 10px', flex: 1 }}
-                />
-                <button disabled={saving || !editName.trim()} onClick={async () => {
-                  setSaving(true);
-                  await onRename(member._id, editName.trim());
-                  setIsEditing(false);
-                  setSaving(false);
-                }} style={{ padding: '4px 14px', borderRadius: '6px', border: 'none', background: '#6366f1', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.6 : 1 }}>
-                  {saving ? 'Saving...' : 'Save'}
-                </button>
-                <button onClick={() => { setEditName(member.name); setIsEditing(false); }} style={{ padding: '4px 10px', borderRadius: '6px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-              </div>
-            ) : (
-              <>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name} — Registrations</h2>
-                <Edit3 style={{ width: '16px', height: '16px', color: '#6b7280', cursor: 'pointer', flexShrink: 0 }} onClick={() => setIsEditing(true)} title="Edit name" />
-              </>
-            )}
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name} — Registrations</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '12px' }}>
             {!confirmDelete ? (
@@ -826,47 +792,48 @@ const SocietyReg = () => {
   const { authFetch, token } = useAuth();
   const { addToast } = useToast();
   const { getItems } = usePicklist();
+  const { setCached } = useDataCache();
   const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
-  const [members, setMembers] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [allMembers, setAllMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({}); // { 'IPRS': 'In Progress', 'PRS': 'Registered', ... }
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 250);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportMode, setExportMode] = useState('login'); // 'login' | 'nocReceived' | 'applicationSentToSociety' | 'thirdPartyAuthorization' | 'bankMandateUpdate'
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [regsRes, usersRes, membersRes] = await Promise.all([
-          authFetch('/api/societyregs'),
-          authFetch('/api/users'),
-          authFetch('/api/members'),
-        ]);
-        const regsData = await regsRes.json();
-        const usersData = await usersRes.json();
-        const membersData = await membersRes.json();
+  const regsQ = useCachedFetch('societyregs:list', async () => {
+    const r = await authFetch('/api/societyregs');
+    const d = await r.json();
+    return (d.registrations || []).map((reg) => ({
+      ...reg,
+      societies: reg.societies || {},
+      assignees: reg.assignees || {},
+    }));
+  });
+  const usersQ = useCachedFetch('users:all', async () => {
+    const r = await authFetch('/api/users');
+    const d = await r.json();
+    return d.users || [];
+  });
+  const allMembersQ = useCachedFetch('members:list', async () => {
+    const r = await authFetch('/api/members');
+    const d = await r.json();
+    return d.members || [];
+  });
 
-        const regs = (regsData.registrations || []).map((reg) => ({
-          ...reg,
-          societies: reg.societies || {},
-          assignees: reg.assignees || {},
-        }));
+  const members = regsQ.data || [];
+  const teamMembers = usersQ.data || [];
+  const allMembers = allMembersQ.data || [];
+  const loading = (regsQ.loading && !regsQ.data) || (usersQ.loading && !usersQ.data) || (allMembersQ.loading && !allMembersQ.data);
 
-        setMembers(regs);
-        setTeamMembers(usersData.users || []);
-        setAllMembers(membersData.members || []);
-      } catch (err) {
-        console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [authFetch]);
+  const setMembers = (updater) => {
+    const current = regsQ.data || [];
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    setCached('societyregs:list', next);
+  };
 
   useNotificationDeeplink({
     expectedType: ['societyreg', 'society'],
@@ -975,8 +942,8 @@ const SocietyReg = () => {
   const filteredMembers = useMemo(() => {
     let result = members;
     // Text search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.toLowerCase();
       result = result.filter((m) => m.name.toLowerCase().includes(q) || (m._id && m._id.toLowerCase().includes(q)));
     }
     // Status filters
@@ -990,7 +957,17 @@ const SocietyReg = () => {
       );
     }
     return result;
-  }, [members, filters, searchQuery]);
+  }, [members, filters, debouncedQuery]);
+
+  useEffect(() => { setPage(1); }, [debouncedQuery, filters, pageSize]);
+
+  const totalFiltered = filteredMembers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedMembers = useMemo(
+    () => filteredMembers.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredMembers, safePage, pageSize]
+  );
 
   const setFilter = (socKey, value) => {
     setFilters((prev) => {
@@ -1247,7 +1224,7 @@ const SocietyReg = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredMembers.map((member) => (
+              {pagedMembers.map((member) => (
                 <tr key={member._id || member.name} style={{ cursor: 'pointer', transition: 'background 0.15s' }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#161b2e'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
@@ -1279,6 +1256,17 @@ const SocietyReg = () => {
           </table>
         )}
       </div>
+
+      {filteredMembers.length > 0 && (
+        <Pagination
+          page={safePage}
+          pageSize={pageSize}
+          total={totalFiltered}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 50, 100]}
+        />
+      )}
 
       {selectedMember && (
         <MemberDetailModal

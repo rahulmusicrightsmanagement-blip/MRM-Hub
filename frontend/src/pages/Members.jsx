@@ -4,6 +4,9 @@ import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import Pagination from '../components/Pagination';
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -105,18 +108,44 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
       ? { ...initialData }
       : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', leadSource: '', priority: 'medium', isReferred: false, referredBy: '', referralCommission: '' },
   );
+  const [conflicts, setConflicts] = useState([]); // ['name' | 'email' | 'clientNumber']
+  const [errorMsg, setErrorMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const h = (f, v) => setForm((p) => ({ ...p, [f]: v }));
+  const h = (f, v) => {
+    setForm((p) => ({ ...p, [f]: v }));
+    if (conflicts.includes(f)) {
+      // Clear the red highlight on the field the user is fixing
+      setConflicts((prev) => prev.filter((c) => c !== f));
+    }
+  };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim() || !form.email.trim()) return;
-    onAdd(form);
-    onClose();
+    setSubmitting(true);
+    try {
+      const result = await onAdd(form);
+      if (result && result.ok) {
+        setConflicts([]);
+        setErrorMsg('');
+        onClose();
+      } else if (result && result.status === 409) {
+        setConflicts(Array.isArray(result.conflicts) ? result.conflicts : []);
+        setErrorMsg(result.message || 'Duplicate name, email or MRM ID already exists.');
+      } else {
+        setErrorMsg((result && result.message) || 'Failed to save member.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputStyle = { width: '100%', padding: '10px 14px', background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' };
+  const conflictStyle = { borderColor: '#ef4444', boxShadow: '0 0 0 1px #ef4444' };
+  const styleFor = (field) => (conflicts.includes(field) ? { ...inputStyle, ...conflictStyle } : inputStyle);
   const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' };
   const sectionStyle = { fontSize: '13px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px', marginTop: '8px' };
+  const FIELD_LABELS = { name: 'Name', email: 'Email', clientNumber: 'MRM Membership ID' };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -126,17 +155,35 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
         </div>
 
+        {errorMsg && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', border: '1px solid #7f1d1d', marginBottom: '18px' }}>
+            <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>!</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>Duplicate already exists</div>
+              <div style={{ color: '#fca5a5', fontSize: '12px', marginTop: '2px' }}>{errorMsg}</div>
+              {conflicts.length > 0 && (
+                <div style={{ color: '#fda4af', fontSize: '11px', marginTop: '4px' }}>
+                  Conflicting field{conflicts.length > 1 ? 's' : ''}: {conflicts.map((c) => FIELD_LABELS[c] || c).join(', ')}
+                </div>
+              )}
+            </div>
+            <button onClick={() => { setErrorMsg(''); setConflicts([]); }} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: '2px' }}><X size={14} /></button>
+          </div>
+        )}
+
         {/* Personal Details */}
         <div style={sectionStyle}>Personal Details</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={labelStyle}>Full Name <span style={{ color: '#ef4444' }}>*</span></label>
-            <input style={inputStyle} placeholder="e.g. Prateek Kuhad" value={form.name} onChange={(e) => h('name', e.target.value)} />
+            <input style={styleFor('name')} placeholder="e.g. Prateek Kuhad" value={form.name} onChange={(e) => h('name', e.target.value)} />
+            {conflicts.includes('name') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This name is already used by another member.</div>}
           </div>
           <MultiRoleSelect selected={form.role} onChange={(v) => h('role', v)} inputStyle={inputStyle} labelStyle={labelStyle} />
           <div>
             <label style={labelStyle}>Email <span style={{ color: '#ef4444' }}>*</span></label>
-            <input style={inputStyle} placeholder="email@example.com" value={form.email} onChange={(e) => h('email', e.target.value)} />
+            <input style={styleFor('email')} placeholder="email@example.com" value={form.email} onChange={(e) => h('email', e.target.value)} />
+            {conflicts.includes('email') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This email is already used by another member.</div>}
           </div>
           <div>
             <label style={labelStyle}>Phone</label>
@@ -161,7 +208,8 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
             <label style={labelStyle}>MRM Membership ID</label>
-            <input style={inputStyle} placeholder="e.g. MRM-176" value={form.clientNumber || ''} onChange={(e) => h('clientNumber', e.target.value)} />
+            <input style={styleFor('clientNumber')} placeholder="e.g. MRM-176" value={form.clientNumber || ''} onChange={(e) => h('clientNumber', e.target.value)} />
+            {conflicts.includes('clientNumber') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This MRM ID is already used by another member.</div>}
           </div>
           <div />
           <div>
@@ -239,9 +287,9 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
 
         {/* Buttons */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px' }}>
-          <button onClick={onClose} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a3050', borderRadius: '8px', color: '#ccc', cursor: 'pointer', fontSize: '14px' }}>Cancel</button>
-          <button onClick={handleSubmit} style={{ padding: '10px 20px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {isEdit ? <><Edit3 size={16} /> Save Changes</> : <><Plus size={16} /> Add Member</>}
+          <button onClick={onClose} disabled={submitting} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a3050', borderRadius: '8px', color: '#ccc', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: submitting ? 0.6 : 1 }}>Cancel</button>
+          <button onClick={handleSubmit} disabled={submitting} style={{ padding: '10px 20px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: submitting ? 0.7 : 1 }}>
+            {submitting ? 'Saving...' : (isEdit ? <><Edit3 size={16} /> Save Changes</> : <><Plus size={16} /> Add Member</>)}
           </button>
         </div>
       </div>
@@ -513,46 +561,54 @@ const Members = () => {
   const navigate = useNavigate();
   const { authFetch } = useAuth();
   const { addToast } = useToast();
-  const [members, setMembers] = useState([]);
-  const [contractMap, setContractMap] = useState({});
+  const { setCached, invalidate } = useDataCache();
   const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
   const getContractColor = (t) => CONTRACT_COLORS[t] || '';
-  const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 250);
   const [contractFilter, setContractFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [membersRes, usersRes, onboardingRes] = await Promise.all([
-          authFetch('/api/members'),
-          authFetch('/api/users/team'),
-          authFetch('/api/onboarding'),
-        ]);
-        const membersData = await membersRes.json();
-        const usersData = await usersRes.json();
-        const onboardingData = await onboardingRes.json();
-        const map = {};
-        (onboardingData.entries || []).forEach((e) => {
-          if (e.clientNumber) map[e.clientNumber] = e.contractType || '';
-          if (e.name) map[`name:${e.name.toLowerCase()}`] = e.contractType || '';
-        });
-        setContractMap(map);
-        setMembers(membersData.members || []);
-        setTeamMembers(usersData.users || []);
-      } catch (err) {
-        console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [authFetch]);
+  const membersQ = useCachedFetch('members:list', async () => {
+    const r = await authFetch('/api/members');
+    const d = await r.json();
+    return d.members || [];
+  });
+  const teamQ = useCachedFetch('users:team', async () => {
+    const r = await authFetch('/api/users/team');
+    const d = await r.json();
+    return d.users || [];
+  });
+  const onboardingQ = useCachedFetch('onboarding:list', async () => {
+    const r = await authFetch('/api/onboarding');
+    const d = await r.json();
+    return d.entries || [];
+  });
+
+  const members = membersQ.data || [];
+  const teamMembers = teamQ.data || [];
+  const onboardingEntries = onboardingQ.data || [];
+  const loading = (membersQ.loading && !membersQ.data) || (teamQ.loading && !teamQ.data) || (onboardingQ.loading && !onboardingQ.data);
+
+  const contractMap = useMemo(() => {
+    const map = {};
+    onboardingEntries.forEach((e) => {
+      if (e.clientNumber) map[e.clientNumber] = e.contractType || '';
+      if (e.name) map[`name:${e.name.toLowerCase()}`] = e.contractType || '';
+    });
+    return map;
+  }, [onboardingEntries]);
+
+  const setMembers = (updater) => {
+    const current = membersQ.data || [];
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    setCached('members:list', next);
+  };
 
   const getMemberContract = (m) =>
     contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`] || '';
@@ -568,7 +624,7 @@ const Members = () => {
   }, [members, contractMap]);
 
   const filteredMembers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     return members.filter((m) => {
       if (contractFilter !== 'All' && getMemberContract(m) !== contractFilter) return false;
       if (!q) return true;
@@ -583,7 +639,17 @@ const Members = () => {
         (m.spoc && m.spoc.toLowerCase().includes(q))
       );
     });
-  }, [members, searchQuery, contractFilter, contractMap]);
+  }, [members, debouncedQuery, contractFilter, contractMap]);
+
+  useEffect(() => { setPage(1); }, [debouncedQuery, contractFilter, pageSize]);
+
+  const totalFiltered = filteredMembers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedMembers = useMemo(
+    () => filteredMembers.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredMembers, safePage, pageSize]
+  );
 
   const handleAddMember = async (form) => {
     try {
@@ -591,12 +657,19 @@ const Members = () => {
         method: 'POST',
         body: JSON.stringify(form),
       });
-      const data = await res.json();
-      if (res.ok) { setMembers((p) => [data.member, ...p]); addToast('Member added'); }
-      else addToast('Failed to add member', 'error');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMembers((p) => [data.member, ...p]);
+        addToast('Member added');
+        return { ok: true };
+      }
+      if (res.status === 409) {
+        return { ok: false, status: 409, conflicts: data.conflicts || [], message: data.message || 'Duplicate name, email or MRM ID already exists.' };
+      }
+      return { ok: false, status: res.status, message: data.message || 'Failed to add member.' };
     } catch (err) {
       console.error('Failed to add member:', err);
-      addToast('Failed to add member', 'error');
+      return { ok: false, message: 'Failed to add member.' };
     }
   };
 
@@ -612,13 +685,28 @@ const Members = () => {
   };
 
   const handleEditSubmit = async (form) => {
-    if (!editingMember) return;
+    if (!editingMember) return { ok: false, message: 'No member selected' };
     try {
       const res = await authFetch(`/api/members/${editingMember._id}`, { method: 'PUT', body: JSON.stringify(form) });
-      const data = await res.json();
-      if (res.ok) { setMembers((p) => p.map((m) => (m._id === editingMember._id ? data.member : m))); addToast('Member updated'); }
-      else addToast('Failed to update member', 'error');
-    } catch (err) { console.error('Failed to edit member:', err); addToast('Failed to update member', 'error'); }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMembers((p) => p.map((m) => (m._id === editingMember._id ? data.member : m)));
+        // Backend propagates name/email/phone to leads / onboarding / society / royalty — drop those caches.
+        invalidate('leads:list');
+        invalidate('onboarding:list');
+        invalidate('societyregs:list');
+        invalidate('royalty:list');
+        addToast('Member updated');
+        return { ok: true };
+      }
+      if (res.status === 409) {
+        return { ok: false, status: 409, conflicts: data.conflicts || [], message: data.message || 'Duplicate name, email or MRM ID already exists.' };
+      }
+      return { ok: false, status: res.status, message: data.message || 'Failed to update member.' };
+    } catch (err) {
+      console.error('Failed to edit member:', err);
+      return { ok: false, message: 'Failed to update member.' };
+    }
   };
 
   const handleDeleteMember = async (memberId) => {
@@ -738,7 +826,7 @@ const Members = () => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-          {filteredMembers.map((m) => (
+          {pagedMembers.map((m) => (
             <div key={m._id} onClick={() => navigate(`/members/${m._id}`)}
               style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
               onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
@@ -798,6 +886,18 @@ const Members = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Pagination */}
+      {filteredMembers.length > 0 && (
+        <Pagination
+          page={safePage}
+          pageSize={pageSize}
+          total={totalFiltered}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 50, 100]}
+        />
       )}
 
       {/* Modals */}

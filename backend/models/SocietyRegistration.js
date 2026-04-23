@@ -77,6 +77,15 @@ const societyRegistrationSchema = new mongoose.Schema(
   { timestamps: true, collection: 'society_registrations' }
 );
 
+// Force canonical Member.name on save. No email field — name-alias match only.
+societyRegistrationSchema.pre('save', async function () {
+  if (this.isNew || this.isModified('name')) {
+    const resolveMember = require('../utils/resolveMember');
+    const hit = await resolveMember({ name: this.name });
+    if (hit && hit.name && hit.name !== this.name) this.name = hit.name;
+  }
+});
+
 societyRegistrationSchema.index({ name: 1 });
 
 module.exports = mongoose.model('SocietyRegistration', societyRegistrationSchema);

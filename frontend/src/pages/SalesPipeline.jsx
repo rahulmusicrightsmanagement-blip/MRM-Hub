@@ -7,6 +7,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import SearchableSelect from '../components/SearchableSelect';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 
@@ -124,13 +126,40 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
         {isEdit ? (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div><label style={LABEL}>Name *</label><input style={INPUT} value={form.name} onChange={(e) => set('name', e.target.value)} /></div>
+              <div>
+                <label style={LABEL}>Name *</label>
+                <input
+                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
+                  value={form.name}
+                  readOnly
+                  title="Edit from the Members page"
+                />
+                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Name is managed from the Members page.</p>
+              </div>
               <div><label style={LABEL}>Genre</label><input style={INPUT} placeholder="e.g. Bollywood Playback" value={form.genre} onChange={(e) => set('genre', e.target.value)} /></div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div><label style={LABEL}>Email *</label><input style={INPUT} placeholder="email@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-              <div><label style={LABEL}>Phone</label><input style={INPUT} placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+              <div>
+                <label style={LABEL}>Email *</label>
+                <input
+                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
+                  placeholder="email@example.com"
+                  value={form.email}
+                  readOnly
+                  title="Edit from the Members page"
+                />
+              </div>
+              <div>
+                <label style={LABEL}>Phone</label>
+                <input
+                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
+                  placeholder="+91 98xxx xxxxx"
+                  value={form.phone}
+                  readOnly
+                  title="Edit from the Members page"
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -1001,32 +1030,39 @@ const SalesPipeline = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
+  const { setCached, invalidate } = useDataCache();
   const STAGES = getOptions('lead_stage');
-  const [leads, setLeads] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [members, setMembers] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 250);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [lR, uR, mR] = await Promise.all([
-          authFetch('/api/leads'),
-          authFetch('/api/users/team'),
-          authFetch('/api/members'),
-        ]);
-        const [lD, uD, mD] = await Promise.all([lR.json(), uR.json(), mR.json()]);
-        setLeads(lD.leads || []);
-        setTeamMembers(uD.users || []);
-        setMembers(mD.members || []);
-      } catch (err) { console.error('Failed to fetch:', err); }
-      finally { setLoading(false); }
-    };
-    load();
-  }, [authFetch]);
+  const leadsQ = useCachedFetch('leads:list', async () => {
+    const r = await authFetch('/api/leads');
+    const d = await r.json();
+    return d.leads || [];
+  });
+  const teamQ = useCachedFetch('users:team', async () => {
+    const r = await authFetch('/api/users/team');
+    const d = await r.json();
+    return d.users || [];
+  });
+  const membersQ = useCachedFetch('members:list', async () => {
+    const r = await authFetch('/api/members');
+    const d = await r.json();
+    return d.members || [];
+  });
+
+  const leads = leadsQ.data || [];
+  const teamMembers = teamQ.data || [];
+  const members = membersQ.data || [];
+  const loading = (leadsQ.loading && !leadsQ.data) || (teamQ.loading && !teamQ.data) || (membersQ.loading && !membersQ.data);
+
+  const setLeads = (updater) => {
+    const current = leadsQ.data || [];
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    setCached('leads:list', next);
+  };
 
   useNotificationDeeplink({
     expectedType: 'lead',
@@ -1040,7 +1076,12 @@ const SalesPipeline = () => {
     try {
       const res = await authFetch('/api/leads', { method: 'POST', body: JSON.stringify(form) });
       const data = await res.json();
-      if (res.ok) { setLeads((p) => [data.lead, ...p]); addToast('Lead created'); }
+      if (res.ok) {
+        setLeads((p) => [data.lead, ...p]);
+        // Backend auto-creates a Member if none exists for this email/name — drop stale members cache.
+        invalidate('members:list');
+        addToast('Lead created');
+      }
       else addToast('Failed to create lead', 'error');
     } catch (err) { console.error('Failed to add lead:', err); addToast('Failed to create lead', 'error'); }
   };
@@ -1118,6 +1159,7 @@ const SalesPipeline = () => {
         }),
       });
       if (res.ok) {
+        invalidate('onboarding:list');
         // Mark the lead as onboarded but keep it in Qualified Lead
         const updateRes = await authFetch(`/api/leads/${lead._id}`, {
           method: 'PUT',
@@ -1178,14 +1220,15 @@ const SalesPipeline = () => {
       if (res.ok) {
         // Update lead in state (now back to qualified/onboarded)
         setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
+        invalidate('onboarding:list');
         addToast(`${lead.name} re-added to Onboarding`);
       } else addToast('Failed to restart onboarding', 'error');
     } catch (err) { console.error('Restart onboarding error:', err); addToast('Failed to restart onboarding', 'error'); }
   };
 
   const filteredLeads = useMemo(() => {
-    if (!searchQuery.trim()) return leads;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedQuery.trim()) return leads;
+    const q = debouncedQuery.toLowerCase();
     return leads.filter((l) =>
       l.name.toLowerCase().includes(q) ||
       (l._id && l._id.toLowerCase().includes(q)) ||
@@ -1194,7 +1237,7 @@ const SalesPipeline = () => {
       (l.spoc && l.spoc.toLowerCase().includes(q)) ||
       (l.source && l.source.toLowerCase().includes(q))
     );
-  }, [leads, searchQuery]);
+  }, [leads, debouncedQuery]);
 
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading pipeline...</div>;
 

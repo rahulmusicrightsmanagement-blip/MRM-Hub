@@ -149,7 +149,10 @@ router.put('/:id', auth, async (req, res) => {
 
     const oldStage = lead.stage;
 
-    const fields = ['name', 'genre', 'email', 'phone', 'source', 'priority', 'stage', 'spoc', 'notes', 'deadline', 'callDone', 'inquiryNotes', 'meetingDate', 'meetingLink', 'meetingAssignedWith', 'meetingNotes', 'inquiryVerified', 'meetingVerified', 'movedToOnboarding', 'onboardingSpoc', 'onboardingContractType', 'onboardedAt', 'previousStage', 'notQualifiedReason'];
+    // Identity fields (name / email / phone) are owned by Member and propagate from there.
+    // They're intentionally excluded here so edits outside the Members page can't drift
+    // the source of truth.
+    const fields = ['genre', 'source', 'priority', 'stage', 'spoc', 'notes', 'deadline', 'callDone', 'inquiryNotes', 'meetingDate', 'meetingLink', 'meetingAssignedWith', 'meetingNotes', 'inquiryVerified', 'meetingVerified', 'movedToOnboarding', 'onboardingSpoc', 'onboardingContractType', 'onboardedAt', 'previousStage', 'notQualifiedReason'];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) lead[f] = req.body[f];
     });

@@ -6,6 +6,7 @@ const SocietyRegistration = require('../models/SocietyRegistration');
 const Royalty = require('../models/Royalty');
 const ClientMessage = require('../models/ClientMessage');
 const { auth } = require('../middleware/auth');
+const { checkMemberUnique, conflictMessage } = require('../utils/memberUnique');
 
 const router = express.Router();
 
@@ -50,8 +51,11 @@ router.get('/', auth, async (req, res) => {
 // POST /api/members
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline, leadSource, priority, isReferred, referredBy, referralCommission } = req.body;
+    const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline, leadSource, priority, isReferred, referredBy, referralCommission, clientNumber } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
+
+    const conflicts = await checkMemberUnique({ name, email, clientNumber });
+    if (conflicts.length) return res.status(409).json({ message: conflictMessage(conflicts), conflicts });
 
     const colors = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
     const color = colors[Math.floor(Math.random() * colors.length)];
@@ -59,6 +63,7 @@ router.post('/', auth, async (req, res) => {
     const member = new Member({
       name: name.trim(),
       email: email.toLowerCase().trim(),
+      clientNumber: clientNumber ? String(clientNumber).trim() : '',
       color,
       role: Array.isArray(role) ? role : (role ? [role] : []),
       phone: phone || '',
@@ -101,11 +106,28 @@ router.get('/:id/profile', auth, async (req, res) => {
       ? new RegExp(`^\\s*(${escapedAliases.join('|')})\\s*$`, 'i')
       : new RegExp(`^${member.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
 
+    // Primary join = memberId. Fallback to (email + name alias) ONLY for legacy rows
+    // that haven't been backfilled yet — prevents pulling in records of sibling Members
+    // that happen to share the same email.
+    const sharesEmail = member.email
+      ? (await Member.countDocuments({ email: member.email })) > 1
+      : false;
+    const legacyEmailClause = sharesEmail
+      ? { email: member.email, name: nameRegex }
+      : { email: member.email };
+    const legacyRoyaltyEmailClause = sharesEmail
+      ? { clientEmail: member.email, clientName: nameRegex }
+      : { clientEmail: member.email };
+
+    const leadFilter = { $or: [{ memberId: member._id }, { $and: [{ memberId: { $in: [null, undefined] } }, legacyEmailClause] }] };
+    const onbFilter = { $or: [{ memberId: member._id }, { $and: [{ memberId: { $in: [null, undefined] } }, legacyEmailClause] }] };
+    const royaltyFilter = { $or: [{ memberId: member._id }, { $and: [{ memberId: { $in: [null, undefined] } }, legacyRoyaltyEmailClause] }] };
+
     const [leads, onboarding, societyRegs, royalties] = await Promise.all([
-      Lead.find({ $or: [{ name: nameRegex }, { email: member.email }] }).sort({ createdAt: -1 }).lean(),
-      OnboardingEntry.find({ name: nameRegex }).sort({ createdAt: -1 }).lean(),
+      Lead.find(leadFilter).sort({ createdAt: -1 }).lean(),
+      OnboardingEntry.find(onbFilter).sort({ createdAt: -1 }).lean(),
       SocietyRegistration.find({ name: nameRegex }).sort({ createdAt: -1 }).lean(),
-      Royalty.find({ $or: [{ clientName: nameRegex }, { clientEmail: member.email }] }).sort({ createdAt: -1 }).lean(),
+      Royalty.find(royaltyFilter).sort({ createdAt: -1 }).lean(),
     ]);
 
     res.json({ member, leads, onboarding, societyRegs, royalties });
@@ -122,8 +144,28 @@ router.put('/:id', auth, async (req, res) => {
     if (!member) return res.status(404).json({ message: 'Member not found' });
 
     const oldName = member.name;
+    const oldEmail = (member.email || '').toLowerCase();
+    const oldPhone = member.phone || '';
     const newName = typeof req.body.name === 'string' ? req.body.name.trim() : oldName;
     const nameChanged = newName && newName !== oldName;
+
+    // Uniqueness check — only for fields the caller is actually changing to a new value.
+    // Historical duplicates stay intact; users can keep editing other fields even on rows
+    // that happen to collide with a sibling today.
+    const toCheck = {};
+    if (nameChanged) toCheck.name = newName;
+    if (typeof req.body.email === 'string') {
+      const emailLc = req.body.email.toLowerCase().trim();
+      if (emailLc && emailLc !== oldEmail) toCheck.email = emailLc;
+    }
+    if (typeof req.body.clientNumber === 'string') {
+      const cn = req.body.clientNumber.trim();
+      if (cn && cn !== (member.clientNumber || '')) toCheck.clientNumber = cn;
+    }
+    if (Object.keys(toCheck).length) {
+      const conflicts = await checkMemberUnique(toCheck, member._id);
+      if (conflicts.length) return res.status(409).json({ message: conflictMessage(conflicts), conflicts });
+    }
 
     // Auto-set assignedDate when spoc changes
     if (req.body.spoc !== undefined && req.body.spoc !== member.spoc) {
@@ -147,9 +189,10 @@ router.put('/:id', auth, async (req, res) => {
 
     await member.save();
 
-    // Always propagate current member name to related records. Match against:
-    //   • email (primary key for Lead/Onboarding/Royalty)
-    //   • current name + any historical previousNames (for SocietyReg/ClientMessage that lack email)
+    // Propagate name change to related records. PRIMARY key = memberId (safe even when
+    // the email is shared by multiple Members). Email-based fallback is only applied
+    // to legacy rows (memberId still null) AND only when this Member does NOT share
+    // its email with any sibling — otherwise we'd clobber siblings' names.
     try {
       const aliases = [newName, oldName, ...(member.previousNames || [])].filter(Boolean);
       const uniqueAliases = [...new Set(aliases.map((n) => n.trim()))].filter(Boolean);
@@ -161,31 +204,38 @@ router.put('/:id', auth, async (req, res) => {
         : null;
       const emailLc = (member.email || '').toLowerCase();
 
-      const orClauses = (nameField) => {
-        const clauses = [];
-        if (nameRx) clauses.push({ [nameField]: nameRx });
-        return clauses;
-      };
+      const sharesEmail = emailLc
+        ? (await Member.countDocuments({ email: emailLc, _id: { $ne: member._id } })) > 0
+        : false;
 
-      const leadFilter = emailLc
-        ? { $or: [{ email: emailLc }, ...orClauses('name')] }
-        : { $or: orClauses('name') };
-      const onboardFilter = emailLc
-        ? { $or: [{ email: emailLc }, ...orClauses('name')] }
-        : { $or: orClauses('name') };
-      const royaltyFilter = emailLc
-        ? { $or: [{ clientEmail: emailLc }, ...orClauses('clientName')] }
-        : { $or: orClauses('clientName') };
-      const societyFilter = nameRx ? { name: nameRx } : null;
-      const messageFilter = nameRx ? { clientName: nameRx } : null;
+      // Legacy fallback clause: hit rows with null memberId that match email (safe)
+      // or matching alias name. When email is shared, require BOTH email AND alias-name
+      // so we don't touch sibling rows.
+      const legacyLeadClause = emailLc
+        ? (sharesEmail && nameRx ? { memberId: null, email: emailLc, name: nameRx } : { memberId: null, email: emailLc })
+        : (nameRx ? { memberId: null, name: nameRx } : null);
+      const legacyRoyaltyClause = emailLc
+        ? (sharesEmail && nameRx ? { memberId: null, clientEmail: emailLc, clientName: nameRx } : { memberId: null, clientEmail: emailLc })
+        : (nameRx ? { memberId: null, clientName: nameRx } : null);
 
-      const ops = [];
-      if (leadFilter.$or && leadFilter.$or.length) ops.push(Lead.updateMany(leadFilter, { $set: { name: newName } }));
-      if (onboardFilter.$or && onboardFilter.$or.length) ops.push(OnboardingEntry.updateMany(onboardFilter, { $set: { name: newName } }));
-      if (royaltyFilter.$or && royaltyFilter.$or.length) ops.push(Royalty.updateMany(royaltyFilter, { $set: { clientName: newName } }));
+      const leadFilter = legacyLeadClause
+        ? { $or: [{ memberId: member._id }, legacyLeadClause] }
+        : { memberId: member._id };
+      const onbFilter = legacyLeadClause
+        ? { $or: [{ memberId: member._id }, legacyLeadClause] }
+        : { memberId: member._id };
+      const royaltyFilter = legacyRoyaltyClause
+        ? { $or: [{ memberId: member._id }, legacyRoyaltyClause] }
+        : { memberId: member._id };
 
-      // Normalized in-memory match for name-linked collections (bulletproofs against
-      // whitespace/casing drift that can defeat regex matching).
+      const ops = [
+        Lead.updateMany(leadFilter, { $set: { name: newName, memberId: member._id } }),
+        OnboardingEntry.updateMany(onbFilter, { $set: { name: newName, memberId: member._id } }),
+        Royalty.updateMany(royaltyFilter, { $set: { clientName: newName, memberId: member._id } }),
+      ];
+
+      // SocietyRegistration has no email/memberId — still name-keyed via alias match.
+      // ClientMessage has clientId (memberId ref). Prefer that; fall back to alias match.
       const normName = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
       const aliasSet = new Set(uniqueAliases.map(normName).filter(Boolean));
 
@@ -193,13 +243,29 @@ router.put('/:id', auth, async (req, res) => {
       const regIds = regDocs.filter((r) => aliasSet.has(normName(r.name))).map((r) => r._id);
       if (regIds.length) ops.push(SocietyRegistration.updateMany({ _id: { $in: regIds } }, { $set: { name: newName } }));
 
-      const msgDocs = await ClientMessage.find({}, { _id: 1, clientName: 1 }).lean();
-      const msgIds = msgDocs.filter((m) => aliasSet.has(normName(m.clientName))).map((m) => m._id);
-      if (msgIds.length) ops.push(ClientMessage.updateMany({ _id: { $in: msgIds } }, { $set: { clientName: newName } }));
+      ops.push(ClientMessage.updateMany({ clientId: member._id }, { $set: { clientName: newName } }));
+
+      // Email / phone propagation — memberId-linked rows only. Never touch orphan rows
+      // matched by the OLD email; those stay as-is until someone interacts with them
+      // and the pre-save hook re-resolves the Member.
+      const newEmailLc = (member.email || '').toLowerCase();
+      const emailChanged = newEmailLc !== oldEmail;
+      const newPhone = member.phone || '';
+      const phoneChanged = newPhone !== oldPhone;
+
+      if (emailChanged) {
+        ops.push(Lead.updateMany({ memberId: member._id }, { $set: { email: newEmailLc } }));
+        ops.push(OnboardingEntry.updateMany({ memberId: member._id }, { $set: { email: newEmailLc } }));
+        ops.push(Royalty.updateMany({ memberId: member._id }, { $set: { clientEmail: newEmailLc } }));
+      }
+      if (phoneChanged) {
+        ops.push(Lead.updateMany({ memberId: member._id }, { $set: { phone: newPhone } }));
+        ops.push(OnboardingEntry.updateMany({ memberId: member._id }, { $set: { phone: newPhone } }));
+      }
 
       const results = await Promise.all(ops);
-      if (results.some((r) => r && r.modifiedCount > 0) || regIds.length || msgIds.length) {
-        console.log(`Member name sync → "${newName}" aliases=[${uniqueAliases.join('|')}] societyMatches=${regIds.length} msgMatches=${msgIds.length}`);
+      if (results.some((r) => r && r.modifiedCount > 0) || regIds.length) {
+        console.log(`Member sync → "${newName}" memberId=${member._id} sharesEmail=${sharesEmail} societyMatches=${regIds.length} emailChanged=${emailChanged} phoneChanged=${phoneChanged}`);
       }
     } catch (propErr) {
       console.error('Name propagation error:', propErr);
@@ -231,52 +297,58 @@ router.post('/:id/sync-name', auth, async (req, res) => {
     const newName = member.name;
     const aliases = [newName, ...(member.previousNames || [])].filter(Boolean);
     const uniqueAliases = [...new Set(aliases.map((n) => n.trim()))].filter(Boolean);
-    // Escape regex metacharacters, then replace runs of whitespace with \s+ so
-    // "Rahul Jadhav" matches "Rahul  Jadhav" / "Rahul\tJadhav" / etc.
     const escapedAliases = uniqueAliases.map((n) =>
       n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
     );
     const nameRx = escapedAliases.length ? new RegExp(`^\\s*(${escapedAliases.join('|')})\\s*$`, 'i') : null;
     const emailLc = (member.email || '').toLowerCase();
 
-    const orClauses = (nameField) => (nameRx ? [{ [nameField]: nameRx }] : []);
-    const leadFilter = emailLc ? { $or: [{ email: emailLc }, ...orClauses('name')] } : { $or: orClauses('name') };
-    const onboardFilter = emailLc ? { $or: [{ email: emailLc }, ...orClauses('name')] } : { $or: orClauses('name') };
-    const royaltyFilter = emailLc ? { $or: [{ clientEmail: emailLc }, ...orClauses('clientName')] } : { $or: orClauses('clientName') };
+    const sharesEmail = emailLc
+      ? (await Member.countDocuments({ email: emailLc, _id: { $ne: member._id } })) > 0
+      : false;
 
-    // Normalize helper — collapse whitespace, lowercase, trim. Bulletproofs against
-    // stray spaces, tabs, casing differences that could defeat regex matching.
+    const legacyLeadClause = emailLc
+      ? (sharesEmail && nameRx ? { memberId: null, email: emailLc, name: nameRx } : { memberId: null, email: emailLc })
+      : (nameRx ? { memberId: null, name: nameRx } : null);
+    const legacyRoyaltyClause = emailLc
+      ? (sharesEmail && nameRx ? { memberId: null, clientEmail: emailLc, clientName: nameRx } : { memberId: null, clientEmail: emailLc })
+      : (nameRx ? { memberId: null, clientName: nameRx } : null);
+
+    const leadFilter = legacyLeadClause
+      ? { $or: [{ memberId: member._id }, legacyLeadClause] }
+      : { memberId: member._id };
+    const onboardFilter = legacyLeadClause
+      ? { $or: [{ memberId: member._id }, legacyLeadClause] }
+      : { memberId: member._id };
+    const royaltyFilter = legacyRoyaltyClause
+      ? { $or: [{ memberId: member._id }, legacyRoyaltyClause] }
+      : { memberId: member._id };
+
     const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
     const aliasSet = new Set(uniqueAliases.map(norm).filter(Boolean));
 
-    // Society Reg: fetch all + in-memory compare. Avoids any regex edge case.
     const allRegs = await SocietyRegistration.find({}, { _id: 1, name: 1 }).lean();
     const matchedRegIds = allRegs.filter((r) => aliasSet.has(norm(r.name))).map((r) => r._id);
     const societyRes = matchedRegIds.length
       ? await SocietyRegistration.updateMany({ _id: { $in: matchedRegIds } }, { $set: { name: newName } })
       : { modifiedCount: 0 };
 
-    // Client Messages: same belt-and-suspenders approach
-    const allMsgs = await ClientMessage.find({}, { _id: 1, clientName: 1 }).lean();
-    const matchedMsgIds = allMsgs.filter((m) => aliasSet.has(norm(m.clientName))).map((m) => m._id);
-    const msgRes = matchedMsgIds.length
-      ? await ClientMessage.updateMany({ _id: { $in: matchedMsgIds } }, { $set: { clientName: newName } })
-      : { modifiedCount: 0 };
+    const msgRes = await ClientMessage.updateMany({ clientId: member._id }, { $set: { clientName: newName } });
 
-    const ops = [];
-    if (leadFilter.$or && leadFilter.$or.length) ops.push(Lead.updateMany(leadFilter, { $set: { name: newName } }));
-    if (onboardFilter.$or && onboardFilter.$or.length) ops.push(OnboardingEntry.updateMany(onboardFilter, { $set: { name: newName } }));
-    if (royaltyFilter.$or && royaltyFilter.$or.length) ops.push(Royalty.updateMany(royaltyFilter, { $set: { clientName: newName } }));
+    const [leadsRes, onbRes, royRes] = await Promise.all([
+      Lead.updateMany(leadFilter, { $set: { name: newName, memberId: member._id } }),
+      OnboardingEntry.updateMany(onboardFilter, { $set: { name: newName, memberId: member._id } }),
+      Royalty.updateMany(royaltyFilter, { $set: { clientName: newName, memberId: member._id } }),
+    ]);
 
-    const results = await Promise.all(ops);
-    console.log(`Sync name → "${newName}" aliases=[${uniqueAliases.join('|')}] societyMatches=${matchedRegIds.length} msgMatches=${matchedMsgIds.length}`);
+    console.log(`Sync name → "${newName}" memberId=${member._id} sharesEmail=${sharesEmail} societyMatches=${matchedRegIds.length}`);
     res.json({
       member,
       synced: {
-        leads: results[0]?.modifiedCount ?? 0,
-        onboarding: results[1]?.modifiedCount ?? 0,
+        leads: leadsRes.modifiedCount ?? 0,
+        onboarding: onbRes.modifiedCount ?? 0,
         societyRegs: societyRes.modifiedCount ?? 0,
-        royalties: results[2]?.modifiedCount ?? 0,
+        royalties: royRes.modifiedCount ?? 0,
         clientMessages: msgRes.modifiedCount ?? 0,
       },
     });

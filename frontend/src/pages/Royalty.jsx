@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, ChevronDown, ChevronRight, X, Upload, FileText, Trash2, Check,
   Search, DollarSign, Calendar, Users, Pencil, Eye,
@@ -7,6 +7,19 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { withApiBase } from '../utils/api';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import Pagination from '../components/Pagination';
+
+const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
+const FALLBACK_AVATAR_COLORS = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
+const pickFallbackColor = (seed) => {
+  const s = String(seed || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return FALLBACK_AVATAR_COLORS[h % FALLBACK_AVATAR_COLORS.length];
+};
+const getInitials = (name) => String(name || '').trim().split(/\s+/).map((w) => w[0]).join('').toUpperCase().slice(0, 2) || '?';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -615,50 +628,82 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
 const Royalty = () => {
   const { authFetch, token } = useAuth();
   const { addToast } = useToast();
-  const [clients, setClients] = useState([]);
-  const [completedOnboarding, setCompletedOnboarding] = useState([]);
+  const { setCached, invalidate } = useDataCache();
   const [selectedClient, setSelectedClient] = useState(null);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 250);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [contractFilter, setContractFilter] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  const fetchData = useCallback(async () => {
-    try {
-      let royaltyClients = [];
-      let onboardingEntries = [];
+  const royaltyQ = useCachedFetch('royalty:list', async () => {
+    const r = await authFetch('/api/royalty');
+    const d = await r.json();
+    return d.clients || [];
+  });
+  const onboardingQ = useCachedFetch('onboarding:list', async () => {
+    const r = await authFetch('/api/onboarding');
+    const d = await r.json();
+    return d.entries || [];
+  });
+  const membersQ = useCachedFetch('members:list', async () => {
+    const r = await authFetch('/api/members');
+    const d = await r.json();
+    return d.members || [];
+  });
 
-      try {
-        const royaltyRes = await authFetch('/api/royalty');
-        const royaltyData = await royaltyRes.json();
-        royaltyClients = royaltyData.clients || [];
-      } catch (e) {
-        console.error('Royalty fetch error:', e);
-      }
+  const clients = royaltyQ.data || [];
+  const onboardingEntries = onboardingQ.data || [];
+  const membersList = membersQ.data || [];
+  const loaded = !royaltyQ.loading || !!royaltyQ.data;
 
-      try {
-        const onboardingRes = await authFetch('/api/onboarding');
-        const onboardingData = await onboardingRes.json();
-        onboardingEntries = onboardingData.entries || [];
-      } catch (e) {
-        console.error('Onboarding fetch error:', e);
-      }
+  const setClients = (updater) => {
+    const current = royaltyQ.data || [];
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    setCached('royalty:list', next);
+  };
 
-      setClients(royaltyClients);
+  const refetchAll = useCallback(() => {
+    royaltyQ.refetch();
+    onboardingQ.refetch();
+  }, [royaltyQ, onboardingQ]);
 
-      // Filter completed onboarding entries not already in music works
-      const existingNames = royaltyClients.map((c) => c.clientName.toLowerCase());
-      const completed = onboardingEntries.filter(
-        (e) => (e.stage === 'Completed' || e.stage === 'Contact Made') && !existingNames.includes(e.name?.toLowerCase())
-      );
-      setCompletedOnboarding(completed);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoaded(true);
-    }
-  }, [authFetch]);
+  // Completed onboarding entries not yet added to Music Works
+  const completedOnboarding = useMemo(() => {
+    const existingNames = new Set(clients.map((c) => (c.clientName || '').toLowerCase()));
+    return onboardingEntries.filter(
+      (e) => (e.stage === 'Completed' || e.stage === 'Contact Made') && !existingNames.has((e.name || '').toLowerCase())
+    );
+  }, [clients, onboardingEntries]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Lookup maps: contractType by name/clientNumber + Member by email/name (for color + initials)
+  const contractByKey = useMemo(() => {
+    const map = {};
+    onboardingEntries.forEach((e) => {
+      if (e.clientNumber) map[`num:${e.clientNumber}`] = e.contractType || '';
+      if (e.name) map[`name:${e.name.toLowerCase()}`] = e.contractType || '';
+      if (e.email) map[`email:${e.email.toLowerCase()}`] = e.contractType || '';
+    });
+    return map;
+  }, [onboardingEntries]);
+
+  const memberByKey = useMemo(() => {
+    const map = {};
+    membersList.forEach((m) => {
+      if (m.email) map[`email:${m.email.toLowerCase()}`] = m;
+      if (m.name) map[`name:${m.name.toLowerCase()}`] = m;
+    });
+    return map;
+  }, [membersList]);
+
+  const getClientContract = (c) =>
+    contractByKey[`email:${(c.clientEmail || '').toLowerCase()}`] ||
+    contractByKey[`name:${(c.clientName || '').toLowerCase()}`] || '';
+
+  const getClientMember = (c) =>
+    memberByKey[`email:${(c.clientEmail || '').toLowerCase()}`] ||
+    memberByKey[`name:${(c.clientName || '').toLowerCase()}`] || null;
 
   useNotificationDeeplink({
     expectedType: ['royalty', 'music'],
@@ -681,7 +726,6 @@ const Royalty = () => {
       const data = await res.json();
       if (data.client) {
         setClients((prev) => [data.client, ...prev]);
-        setCompletedOnboarding((prev) => prev.filter((e) => e._id !== entry._id));
         addToast(`${entry.name} added to Music Works`);
         setShowAddModal(false);
       } else {
@@ -698,7 +742,7 @@ const Royalty = () => {
       setClients((prev) => prev.filter((c) => c._id !== clientId));
       if (selectedClient?._id === clientId) setSelectedClient(null);
       addToast('Client removed');
-      fetchData();
+      invalidate('royalty:list');
     } catch (err) {
       addToast('Failed to delete', 'error');
     }
@@ -709,12 +753,38 @@ const Royalty = () => {
     if (selectedClient?._id === updatedClient._id) setSelectedClient(updatedClient);
   };
 
-  const filtered = clients.filter((c) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return c.clientName.toLowerCase().includes(q) ||
-      (c.clientEmail && c.clientEmail.toLowerCase().includes(q));
-  });
+  const contractCounts = useMemo(() => {
+    const counts = { All: clients.length, Royalty: 0, Retainer: 0, 'Work-Based': 0, Inhouse: 0 };
+    clients.forEach((c) => {
+      const t = getClientContract(c);
+      if (counts[t] !== undefined) counts[t] += 1;
+    });
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, contractByKey]);
+
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    return clients.filter((c) => {
+      if (contractFilter !== 'All' && getClientContract(c) !== contractFilter) return false;
+      if (!q) return true;
+      return (
+        (c.clientName || '').toLowerCase().includes(q) ||
+        (c.clientEmail && c.clientEmail.toLowerCase().includes(q))
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients, debouncedSearch, contractFilter, contractByKey]);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, contractFilter, pageSize]);
+
+  const totalFiltered = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pagedClients = useMemo(
+    () => filtered.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filtered, safePage, pageSize]
+  );
 
   return (
     <div style={{ padding: '28px 36px', minHeight: '100%' }}>
@@ -738,27 +808,74 @@ const Royalty = () => {
         </button>
       </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
-        <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-        <input
-          type="text" placeholder="Search clients..."
-          value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ ...inputStyle, paddingLeft: '38px' }}
-        />
+      {/* Contract color legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '16px', padding: '10px 14px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px' }}>
+        <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600 }}>Contract Type:</span>
+        {Object.entries(CONTRACT_COLORS).map(([label, col]) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col }} />
+            <span style={{ color: '#e5e7eb', fontSize: '12px' }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Search + Contract Filter */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: '240px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+          <input
+            placeholder="Search clients by name or email..."
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }}
+          />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {['All', ...Object.keys(CONTRACT_COLORS)].map((label) => {
+            const active = contractFilter === label;
+            const accent = label === 'All' ? '#6366f1' : CONTRACT_COLORS[label];
+            const count = contractCounts[label] ?? 0;
+            return (
+              <button key={label} onClick={() => setContractFilter(label)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 14px', borderRadius: '9999px',
+                  background: active ? accent : '#141720',
+                  border: `1px solid ${active ? accent : '#1e2540'}`,
+                  color: active ? '#fff' : '#e5e7eb',
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}>
+                {label !== 'All' && (
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: active ? '#fff' : accent }} />
+                )}
+                {label}
+                <span style={{
+                  fontSize: '11px', fontWeight: 700,
+                  padding: '1px 7px', borderRadius: '9999px',
+                  background: active ? 'rgba(255,255,255,0.22)' : '#1e2540',
+                  color: active ? '#fff' : '#9ca3af',
+                }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Client Grid */}
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>
           <DollarSign size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-          <p style={{ fontSize: '16px', fontWeight: 600 }}>No clients yet</p>
-          <p style={{ fontSize: '13px' }}>Add clients from completed onboarding</p>
+          <p style={{ fontSize: '16px', fontWeight: 600 }}>{clients.length === 0 ? 'No clients yet' : 'No clients match your filters'}</p>
+          <p style={{ fontSize: '13px' }}>{clients.length === 0 ? 'Add clients from completed onboarding' : 'Try changing the search or contract filter'}</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-          {filtered.map((client) => {
+          {pagedClients.map((client) => {
             const totalYears = client.years?.length || 0;
+            const contract = getClientContract(client);
+            const linkedMember = getClientMember(client);
+            const avatarColor = CONTRACT_COLORS[contract] || linkedMember?.color || pickFallbackColor(client.clientEmail || client.clientName);
+            const initials = linkedMember?.initials || getInitials(client.clientName);
             return (
               <div
                 key={client._id}
@@ -771,12 +888,12 @@ const Royalty = () => {
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1e2540'; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#1f2d1f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <DollarSign size={18} color="#22c55e" />
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                    {initials}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0 }}>{client.clientName}</h3>
-                    {client.clientEmail && <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0' }}>{client.clientEmail}</p>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientName}</h3>
+                    {client.clientEmail && <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientEmail}</p>}
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); if (confirm('Delete this client?')) handleDeleteClient(client._id); }}
@@ -785,7 +902,13 @@ const Royalty = () => {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#8892b0' }}>
+                <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#8892b0', flexWrap: 'wrap' }}>
+                  {contract && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(255,255,255,0.04)', color: CONTRACT_COLORS[contract], fontWeight: 600 }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: CONTRACT_COLORS[contract] }} />
+                      {contract}
+                    </span>
+                  )}
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Calendar size={12} /> {totalYears} year{totalYears !== 1 ? 's' : ''}
                   </span>
@@ -801,6 +924,17 @@ const Royalty = () => {
             );
           })}
         </div>
+      )}
+
+      {filtered.length > 0 && (
+        <Pagination
+          page={safePage}
+          pageSize={pageSize}
+          total={totalFiltered}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 50, 100]}
+        />
       )}
 
       {/* Add Client Modal — pick from completed onboarding */}

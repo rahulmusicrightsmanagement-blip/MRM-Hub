@@ -9,6 +9,7 @@ const subTaskSchema = new mongoose.Schema({
 const leadSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    memberId: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', default: null },
     initials: { type: String, default: '' },
     color: { type: String, default: '#6366f1' },
     genre: { type: String, default: '' },
@@ -45,6 +46,18 @@ const leadSchema = new mongoose.Schema(
   { timestamps: true, collection: 'leads' }
 );
 
+// Force canonical Member.name + memberId link on save. Preserves data on ambiguous matches.
+leadSchema.pre('save', async function () {
+  if (this.isNew || this.isModified('name') || this.isModified('email') || !this.memberId) {
+    const resolveMember = require('../utils/resolveMember');
+    const hit = await resolveMember({ email: this.email, name: this.name });
+    if (hit) {
+      this.memberId = hit._id;
+      if (hit.name && hit.name !== this.name) this.name = hit.name;
+    }
+  }
+});
+
 leadSchema.pre('save', function () {
   if (this.isModified('name') && this.name) {
     this.initials = this.name
@@ -59,6 +72,7 @@ leadSchema.pre('save', function () {
 leadSchema.index({ spoc: 1 });
 leadSchema.index({ stage: 1 });
 leadSchema.index({ email: 1 });
+leadSchema.index({ memberId: 1 });
 leadSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Lead', leadSchema);

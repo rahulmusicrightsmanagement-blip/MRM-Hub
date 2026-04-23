@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown, X } from 'lucide-react';
 
-const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search...', emptyMessage = 'No options found', label, required }) => {
+const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search...', emptyMessage = 'No options found', label, required, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef(null);
@@ -23,6 +23,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
   }, [isOpen]);
 
   const handleSelect = (name) => {
+    if (disabled) return;
     onChange(name);
     setQuery('');
     setIsOpen(false);
@@ -30,6 +31,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
 
   const handleClear = (e) => {
     e.stopPropagation();
+    if (disabled) return;
     onChange('');
     setQuery('');
   };
@@ -42,12 +44,16 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
 
       {/* Trigger */}
       <div
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => { if (!disabled) setIsOpen(!isOpen); }}
+        title={disabled ? 'Edit from the Members page' : undefined}
         style={{
           width: '100%', padding: '10px 14px', borderRadius: '8px',
-          border: `1px solid ${isOpen ? '#6366f1' : '#2d3348'}`,
-          backgroundColor: '#1a1e2e', color: selected ? '#e5e7eb' : '#6b7280',
-          fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          border: `1px solid ${isOpen && !disabled ? '#6366f1' : '#2d3348'}`,
+          backgroundColor: disabled ? '#141823' : '#1a1e2e',
+          color: selected ? '#e5e7eb' : '#6b7280',
+          opacity: disabled ? 0.75 : 1,
+          fontSize: '14px', cursor: disabled ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           transition: 'border-color 0.15s',
         }}
       >
@@ -55,15 +61,17 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
           {selected ? selected.name : placeholder}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-          {selected && (
+          {selected && !disabled && (
             <X size={14} style={{ color: '#9ca3af', cursor: 'pointer' }} onClick={handleClear} />
           )}
-          <ChevronDown size={16} style={{ color: '#9ca3af', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          {!disabled && (
+            <ChevronDown size={16} style={{ color: '#9ca3af', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          )}
         </div>
       </div>
 
       {/* Dropdown */}
-      {isOpen && (
+      {isOpen && !disabled && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
           backgroundColor: '#1e2235', border: '1px solid #2d3348', borderRadius: '10px',

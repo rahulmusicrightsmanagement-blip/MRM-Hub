@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { withApiBase } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
@@ -1159,13 +1161,34 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
           <div>
-            <SearchableSelect label="Select Member" required options={members} value={form.name} onChange={handleMemberSelect} placeholder="Search member..." emptyMessage="No members found. Add members first." />
+            <SearchableSelect label="Select Member" required options={members} value={form.name} onChange={handleMemberSelect} placeholder="Search member..." emptyMessage="No members found. Add members first." disabled={isEdit} />
+            {isEdit && <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Name is managed from the Members page.</p>}
           </div>
           <MultiRoleSelect selected={form.role} onChange={(v) => setForm({ ...form, role: v })} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-          <div><label style={labelStyle}>Email *</label><input style={inputStyle} placeholder="email@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div><label style={labelStyle}>Phone</label><input style={inputStyle} placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+          <div>
+            <label style={labelStyle}>Email *</label>
+            <input
+              style={{ ...inputStyle, backgroundColor: isEdit ? '#141823' : inputStyle.backgroundColor, cursor: isEdit ? 'not-allowed' : 'text', opacity: isEdit ? 0.8 : 1 }}
+              placeholder="email@example.com"
+              value={form.email}
+              readOnly={isEdit}
+              title={isEdit ? 'Edit from the Members page' : undefined}
+              onChange={(e) => !isEdit && setForm({ ...form, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Phone</label>
+            <input
+              style={{ ...inputStyle, backgroundColor: isEdit ? '#141823' : inputStyle.backgroundColor, cursor: isEdit ? 'not-allowed' : 'text', opacity: isEdit ? 0.8 : 1 }}
+              placeholder="+91 98xxx xxxxx"
+              value={form.phone}
+              readOnly={isEdit}
+              title={isEdit ? 'Edit from the Members page' : undefined}
+              onChange={(e) => !isEdit && setForm({ ...form, phone: e.target.value })}
+            />
+          </div>
         </div>
         <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Contract Type</label><select style={{ ...inputStyle, cursor: 'pointer' }} value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })}>{contractTypes.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
         <div style={{ marginBottom: '20px' }}><label style={labelStyle}>Assign SPOC</label>
@@ -1463,30 +1486,39 @@ const Onboarding = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
+  const { setCached, invalidate } = useDataCache();
   const STAGES = getOptions('onboarding_stage');
-  const [entries, setEntries] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [members, setMembers] = useState([]);
   const [editingEntry, setEditingEntry] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 250);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [entriesRes, usersRes, membersRes] = await Promise.all([authFetch('/api/onboarding'), authFetch('/api/users/team'), authFetch('/api/members')]);
-        const entriesData = await entriesRes.json();
-        const usersData = await usersRes.json();
-        const membersData = await membersRes.json();
-        setEntries(entriesData.entries || []);
-        setTeamMembers(usersData.users || []);
-        setMembers(membersData.members || []);
-      } catch (err) { console.error('Failed to fetch:', err); }
-      finally { setLoading(false); }
-    };
-    fetchData();
-  }, [authFetch]);
+  const entriesQ = useCachedFetch('onboarding:list', async () => {
+    const r = await authFetch('/api/onboarding');
+    const d = await r.json();
+    return d.entries || [];
+  });
+  const teamQ = useCachedFetch('users:team', async () => {
+    const r = await authFetch('/api/users/team');
+    const d = await r.json();
+    return d.users || [];
+  });
+  const membersQ = useCachedFetch('members:list', async () => {
+    const r = await authFetch('/api/members');
+    const d = await r.json();
+    return d.members || [];
+  });
+
+  const entries = entriesQ.data || [];
+  const teamMembers = teamQ.data || [];
+  const members = membersQ.data || [];
+  const loading = (entriesQ.loading && !entriesQ.data) || (teamQ.loading && !teamQ.data) || (membersQ.loading && !membersQ.data);
+
+  const setEntries = (updater) => {
+    const current = entriesQ.data || [];
+    const next = typeof updater === 'function' ? updater(current) : updater;
+    setCached('onboarding:list', next);
+  };
 
   useNotificationDeeplink({
     expectedType: 'onboarding',
@@ -1520,7 +1552,13 @@ const Onboarding = () => {
     try {
       const res = await authFetch(`/api/onboarding/${editingEntry._id}`, { method: 'PUT', body: JSON.stringify(form) });
       const data = await res.json();
-      if (res.ok) { setEntries((p) => p.map((e) => (e._id === editingEntry._id ? data.entry : e))); addToast('Entry updated'); }
+      if (res.ok) {
+        setEntries((p) => p.map((e) => (e._id === editingEntry._id ? data.entry : e)));
+        // Backend syncs clientNumber/KYC → Member, and contractType → Lead — drop stale caches.
+        invalidate('members:list');
+        invalidate('leads:list');
+        addToast('Entry updated');
+      }
       else addToast('Failed to update entry', 'error');
     } catch (err) { console.error('Failed to edit entry:', err); addToast('Failed to update entry', 'error'); }
   };
@@ -1553,6 +1591,8 @@ const Onboarding = () => {
       });
       if (res.ok) {
         setEntries((p) => p.filter((e) => e._id !== entryId));
+        // Matching lead flips to Not Qualified server-side — drop leads cache.
+        invalidate('leads:list');
         setSelectedMember(null);
         addToast('Moved to Sales Pipeline — Not Qualified');
       } else addToast('Failed to mark not qualified', 'error');
@@ -1566,8 +1606,8 @@ const Onboarding = () => {
   };
 
   const filteredEntries = useMemo(() => {
-    if (!searchQuery.trim()) return entries;
-    const q = searchQuery.toLowerCase();
+    if (!debouncedQuery.trim()) return entries;
+    const q = debouncedQuery.toLowerCase();
     return entries.filter((e) =>
       e.name.toLowerCase().includes(q) ||
       (e._id && e._id.toLowerCase().includes(q)) ||
@@ -1577,7 +1617,7 @@ const Onboarding = () => {
       (e.spoc && e.spoc.toLowerCase().includes(q)) ||
       (e.contractType && e.contractType.toLowerCase().includes(q))
     );
-  }, [entries, searchQuery]);
+  }, [entries, debouncedQuery]);
 
   const handleExportExcel = () => {
     try {

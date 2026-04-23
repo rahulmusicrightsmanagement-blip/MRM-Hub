@@ -32,6 +32,7 @@ const STAGES = [
 const onboardingEntrySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
+    memberId: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', default: null },
     initials: { type: String, default: '' },
     color: { type: String, default: '#6366f1' },
     role: { type: [String], default: [] },
@@ -89,6 +90,18 @@ const onboardingEntrySchema = new mongoose.Schema(
   { timestamps: true, collection: 'onboarding_entries' }
 );
 
+// Force canonical Member.name + memberId link on save. Preserves data on ambiguous matches.
+onboardingEntrySchema.pre('save', async function () {
+  if (this.isNew || this.isModified('name') || this.isModified('email') || !this.memberId) {
+    const resolveMember = require('../utils/resolveMember');
+    const hit = await resolveMember({ email: this.email, name: this.name });
+    if (hit) {
+      this.memberId = hit._id;
+      if (hit.name && hit.name !== this.name) this.name = hit.name;
+    }
+  }
+});
+
 onboardingEntrySchema.pre('save', function () {
   if (this.isModified('name') && this.name) {
     this.initials = this.name
@@ -104,6 +117,7 @@ onboardingEntrySchema.index({ spoc: 1 });
 // Sparse unique index — enforces uniqueness at DB level, ignores empty/null values
 onboardingEntrySchema.index({ clientNumber: 1 }, { unique: true, sparse: true, partialFilterExpression: { clientNumber: { $gt: '' } } });
 onboardingEntrySchema.index({ email: 1 });
+onboardingEntrySchema.index({ memberId: 1 });
 onboardingEntrySchema.index({ stage: 1 });
 onboardingEntrySchema.index({ createdAt: -1 });
 

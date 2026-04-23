@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { PicklistProvider } from './context/PicklistContext';
+import { DataCacheProvider } from './context/DataCacheContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import SalesPipeline from './pages/SalesPipeline';
@@ -141,15 +142,17 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <PicklistProvider>
-          <ToastProvider>
-            <SessionTimeoutModal />
-            <Routes>
-              <Route path="/login" element={<LoginGuard />} />
-              <Route path="/*" element={<ProtectedRoutes />} />
-            </Routes>
-          </ToastProvider>
-        </PicklistProvider>
+        <DataCacheProvider>
+          <PicklistProvider>
+            <ToastProvider>
+              <SessionTimeoutModal />
+              <Routes>
+                <Route path="/login" element={<LoginGuard />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </ToastProvider>
+          </PicklistProvider>
+        </DataCacheProvider>
       </AuthProvider>
     </Router>
   );

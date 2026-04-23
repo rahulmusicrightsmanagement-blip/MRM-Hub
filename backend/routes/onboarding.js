@@ -27,10 +27,13 @@ const reconcileSelectedSocieties = async (entry) => {
   } catch (err) { console.error('reconcileSelectedSocieties error:', err); return entry; }
 };
 
-// Helper: sync KYC status from onboarding entry to linked Member
+// Helper: sync KYC status from onboarding entry to linked Member.
+// Uses memberId (unique FK) when available to avoid cross-contamination on shared emails.
 const syncKycToMember = async (entry) => {
   try {
-    const member = await Member.findOne({ email: entry.email.toLowerCase() });
+    const member = entry.memberId
+      ? await Member.findById(entry.memberId)
+      : await Member.findOne({ email: entry.email.toLowerCase(), name: entry.name });
     if (!member) return;
 
     const STAGES_PAST_KYC = ['Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
@@ -71,10 +74,13 @@ const nowHHmm = () => {
 /* ─── Multer config (memory — buffer goes to Google Drive) ─── */
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter }); // 10 MB
 
-/* ─── GET all entries ─── */
-router.get('/', auth, async (req, res) => {
+// One-time legacy-documents migration — runs once per process boot, not per request.
+// syncKycToMember + reconcileSelectedSocieties are invoked on POST/PUT/doc-upload paths,
+// so GET stays a pure read and finishes in a single round-trip.
+let _docsMigrationDone = false;
+const ensureDocsMigration = async () => {
+  if (_docsMigrationDone) return;
   try {
-    // Migrate legacy entries that don't have documents array
     await OnboardingEntry.updateMany(
       { $or: [{ documents: { $exists: false } }, { documents: { $size: 0 } }] },
       { $set: { documents: [
@@ -82,17 +88,21 @@ router.get('/', auth, async (req, res) => {
         { _id: new (require('mongoose').Types.ObjectId)(), docType: 'pan', label: 'PAN Card', requested: false, received: false, fileUrl: '', fileName: '' },
       ] } }
     );
+    _docsMigrationDone = true;
+  } catch (err) {
+    console.error('Onboarding docs migration error:', err);
+  }
+};
+
+/* ─── GET all entries ─── */
+router.get('/', auth, async (req, res) => {
+  try {
+    await ensureDocsMigration();
 
     const filter = req.user.hasRole('admin') ? {} : { spoc: req.user.name };
-    const filtered = await OnboardingEntry.find(filter).sort({ createdAt: -1 }).lean();
+    const entries = await OnboardingEntry.find(filter).sort({ createdAt: -1 }).lean();
 
-    // Sync KYC + reconcile selectedSocieties against SocietyRegistration in parallel
-    await Promise.all(filtered.map(async (entry) => {
-      await syncKycToMember(entry);
-      await reconcileSelectedSocieties(entry);
-    }));
-
-    res.json({ entries: filtered });
+    res.json({ entries });
   } catch (err) {
     console.error('GET onboarding error:', err);
     res.status(500).json({ message: 'Server error' });
@@ -207,8 +217,11 @@ router.put('/:id', auth, async (req, res) => {
 
     const oldStage = entry.stage;
 
+    // Identity fields (name / email / phone) are owned by Member and propagate from there.
+    // They're intentionally excluded here so edits outside the Members page can't drift
+    // the source of truth.
     const fields = [
-      'name', 'role', 'email', 'phone', 'contractType', 'stage', 'spoc', 'notes', 'priority', 'deadline',
+      'role', 'contractType', 'stage', 'spoc', 'notes', 'priority', 'deadline',
       'contractSent', 'contractReceived', 'contractFileUrl', 'contractFileName', 'contractStartDate', 'contractRenewalDate', 'renewalType', 'renewalRemarks', 'selectedSocieties',
       'addedToWhatsApp', 'whatsAppGroupName', 'emailCreated', 'createdEmailAddress', 'createdEmailPassword', 'clientNumber',
       'previousStage',
@@ -245,8 +258,12 @@ router.put('/:id', auth, async (req, res) => {
       if (req.body.contractType) syncToLead.onboardingContractType = req.body.contractType;
       if (req.body.clientNumber !== undefined) syncToMember.clientNumber = req.body.clientNumber;
 
-      if (Object.keys(syncToLead).length && entry.email) {
-        await Lead.updateOne({ email: entry.email }, syncToLead);
+      if (Object.keys(syncToLead).length) {
+        // Prefer memberId join (safe when email is shared); fall back to (email+name) combo.
+        const leadFilter = entry.memberId
+          ? { memberId: entry.memberId }
+          : (entry.email ? { email: entry.email, name: entry.name } : null);
+        if (leadFilter) await Lead.updateOne(leadFilter, syncToLead);
       }
 
       if (Object.keys(syncToMember).length && entry.name) {
@@ -308,8 +325,10 @@ router.post('/:id/not-qualified', auth, async (req, res) => {
 
     const { reason } = req.body;
 
-    // Find the lead by email match
-    const lead = await Lead.findOne({ email: entry.email.toLowerCase() });
+    // Find the lead by memberId (safe on shared emails), fall back to email+name.
+    const lead = entry.memberId
+      ? await Lead.findOne({ memberId: entry.memberId })
+      : await Lead.findOne({ email: entry.email.toLowerCase(), name: entry.name });
     if (lead) {
       lead.previousStage = lead.stage;
       lead.stage = 'Not Qualified';
@@ -342,6 +361,7 @@ router.post('/restart/:leadId', auth, async (req, res) => {
     const entry = new OnboardingEntry({
       name: lead.name,
       email: lead.email,
+      memberId: lead.memberId || null,
       color,
       phone: lead.phone || '',
       contractType: lead.onboardingContractType || 'Retainer',

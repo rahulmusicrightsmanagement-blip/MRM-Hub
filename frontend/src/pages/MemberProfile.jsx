@@ -33,6 +33,36 @@ const Badge = ({ label, colorMap, fallbackBg = '#374151', fallbackText = '#9ca3a
   );
 };
 
+/* ─── Reusable "Link" button — opens a document URL in a new tab ─── */
+const DocLinkBtn = ({ url, title = 'Open document', compact = false }) => {
+  if (!url) return null;
+  const base = {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: compact ? '2px 8px' : '4px 10px',
+    borderRadius: '6px',
+    background: 'rgba(59,130,246,0.12)',
+    border: '1px solid #1e3a5f',
+    color: '#60a5fa',
+    fontSize: compact ? '10px' : '11px',
+    fontWeight: 600,
+    textDecoration: 'none',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  };
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={title}
+      style={base}
+    >
+      <ExternalLink size={compact ? 10 : 12} /> Link
+    </a>
+  );
+};
+
 const stageColors = {
   'New Enquiry': { bg: '#1e3a5f', text: '#60a5fa' },
   'Meeting Set': { bg: '#713f12', text: '#fbbf24' },
@@ -229,7 +259,7 @@ const MemberProfile = () => {
         </div>
 
         {/* Renewal Details & Notes from Onboarding */}
-        {onboarding.length > 0 && (onboarding[0].renewalType || onboarding[0].renewalRemarks || onboarding[0].contractStartDate || onboarding[0].contractRenewalDate || onboarding[0].notes) && (
+        {onboarding.length > 0 && (onboarding[0].renewalType || onboarding[0].renewalRemarks || onboarding[0].contractStartDate || onboarding[0].contractRenewalDate || onboarding[0].notes || onboarding[0].contractFileUrl) && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
             {onboarding[0].contractType && <div style={infoBox}><div style={infoLabel}>Contract Type</div><div style={infoVal}>{onboarding[0].contractType}</div></div>}
             {onboarding[0].contractStartDate && <div style={infoBox}><div style={infoLabel}>Contract Start</div><div style={infoVal}>{fmtDate(onboarding[0].contractStartDate)}</div></div>}
@@ -237,6 +267,15 @@ const MemberProfile = () => {
             {onboarding[0].renewalType && <div style={infoBox}><div style={infoLabel}>Renewal Type</div><div style={{ ...infoVal, color: '#c4b5fd' }}>{onboarding[0].renewalType}</div></div>}
             {onboarding[0].renewalRemarks && <div style={infoBox}><div style={infoLabel}>Renewal Remarks</div><div style={infoVal}>{onboarding[0].renewalRemarks}</div></div>}
             {onboarding[0].notes && <div style={infoBox}><div style={infoLabel}>Notes</div><div style={infoVal}>{onboarding[0].notes}</div></div>}
+            {onboarding[0].contractFileUrl && (
+              <div style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={infoLabel}>Contract File</div>
+                  <div style={{ ...infoVal, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{onboarding[0].contractFileName || 'Contract'}</div>
+                </div>
+                <DocLinkBtn url={onboarding[0].contractFileUrl} title={`Open ${onboarding[0].contractFileName || 'Contract'}`} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -365,9 +404,9 @@ const MemberProfile = () => {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px', marginBottom: otherDocs.length > 0 ? '12px' : '0' }}>
                 {[
-                  { label: 'PAN Card', value: panValue, verified: panReceived, requested: panDoc?.requested, key: 'pan' },
-                  { label: 'Aadhaar', value: aadhaarValue, verified: aadhaarReceived, requested: aadhaarDoc?.requested, key: 'aadhaar' },
-                ].map(({ label, value, verified, requested, key }) => (
+                  { label: 'PAN Card', value: panValue, verified: panReceived, requested: panDoc?.requested, fileUrl: panDoc?.fileUrl, fileName: panDoc?.fileName, key: 'pan' },
+                  { label: 'Aadhaar', value: aadhaarValue, verified: aadhaarReceived, requested: aadhaarDoc?.requested, fileUrl: aadhaarDoc?.fileUrl, fileName: aadhaarDoc?.fileName, key: 'aadhaar' },
+                ].map(({ label, value, verified, requested, fileUrl, fileName, key }) => (
                   <div key={key} style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <div style={infoLabel}>{label}</div>
@@ -381,6 +420,7 @@ const MemberProfile = () => {
                       ) : (
                         <Badge label="Pending" colorMap={{ Pending: { bg: '#7f1d1d', text: '#f87171' } }} />
                       )}
+                      <DocLinkBtn url={fileUrl} title={fileName ? `Open ${fileName}` : `Open ${label}`} />
                       {value && (
                         <button onClick={() => copyToClipboard(value, key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === key ? '#22c55e' : '#8892b0', padding: '4px' }}>
                           {copiedField === key ? <Check size={14} /> : <Copy size={14} />}
@@ -408,6 +448,7 @@ const MemberProfile = () => {
                         ) : (
                           <Badge label="Pending" colorMap={{ Pending: { bg: '#7f1d1d', text: '#f87171' } }} />
                         )}
+                        <DocLinkBtn url={doc.fileUrl} title={doc.fileName ? `Open ${doc.fileName}` : `Open ${doc.label}`} />
                       </div>
                     </div>
                   ))}
@@ -565,6 +606,7 @@ const MemberProfile = () => {
                       {doc.received ? '✓ Received' : doc.requested ? '● Requested' : '○ Not Requested'}
                     </span>
                     {doc.docNumber && <span style={{ color: '#8892b0', fontSize: '11px', fontFamily: 'monospace' }}>{doc.docNumber}</span>}
+                    <DocLinkBtn url={doc.fileUrl} title={doc.fileName ? `Open ${doc.fileName}` : `Open ${doc.label}`} compact />
                   </div>
                 ))}
               </div>
@@ -581,7 +623,14 @@ const MemberProfile = () => {
                 {entry.contractStartDate && <span>Start: {fmtDate(entry.contractStartDate)}</span>}
                 {entry.contractRenewalDate && <span>Renewal: {fmtDate(entry.contractRenewalDate)}</span>}
               </div>
-              {entry.contractFileName && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}><FileText size={12} /> {entry.contractFileName}</div>}
+              {(entry.contractFileName || entry.contractFileUrl) && (
+                <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <FileText size={12} /> {entry.contractFileName || 'Contract'}
+                  </span>
+                  <DocLinkBtn url={entry.contractFileUrl} title={`Open ${entry.contractFileName || 'Contract'}`} compact />
+                </div>
+              )}
               {(entry.renewalType || entry.renewalRemarks) && (
                 <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
                   {entry.renewalType && <span>Renewal Type: <strong style={{ color: '#c4b5fd' }}>{entry.renewalType}</strong></span>}
@@ -676,8 +725,13 @@ const MemberProfile = () => {
             </div>
           </div>
 
-          {royalty.documentFileName && (
-            <div style={{ fontSize: '12px', color: '#60a5fa', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}><FileText size={12} /> {royalty.documentFileName}</div>
+          {(royalty.documentFileName || royalty.documentFileUrl) && (
+            <div style={{ fontSize: '12px', color: '#60a5fa', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <FileText size={12} /> {royalty.documentFileName || 'Document'}
+              </span>
+              <DocLinkBtn url={royalty.documentFileUrl} title={`Open ${royalty.documentFileName || 'Document'}`} compact />
+            </div>
           )}
 
           {/* Year-wise data */}
@@ -798,8 +852,8 @@ const SocietyCard = ({ society, data }) => {
   };
 
   return (
-    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px' }}>
+      <div onClick={() => setExpanded(!expanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
         <div>
           <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{society}</div>
           <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{completedSteps}/{stepEntries.length} steps</div>
@@ -811,18 +865,32 @@ const SocietyCard = ({ society, data }) => {
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: '3px', background: '#1e2540', borderRadius: '3px', marginTop: '8px' }}>
+      <div onClick={() => setExpanded(!expanded)} style={{ height: '3px', background: '#1e2540', borderRadius: '3px', marginTop: '8px', cursor: 'pointer' }}>
         <div style={{ height: '100%', width: `${stepEntries.length > 0 ? (completedSteps / stepEntries.length) * 100 : 0}%`, background: '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
       </div>
 
       {expanded && (
-        <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {stepEntries.map(([label, val]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '3px 0' }}>
-              <span style={{ color: '#8892b0' }}>{label}</span>
-              <span style={{ color: stepColor(val), fontWeight: 600 }}>{val || 'NA'}</span>
-            </div>
-          ))}
+        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {(() => {
+            const STEP_FILES = {
+              'NOC Received': { url: steps.nocReceivedFileUrl, name: steps.nocReceivedFileName },
+              'Sent to Society': { url: steps.applicationSentFileUrl, name: steps.applicationSentFileName },
+              '3rd Party Auth': { url: steps.thirdPartyAuthFileUrl, name: steps.thirdPartyAuthFileName },
+              'Bank Mandate': { url: steps.bankMandateFileUrl, name: steps.bankMandateFileName },
+            };
+            return stepEntries.map(([label, val]) => {
+              const file = STEP_FILES[label];
+              return (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '3px 0' }}>
+                  <span style={{ color: '#8892b0' }}>{label}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <DocLinkBtn url={file?.url} title={file?.name ? `Open ${file.name}` : `Open ${label}`} compact />
+                    <span style={{ color: stepColor(val), fontWeight: 600 }}>{val || 'NA'}</span>
+                  </span>
+                </div>
+              );
+            });
+          })()}
           {steps.loginId && (
             <div style={{ marginTop: '4px', padding: '8px 10px', background: '#1a1f2e', borderRadius: '6px', fontSize: '11px' }}>
               <span style={{ color: '#8892b0' }}>Login: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.loginId}</span>
@@ -864,8 +932,8 @@ const RoyaltyYearCard = ({ yearData }) => {
   const monthKeys = Object.keys(months);
 
   return (
-    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px', cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px' }}>
+      <div onClick={() => setExpanded(!expanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
         <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}><Calendar size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />{yearData.year}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#8892b0' }}>{monthKeys.filter(m => months[m]?.fileReceived).length} / {monthKeys.length} months received</span>
@@ -874,12 +942,15 @@ const RoyaltyYearCard = ({ yearData }) => {
       </div>
 
       {expanded && (
-        <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
           {monthKeys.map((mon) => {
             const md = months[mon] || {};
             return (
               <div key={mon} style={{ padding: '10px', background: '#1a1f2e', borderRadius: '8px', borderLeft: `3px solid ${md.fileReceived ? '#22c55e' : '#374151'}` }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff', marginBottom: '6px' }}>{mon}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '6px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{mon}</div>
+                  <DocLinkBtn url={md.fileUrl} title={md.fileName ? `Open ${md.fileName}` : `Open ${mon} file`} compact />
+                </div>
                 <div style={{ fontSize: '11px', color: md.fileReceived ? '#34d399' : '#6b7280' }}>{md.fileReceived ? '✓ Received' : '○ Pending'}</div>
                 {(md.totalSongs > 0 || md.totalBGMMovies > 0 || md.totalTVBGM > 0) && (
                   <div style={{ marginTop: '4px', fontSize: '10px', color: '#8892b0' }}>
