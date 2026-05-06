@@ -7,6 +7,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 
 /* ═══════════════════════════════════════════
    CONSTANTS & HELPERS
@@ -686,6 +687,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
 const Tracker = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
+  const { isGuest, guardAction, blockGuestAction } = useGuestGuard();
   const { getOptions } = usePicklist();
   const TASK_CATEGORIES = getOptions('task_category');
   const CATEGORIES = ['All Categories', ...TASK_CATEGORIES];
@@ -804,7 +806,8 @@ const Tracker = () => {
       const hit = tasks.find((t) => t._id === id);
       if (hit) {
         clearUrl();
-        setEditingTask(hit);
+        if (isGuest) setSelectedTask(hit);
+        else setEditingTask(hit);
         return;
       }
 
@@ -830,7 +833,8 @@ const Tracker = () => {
           clearUrl();
           const taskDate = new Date(data.task.date);
           setWeekStart(getMonday(taskDate));
-          setEditingTask(data.task);
+          if (isGuest) setSelectedTask(data.task);
+          else setEditingTask(data.task);
         }
       } catch (err) {
         console.error('Notif task fetch failed:', err);
@@ -838,10 +842,11 @@ const Tracker = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [location.search, location.key, tasks, authFetch, location.pathname, navigate]);
+  }, [location.search, location.key, tasks, authFetch, location.pathname, navigate, isGuest]);
 
   /* ── Create / Update task ── */
   const handleSaveTask = async (form) => {
+    if (blockGuestAction()) return;
     try {
       if (form._id) {
         // Update
@@ -869,6 +874,7 @@ const Tracker = () => {
 
   /* ── Toggle completed ── */
   const handleToggle = async (id) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`${API}/tasks/${id}/toggle`, { method: 'PATCH' });
       if (!res.ok) throw new Error('Failed');
@@ -883,6 +889,7 @@ const Tracker = () => {
 
   /* ── Delete task ── */
   const handleDelete = async (id) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`${API}/tasks/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed');
@@ -897,6 +904,7 @@ const Tracker = () => {
 
   /* ── Edit (opens schedule modal with data) ── */
   const handleEdit = (task) => {
+    if (blockGuestAction()) return;
     setSelectedTask(null);
     setEditingTask(task);
     setShowScheduleModal(true);
@@ -961,7 +969,7 @@ const Tracker = () => {
             Today
           </button>
           <button
-            onClick={() => { setEditingTask(null); setShowScheduleModal(true); }}
+            onClick={() => guardAction(() => { setEditingTask(null); setShowScheduleModal(true); })}
             style={{
               padding: '8px 18px', borderRadius: '10px', border: 'none',
               backgroundColor: '#6366f1', color: 'white', fontSize: '13px', fontWeight: 600,

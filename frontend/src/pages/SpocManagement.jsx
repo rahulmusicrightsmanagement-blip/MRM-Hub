@@ -9,6 +9,7 @@ const ROLE_META = {
   onboarding_manager: { label: 'Onboarding Mgr', bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', avatar: '#059669' },
   society_manager: { label: 'Society Mgr', bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', avatar: '#d97706' },
   music_work_manager: { label: 'Music Work Mgr', bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', avatar: '#db2777' },
+  guest: { label: 'Guest', bg: 'rgba(107, 114, 128, 0.15)', text: '#9ca3af', avatar: '#6b7280' },
 };
 
 const getAvatarColor = (roles) => {
@@ -18,7 +19,7 @@ const getAvatarColor = (roles) => {
 };
 
 const SpocManagement = () => {
-  const { authFetch, isFullAccess, user: currentUser } = useAuth();
+  const { authFetch, isFullAccess, isGuest, user: currentUser } = useAuth();
   const { addToast } = useToast();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
@@ -26,6 +27,12 @@ const SpocManagement = () => {
   const [editUser, setEditUser] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -52,6 +59,7 @@ const SpocManagement = () => {
   );
 
   const handleDelete = async (id) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/users/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -67,7 +75,7 @@ const SpocManagement = () => {
     }
   };
 
-  if (!isFullAccess) {
+  if (!isFullAccess && !isGuest) {
     return (
       <div style={{ padding: '40px', color: '#6b7280', textAlign: 'center', fontSize: '16px' }}>
         Access denied. Admin or Lead only.
@@ -85,6 +93,7 @@ const SpocManagement = () => {
         </div>
         <button
           onClick={() => {
+            if (blockGuestAction()) return;
             setEditUser(null);
             setShowModal(true);
           }}

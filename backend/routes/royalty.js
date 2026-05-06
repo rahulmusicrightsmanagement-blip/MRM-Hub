@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const Royalty = require('../models/Royalty');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest } = require('../middleware/auth');
 const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFileMusic } = require('../utils/gdrive');
 
@@ -21,7 +21,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/royalty — create a new royalty client (from completed onboarding)
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { clientName, clientEmail, onboardingId } = req.body;
     if (!clientName) return res.status(400).json({ message: 'Client name is required' });
@@ -52,7 +52,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // PUT /api/royalty/:id — update client fields (documentsReceived, etc.)
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const client = await Royalty.findById(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -67,7 +67,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // POST /api/royalty/:id/years — add a year (above or below)
-router.post('/:id/years', auth, async (req, res) => {
+router.post('/:id/years', auth, denyGuest, async (req, res) => {
   try {
     const client = await Royalty.findById(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -96,7 +96,7 @@ router.post('/:id/years', auth, async (req, res) => {
 });
 
 // PUT /api/royalty/:id/months — update month data for a specific year+month
-router.put('/:id/months', auth, async (req, res) => {
+router.put('/:id/months', auth, denyGuest, async (req, res) => {
   try {
     const client = await Royalty.findById(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -121,7 +121,7 @@ router.put('/:id/months', auth, async (req, res) => {
 });
 
 // POST /api/royalty/:id/upload — upload file for a specific year+month
-router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/upload', auth, denyGuest, upload.single('file'), async (req, res) => {
   try {
     const client = await Royalty.findById(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -154,7 +154,7 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
 });
 
 // POST /api/royalty/:id/upload-document — upload client-level document to GDrive
-router.post('/:id/upload-document', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/upload-document', auth, denyGuest, upload.single('file'), async (req, res) => {
   try {
     const client = await Royalty.findById(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
@@ -174,7 +174,7 @@ router.post('/:id/upload-document', auth, upload.single('file'), async (req, res
 });
 
 // DELETE /api/royalty/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const client = await Royalty.findByIdAndDelete(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });

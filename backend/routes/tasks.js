@@ -2,7 +2,7 @@ const express = require('express');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const SocietyRegistration = require('../models/SocietyRegistration');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest, isGuestUser } = require('../middleware/auth');
 const notify = require('../utils/notify');
 
 const router = express.Router();
@@ -10,7 +10,7 @@ const router = express.Router();
 // Reconcile society-linked tasks against current registration status.
 // Ensures stale 'incomplete' tasks flip to completed once the society is Registered,
 // and vice versa. Runs opportunistically on GET so existing data self-heals.
-const reconcileSocietyTasks = async (tasks) => {
+const reconcileSocietyTasks = async (tasks, { persist = true } = {}) => {
   try {
     const socTasks = tasks.filter((t) => t.sourceType === 'societyreg' && t.sourceId);
     if (!socTasks.length) return;
@@ -61,7 +61,7 @@ const reconcileSocietyTasks = async (tasks) => {
 
       if (Object.keys(set).length) bulkOps.push({ updateOne: { filter: { _id: t._id }, update: { $set: set } } });
     }
-    if (bulkOps.length) await Task.bulkWrite(bulkOps);
+    if (persist && bulkOps.length) await Task.bulkWrite(bulkOps);
   } catch (err) { console.error('reconcileSocietyTasks error:', err); }
 };
 
@@ -87,7 +87,7 @@ router.get('/', auth, async (req, res) => {
     }
 
     const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 }).lean();
-    await reconcileSocietyTasks(tasks);
+    await reconcileSocietyTasks(tasks, { persist: !isGuestUser(req.user) });
     res.json({ tasks });
   } catch (err) {
     console.error('Get tasks error:', err);
@@ -110,7 +110,7 @@ router.get('/stats', auth, async (req, res) => {
     }
 
     const tasks = await Task.find(filter).lean();
-    await reconcileSocietyTasks(tasks);
+    await reconcileSocietyTasks(tasks, { persist: !isGuestUser(req.user) });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -149,7 +149,7 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // POST /api/tasks — create a new task
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { title, date, startTime, duration, category, priority, spoc, spocColor, notes, sourceType, sourceId, deadline } = req.body;
     if (!title || !date || !startTime) {
@@ -197,7 +197,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // PUT /api/tasks/:id — update a task
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
@@ -254,7 +254,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // DELETE /api/tasks/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });
@@ -266,7 +266,7 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // PATCH /api/tasks/:id/toggle — toggle completed
-router.patch('/:id/toggle', auth, async (req, res) => {
+router.patch('/:id/toggle', auth, denyGuest, async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: 'Task not found' });

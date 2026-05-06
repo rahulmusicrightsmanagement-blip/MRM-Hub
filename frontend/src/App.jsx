@@ -1,8 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { PicklistProvider } from './context/PicklistContext';
-import { DataCacheProvider } from './context/DataCacheContext';
+import { DataCacheProvider, useDataCache } from './context/DataCacheContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import SalesPipeline from './pages/SalesPipeline';
@@ -19,7 +20,7 @@ import PicklistManager from './pages/PicklistManager';
 import ClientChat from './pages/ClientChat';
 
 const ProtectedRoutes = () => {
-  const { user, loading, isFullAccess, hasRole } = useAuth();
+  const { user, loading, isFullAccess, isGuest, hasRole } = useAuth();
 
   if (loading) {
     return (
@@ -32,7 +33,9 @@ const ProtectedRoutes = () => {
   if (!user) return <Navigate to="/login" replace />;
 
   // Role-gated wrapper: redirects to "/" if user lacks access
+  // Guest users are allowed through for view-only access (backend denyGuest blocks writes)
   const Gate = ({ roles, fullOnly, children }) => {
+    if (isGuest) return children;
     if (fullOnly && !isFullAccess) return <Navigate to="/" replace />;
     if (roles && !isFullAccess && !roles.some((r) => hasRole(r))) return <Navigate to="/" replace />;
     return children;
@@ -138,6 +141,30 @@ const SessionTimeoutModal = () => {
   );
 };
 
+const GuestWriteBlockToast = () => {
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const handleBlocked = () => addToast('Guest users have view-only access', 'error');
+    window.addEventListener('mrm:guest-write-blocked', handleBlocked);
+    return () => window.removeEventListener('mrm:guest-write-blocked', handleBlocked);
+  }, [addToast]);
+
+  return null;
+};
+
+const RouteCacheRefresh = () => {
+  const location = useLocation();
+  const { refreshActive } = useDataCache();
+
+  useEffect(() => {
+    const timer = window.setTimeout(refreshActive, 0);
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, location.search, refreshActive]);
+
+  return null;
+};
+
 function App() {
   return (
     <Router>
@@ -145,6 +172,8 @@ function App() {
         <DataCacheProvider>
           <PicklistProvider>
             <ToastProvider>
+              <GuestWriteBlockToast />
+              <RouteCacheRefresh />
               <SessionTimeoutModal />
               <Routes>
                 <Route path="/login" element={<LoginGuard />} />

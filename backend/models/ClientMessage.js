@@ -5,6 +5,7 @@ const responseSchema = new mongoose.Schema(
     text: { type: String, required: true, trim: true },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: String, default: '' },
+    createdById: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { _id: true }
 );
@@ -25,12 +26,15 @@ const clientMessageSchema = new mongoose.Schema(
     assignedToId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     responses: { type: [responseSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    taskType: { type: String, enum: ['client', 'spoc'], default: 'client' },
+    priority: { type: String, enum: ['Low', 'Medium', 'High', 'Urgent'], default: 'Medium' },
   },
   { timestamps: true, collection: 'client_messages' }
 );
 
 // Force canonical Member.name + clientId link on save. clientId IS the memberId ref here.
 clientMessageSchema.pre('save', async function () {
+  if (this.taskType === 'spoc') return;
   if (this.isNew || this.isModified('clientName') || this.isModified('clientId')) {
     const resolveMember = require('../utils/resolveMember');
     let email = '';

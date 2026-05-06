@@ -5,19 +5,36 @@ const Lead = require('../models/Lead');
 const Member = require('../models/Member');
 const Task = require('../models/Task');
 const SocietyRegistration = require('../models/SocietyRegistration');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest, isGuestUser } = require('../middleware/auth');
 const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFile, deleteFile } = require('../utils/gdrive');
 const notify = require('../utils/notify');
+const resolveMember = require('../utils/resolveMember');
 
-// Reconcile onboarding selectedSocieties against actual SocietyRegistration entries
+// Reconcile onboarding selectedSocieties against actual SocietyRegistration entries.
+// Uses Member alias-aware matching so name drift doesn't cause silent data loss.
 const reconcileSelectedSocieties = async (entry) => {
   try {
     if (!entry || !Array.isArray(entry.selectedSocieties) || entry.selectedSocieties.length === 0) return entry;
-    const reg = await SocietyRegistration.findOne({ name: entry.name });
-    const validKeys = reg
-      ? (reg.societies instanceof Map ? Array.from(reg.societies.keys()) : Object.keys(reg.societies || {}))
-      : [];
+
+    // 1) Try exact name match first
+    let reg = await SocietyRegistration.findOne({ name: entry.name });
+
+    // 2) If no exact match, resolve through Member aliases
+    if (!reg) {
+      const hit = await resolveMember({ email: entry.email, name: entry.name });
+      if (hit) {
+        reg = await SocietyRegistration.findOne({ name: hit.name });
+      }
+    }
+
+    // 3) If still no registration found, leave selectedSocieties as-is
+    //    (don't strip them — the registration may exist under a different name we can't resolve)
+    if (!reg) return entry;
+
+    const validKeys = reg.societies instanceof Map
+      ? Array.from(reg.societies.keys())
+      : Object.keys(reg.societies || {});
     const filtered = entry.selectedSocieties.filter((k) => validKeys.includes(k));
     if (filtered.length !== entry.selectedSocieties.length) {
       await OnboardingEntry.updateOne({ _id: entry._id }, { $set: { selectedSocieties: filtered } });
@@ -97,9 +114,9 @@ const ensureDocsMigration = async () => {
 /* ─── GET all entries ─── */
 router.get('/', auth, async (req, res) => {
   try {
-    await ensureDocsMigration();
+    if (!isGuestUser(req.user)) await ensureDocsMigration();
 
-    const filter = req.user.hasRole('admin') ? {} : { spoc: req.user.name };
+    const filter = req.user.isFullAccess() ? {} : { spoc: req.user.name };
     const entries = await OnboardingEntry.find(filter).sort({ createdAt: -1 }).lean();
 
     res.json({ entries });
@@ -110,7 +127,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 /* ─── POST create entry ─── */
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { name, role, email, phone, contractType, spoc, notes, priority, deadline } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
@@ -176,7 +193,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 /* ─── PUT update entry ─── */
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -303,7 +320,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 /* ─── DELETE entry ─── */
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findByIdAndDelete(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -318,7 +335,7 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 /* ─── NOT QUALIFIED — move linked lead to Sales NQ & delete onboarding entry ─── */
-router.post('/:id/not-qualified', auth, async (req, res) => {
+router.post('/:id/not-qualified', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -350,7 +367,7 @@ router.post('/:id/not-qualified', auth, async (req, res) => {
 });
 
 // POST /api/onboarding/restart/:leadId — restart onboarding from Sales Not Qualified
-router.post('/restart/:leadId', auth, async (req, res) => {
+router.post('/restart/:leadId', auth, denyGuest, async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.leadId);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -412,7 +429,7 @@ router.post('/restart/:leadId', auth, async (req, res) => {
    ═══════════════════════════════════════════════ */
 
 // POST /api/onboarding/:id/documents  — add a new document row
-router.post('/:id/documents', auth, async (req, res) => {
+router.post('/:id/documents', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -431,7 +448,7 @@ router.post('/:id/documents', auth, async (req, res) => {
 });
 
 // PUT /api/onboarding/:id/documents/:docId  — update flags
-router.put('/:id/documents/:docId', auth, async (req, res) => {
+router.put('/:id/documents/:docId', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -458,7 +475,7 @@ router.put('/:id/documents/:docId', auth, async (req, res) => {
 });
 
 // DELETE /api/onboarding/:id/documents/:docId  — remove a custom doc
-router.delete('/:id/documents/:docId', auth, async (req, res) => {
+router.delete('/:id/documents/:docId', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -476,7 +493,7 @@ router.delete('/:id/documents/:docId', auth, async (req, res) => {
 });
 
 // POST /api/onboarding/:id/documents/:docId/upload  — upload file for a document
-router.post('/:id/documents/:docId/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/documents/:docId/upload', auth, denyGuest, upload.single('file'), async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -528,7 +545,7 @@ router.post('/:id/documents/:docId/upload', auth, upload.single('file'), async (
    ═══════════════════════════════════════════════ */
 
 // POST /api/onboarding/:id/contract/upload  — upload signed contract
-router.post('/:id/contract/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/contract/upload', auth, denyGuest, upload.single('file'), async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -558,7 +575,7 @@ router.post('/:id/contract/upload', auth, upload.single('file'), async (req, res
    SUB-TASKS
    ═══════════════════════════════════════════════ */
 
-router.post('/:id/subtasks', auth, async (req, res) => {
+router.post('/:id/subtasks', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });
@@ -592,7 +609,7 @@ router.post('/:id/subtasks', auth, async (req, res) => {
   }
 });
 
-router.put('/:id/subtasks/:taskId', auth, async (req, res) => {
+router.put('/:id/subtasks/:taskId', auth, denyGuest, async (req, res) => {
   try {
     const entry = await OnboardingEntry.findById(req.params.id);
     if (!entry) return res.status(404).json({ message: 'Entry not found' });

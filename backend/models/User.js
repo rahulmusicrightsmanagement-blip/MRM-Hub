@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const VALID_ROLES = ['admin', 'lead', 'onboarding_manager', 'society_manager', 'music_work_manager'];
+const VALID_ROLES = ['admin', 'lead', 'onboarding_manager', 'society_manager', 'music_work_manager', 'guest'];
 
 const userSchema = new mongoose.Schema(
   {
@@ -26,9 +26,10 @@ const userSchema = new mongoose.Schema(
 
 // Virtual: backward-compat "role" getter (returns primary role)
 userSchema.virtual('role').get(function () {
-  if (this.roles.includes('admin')) return 'admin';
-  if (this.roles.includes('lead')) return 'lead';
-  return this.roles[0] || 'lead';
+  const roles = this.roles || [];
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('lead')) return 'lead';
+  return roles[0] || 'lead';
 });
 
 // Hash password before saving
@@ -63,9 +64,10 @@ userSchema.methods.hasAnyRole = function (roleList) {
   return roleList.some((r) => this.roles.includes(r));
 };
 
-// Helper: admin or lead = full access
+// Helper: admin, lead, or guest = full read access
 userSchema.methods.isFullAccess = function () {
-  return this.roles.includes('admin') || this.roles.includes('lead');
+  const roles = this.roles || [];
+  return roles.includes('admin') || roles.includes('lead') || (roles.length === 1 && roles[0] === 'guest');
 };
 
 const User = mongoose.model('User', userSchema);

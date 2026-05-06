@@ -1,6 +1,6 @@
 const express = require('express');
 const Notification = require('../models/Notification');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ router.get('/unread-count', auth, async (req, res) => {
 });
 
 // PUT /api/notifications/read-all (MUST be before /:id routes)
-router.put('/read-all', auth, async (req, res) => {
+router.put('/read-all', auth, denyGuest, async (req, res) => {
   try {
     await Notification.updateMany({ recipient: req.user._id, read: false }, { read: true });
     res.json({ message: 'All marked as read' });
@@ -42,7 +42,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // PUT /api/notifications/:id/read — mark one as read
-router.put('/:id/read', auth, async (req, res) => {
+router.put('/:id/read', auth, denyGuest, async (req, res) => {
   try {
     const notif = await Notification.findOneAndUpdate(
       { _id: req.params.id, recipient: req.user._id },
@@ -57,7 +57,7 @@ router.put('/:id/read', auth, async (req, res) => {
 });
 
 // DELETE /api/notifications/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
     res.json({ message: 'Deleted' });

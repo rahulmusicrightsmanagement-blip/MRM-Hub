@@ -2,7 +2,7 @@ const express = require('express');
 const Lead = require('../models/Lead');
 const Member = require('../models/Member');
 const Task = require('../models/Task');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest } = require('../middleware/auth');
 const notify = require('../utils/notify');
 
 const router = express.Router();
@@ -29,7 +29,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/leads
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { name, genre, email, phone, source, priority, spoc, notes, deadline } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
@@ -123,7 +123,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // PUT /api/leads/:id
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -192,7 +192,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // DELETE /api/leads/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const lead = await Lead.findByIdAndDelete(req.params.id);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -207,7 +207,7 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // POST /api/leads/:id/subtasks
-router.post('/:id/subtasks', auth, async (req, res) => {
+router.post('/:id/subtasks', auth, denyGuest, async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });
@@ -242,7 +242,7 @@ router.post('/:id/subtasks', auth, async (req, res) => {
 });
 
 // PUT /api/leads/:id/subtasks/:taskId
-router.put('/:id/subtasks/:taskId', auth, async (req, res) => {
+router.put('/:id/subtasks/:taskId', auth, denyGuest, async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id);
     if (!lead) return res.status(404).json({ message: 'Lead not found' });

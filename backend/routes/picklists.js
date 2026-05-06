@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Picklist = require('../models/Picklist');
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, denyGuest } = require('../middleware/auth');
 
 const SUPER_ADMIN_EMAIL = 'rahuljadhav0417@gmail.com';
 
@@ -97,7 +97,7 @@ router.get('/:category', auth, async (req, res) => {
 });
 
 // POST /api/picklists — add a new picklist item (admin only)
-router.post('/', auth, adminOnly, async (req, res) => {
+router.post('/', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const { category, categoryLabel, value, label, order, metadata } = req.body;
     if (!category || !value) return res.status(400).json({ message: 'category and value are required' });
@@ -124,7 +124,7 @@ router.post('/', auth, adminOnly, async (req, res) => {
 });
 
 // PUT /api/picklists/:id — update a picklist item (admin only)
-router.put('/:id', auth, adminOnly, async (req, res) => {
+router.put('/:id', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const { value, label, order, isActive } = req.body;
     const item = await Picklist.findById(req.params.id);
@@ -145,7 +145,7 @@ router.put('/:id', auth, adminOnly, async (req, res) => {
 });
 
 // DELETE /api/picklists/:id — only rahuljadhav0417@gmail.com can delete
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     if (req.user.email !== SUPER_ADMIN_EMAIL) {
       return res.status(403).json({ message: 'Only the super admin can delete picklist items' });
@@ -159,7 +159,7 @@ router.delete('/:id', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/picklists/seed-defaults — seed default values for all categories (admin only)
-router.post('/seed-defaults', auth, adminOnly, async (req, res) => {
+router.post('/seed-defaults', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const { category } = req.body; // optional: seed only one category
 

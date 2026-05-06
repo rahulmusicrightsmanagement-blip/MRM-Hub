@@ -5,7 +5,7 @@ const OnboardingEntry = require('../models/OnboardingEntry');
 const SocietyRegistration = require('../models/SocietyRegistration');
 const Royalty = require('../models/Royalty');
 const ClientMessage = require('../models/ClientMessage');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest } = require('../middleware/auth');
 const { checkMemberUnique, conflictMessage } = require('../utils/memberUnique');
 
 const router = express.Router();
@@ -49,7 +49,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/members
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { name, role, email, phone, genre, languages, bio, spoc, panCard, aadhaar, dateOfFirstContact, deadline, leadSource, priority, isReferred, referredBy, referralCommission, clientNumber } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
@@ -138,7 +138,7 @@ router.get('/:id/profile', auth, async (req, res) => {
 });
 
 // PUT /api/members/:id
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });
@@ -280,7 +280,7 @@ router.put('/:id', auth, async (req, res) => {
 
 // POST /api/members/:id/sync-name — one-shot backfill for related records
 // Body: { previousName? } — optional alias to add before syncing
-router.post('/:id/sync-name', auth, async (req, res) => {
+router.post('/:id/sync-name', auth, denyGuest, async (req, res) => {
   try {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });
@@ -359,7 +359,7 @@ router.post('/:id/sync-name', auth, async (req, res) => {
 });
 
 // DELETE /api/members/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const member = await Member.findByIdAndDelete(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });
@@ -370,7 +370,7 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // POST /api/members/:id/subtasks
-router.post('/:id/subtasks', auth, async (req, res) => {
+router.post('/:id/subtasks', auth, denyGuest, async (req, res) => {
   try {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });
@@ -384,7 +384,7 @@ router.post('/:id/subtasks', auth, async (req, res) => {
 });
 
 // PUT /api/members/:id/subtasks/:taskId
-router.put('/:id/subtasks/:taskId', auth, async (req, res) => {
+router.put('/:id/subtasks/:taskId', auth, denyGuest, async (req, res) => {
   try {
     const member = await Member.findById(req.params.id);
     if (!member) return res.status(404).json({ message: 'Member not found' });

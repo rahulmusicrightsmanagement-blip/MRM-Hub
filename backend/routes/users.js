@@ -3,7 +3,7 @@ const speakeasy = require('speakeasy');
 const QRCode = require('qrcode');
 const User = require('../models/User');
 const { VALID_ROLES } = require('../models/User');
-const { auth, adminOnly, fullAccessOnly } = require('../middleware/auth');
+const { auth, adminOnly, fullAccessOnly, denyGuest } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -34,7 +34,7 @@ router.get('/', auth, fullAccessOnly, async (req, res) => {
 });
 
 // POST /api/users — create a new SPOC (admin & lead only)
-router.post('/', auth, fullAccessOnly, async (req, res) => {
+router.post('/', auth, denyGuest, fullAccessOnly, async (req, res) => {
   try {
     const { name, email, password, roles, phone, department } = req.body;
 
@@ -85,7 +85,7 @@ router.post('/', auth, fullAccessOnly, async (req, res) => {
 });
 
 // GET /api/users/:id/totp-qr — get QR code for existing user (admin only)
-router.get('/:id/totp-qr', auth, adminOnly, async (req, res) => {
+router.get('/:id/totp-qr', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -119,7 +119,7 @@ router.get('/:id/totp-qr', auth, adminOnly, async (req, res) => {
 });
 
 // POST /api/users/:id/reset-totp — regenerate TOTP secret (admin only)
-router.post('/:id/reset-totp', auth, adminOnly, async (req, res) => {
+router.post('/:id/reset-totp', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -141,7 +141,7 @@ router.post('/:id/reset-totp', auth, adminOnly, async (req, res) => {
 });
 
 // PUT /api/users/:id — update a SPOC (admin only)
-router.put('/:id', auth, adminOnly, async (req, res) => {
+router.put('/:id', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     const { name, email, role, phone, department, password, isActive } = req.body;
     const user = await User.findById(req.params.id);
@@ -180,7 +180,7 @@ router.put('/:id', auth, adminOnly, async (req, res) => {
 });
 
 // DELETE /api/users/:id — delete a SPOC (admin only)
-router.delete('/:id', auth, adminOnly, async (req, res) => {
+router.delete('/:id', auth, denyGuest, adminOnly, async (req, res) => {
   try {
     // Prevent deleting yourself
     if (req.user._id.toString() === req.params.id) {

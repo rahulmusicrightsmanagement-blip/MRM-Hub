@@ -65,6 +65,7 @@ const TripleToggle = ({ value, onChange }) => {
    ═══════════════════════════════════════════════════════ */
 const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, token, readOnly = false, notAssigned = false }) => {
   const { addToast } = useToast();
+  const { isGuest } = useAuth();
   const [localSteps, setLocalSteps] = useState(steps || {});
   const [newRemark, setNewRemark] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -85,6 +86,10 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   }, [steps]);
 
   const saveStep = async (key, value) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     const updated = { ...localSteps, [key]: value };
     setLocalSteps(updated);
     try {
@@ -96,6 +101,10 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   };
 
   const saveLoginField = async (field, value) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     const updated = { ...localSteps, [field]: value };
     setLocalSteps(updated);
     dirtyFieldsRef.current.delete(field);
@@ -116,6 +125,10 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   };
 
   const uploadFile = async (file, stepKey) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
@@ -135,6 +148,10 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   };
 
   const addRemark = async () => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     if (!newRemark.trim()) return;
     try {
       const res = await authFetch(`/api/societyregs/${regId}/remarks`, { method: 'POST', body: JSON.stringify({ society: societyKey, text: newRemark.trim() }) });
@@ -145,6 +162,10 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   };
 
   const deleteRemark = async (remarkId) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     try {
       const res = await authFetch(`/api/societyregs/${regId}/remarks`, {
         method: 'DELETE',
@@ -437,10 +458,16 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
    Member Detail Modal — shows all 12 societies with expand for steps
    ═══════════════════════════════════════════════════════ */
 const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUpdated, onDelete, onRename, teamMembers, authFetch, token }) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getItems } = usePicklist();
   const SOCIETIES = getItems('societies').map((i) => ({ key: i.value, name: i.label, flag: i.metadata?.flag || '🌍' }));
+
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
 
   const isAssignedToSoc = (socKey) => {
     if (isAdmin) return true;
@@ -465,6 +492,10 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   };
 
   const handleUpdateDeadline = async (socKey, deadline) => {
+    if (blockGuestAction()) {
+      setEditingDeadline(null);
+      return;
+    }
     try {
       const res = await authFetch(`/api/societyregs/${member._id}`, {
         method: 'PUT',
@@ -495,6 +526,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   };
 
   const handleAssign = async (socKey) => {
+    if (blockGuestAction()) return;
     const tm = teamMembers.find((m) => m.name === assignForm.spoc);
     if (!tm) return;
     setActionLoading(socKey);
@@ -505,6 +537,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   };
 
   const handleDone = async (socKey) => {
+    if (blockGuestAction()) return;
     setActionLoading(socKey);
     await onMarkDone(member._id || member.name, socKey);
     setConfirmDone(null);
@@ -512,6 +545,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
   };
 
   const handleDeleteSoc = async (socKey) => {
+    if (blockGuestAction()) return;
     setActionLoading(socKey);
     try {
       const res = await authFetch(`/api/societyregs/${member._id}/society`, {
@@ -535,11 +569,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '12px' }}>
             {!confirmDelete ? (
-              <Trash2 style={{ width: '18px', height: '18px', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }} onClick={() => setConfirmDelete(true)} title="Delete registration" />
+              <Trash2 style={{ width: '18px', height: '18px', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }} onClick={() => { if (blockGuestAction()) return; setConfirmDelete(true); }} title="Delete registration" />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '12px', color: '#fca5a5' }}>Delete?</span>
-                <button onClick={() => { onDelete(member._id); onClose(); }} style={{ padding: '3px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Yes</button>
+                <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '3px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Yes</button>
                 <button onClick={() => setConfirmDelete(false)} style={{ padding: '3px 10px', borderRadius: '6px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '11px', cursor: 'pointer' }}>No</button>
               </div>
             )}
@@ -588,7 +622,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       <StatusBadge status={status} isOverdue={status === 'In Progress' && dlColor && dlColor.label === 'Overdue'} />
 
                       {(status === 'Not Started' || status === 'N/A') && (
-                        <button onClick={() => { setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
+                        <button onClick={() => { if (blockGuestAction()) return; setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
                           style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                           Assign
                         </button>
@@ -601,13 +635,14 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             {isExpanded ? 'Close' : 'View'}
                           </button>
                           <button onClick={() => {
+                            if (blockGuestAction()) return;
                             if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                             setConfirmDone(isConfirmingDone ? null : soc.key); setExpandedKey(null); setAssigningKey(null);
                           }} disabled={isLoading}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#34d399', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             Done
                           </button>
-                          <button onClick={() => { setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
+                          <button onClick={() => { if (blockGuestAction()) return; setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
                             ✕
                           </button>
@@ -620,11 +655,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             style={{ fontSize: '12px', fontWeight: 600, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isExpanded && !isEditingRegistered ? 'Close' : 'View'}
                           </button>
-                          <button onClick={() => { setExpandedKey(soc.key); setEditingRegistered(isEditingRegistered ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
+                          <button onClick={() => { if (blockGuestAction()) return; setExpandedKey(soc.key); setEditingRegistered(isEditingRegistered ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
                             style={{ fontSize: '12px', fontWeight: 600, color: isEditingRegistered ? '#f97316' : '#818cf8', background: isEditingRegistered ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${isEditingRegistered ? 'rgba(249,115,22,0.3)' : 'rgba(99,102,241,0.3)'}`, borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isEditingRegistered ? 'Done Editing' : 'Edit'}
                           </button>
-                          <button onClick={() => { setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
+                          <button onClick={() => { if (blockGuestAction()) return; setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
                             style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
                             ✕
                           </button>
@@ -670,6 +705,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                           <span
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (blockGuestAction()) return;
                               if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                               setEditingDeadline(soc.key);
                             }}
@@ -682,6 +718,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (blockGuestAction()) return;
                               if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                               setEditingDeadline(soc.key);
                             }}
@@ -735,8 +772,8 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       onUpdated={onUpdated}
                       authFetch={authFetch}
                       token={token}
-                      readOnly={(status === 'Registered' && !isEditingRegistered) || (status !== 'Registered' && !isAssignedToSoc(soc.key))}
-                      notAssigned={status !== 'Registered' && !isAssignedToSoc(soc.key)}
+                      readOnly={isGuest || (status === 'Registered' && !isEditingRegistered) || (status !== 'Registered' && !isAssignedToSoc(soc.key))}
+                      notAssigned={!isGuest && status !== 'Registered' && !isAssignedToSoc(soc.key)}
                     />
                   )}
 
@@ -789,7 +826,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
    Main Society Registration Page
    ═══════════════════════════════════════════════════════ */
 const SocietyReg = () => {
-  const { authFetch, token } = useAuth();
+  const { authFetch, token, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getItems } = usePicklist();
   const { setCached } = useDataCache();
@@ -888,6 +925,10 @@ const SocietyReg = () => {
   };
 
   const handleAssignAndStart = async (memberId, societyKey, teamMember, deadline, startDate) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     try {
       const reg = members.find((m) => m._id === memberId || m.name === memberId);
       if (!reg) return;
@@ -904,6 +945,10 @@ const SocietyReg = () => {
   };
 
   const handleMarkDone = async (memberId, societyKey) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     try {
       const reg = members.find((m) => m._id === memberId || m.name === memberId);
       if (!reg) return;
@@ -915,6 +960,10 @@ const SocietyReg = () => {
   };
 
   const handleDeleteMember = async (id) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     try {
       const res = await authFetch(`/api/societyregs/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -926,6 +975,10 @@ const SocietyReg = () => {
   };
 
   const handleRenameMember = async (id, newName) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     try {
       const res = await authFetch(`/api/societyregs/${id}/rename`, { method: 'PUT', body: JSON.stringify({ name: newName }) });
       const data = await res.json();

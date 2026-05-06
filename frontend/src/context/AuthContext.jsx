@@ -116,6 +116,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const authFetch = async (url, options = {}) => {
+    const roles = user?.roles || [];
+    const guestOnly = roles.length === 1 && roles[0] === 'guest';
+    const method = String(options.method || 'GET').toUpperCase();
+    const isWrite = options.body !== undefined || !['GET', 'HEAD', 'OPTIONS'].includes(method);
+    if (guestOnly && isWrite) {
+      window.dispatchEvent(new CustomEvent('mrm:guest-write-blocked'));
+      return new Response(JSON.stringify({ message: 'Guest users have view-only access' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const headers = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
@@ -126,6 +138,9 @@ export const AuthProvider = ({ children }) => {
       logout();
       throw new Error('Session expired');
     }
+    if (res.ok && isWrite) {
+      window.dispatchEvent(new CustomEvent('mrm:data-mutated', { detail: { url, method } }));
+    }
     return res;
   };
 
@@ -134,10 +149,11 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = user?.roles?.includes('admin') || false;
   const isLead = user?.roles?.includes('lead') || false;
   const isFullAccess = isAdmin || isLead;
+  const isGuest = (user?.roles?.length === 1 && user?.roles?.[0] === 'guest') || false;
   const hasRole = (role) => user?.roles?.includes(role) || false;
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, authFetch, isAdmin, isLead, isFullAccess, hasRole, sessionExpired, dismissSessionExpired }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, authFetch, isAdmin, isLead, isFullAccess, isGuest, hasRole, sessionExpired, dismissSessionExpired }}>
       {children}
     </AuthContext.Provider>
   );

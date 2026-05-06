@@ -46,6 +46,7 @@ const labelStyle = {
 
 /* ────────── Month Row ────────── */
 const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, addToast }) => {
+  const { isGuest } = useAuth();
   const hasFile = !!data?.fileName;
   const hasData = (data?.totalSongs || 0) + (data?.totalBGMMovies || 0) + (data?.totalTVBGM || 0) + (data?.totalTVBGMEpisode || 0) > 0;
   // Summary row only shows when there are actual counts saved; file alone doesn't count
@@ -64,6 +65,12 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
   // Start in edit mode unless count data is already saved (file upload alone doesn't lock to view)
   const [editing, setEditing] = useState(!hasData);
 
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
+
   useEffect(() => {
     setForm({
       totalSongs: data?.totalSongs || '',
@@ -78,6 +85,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
   }, [data]);
 
   const handleSave = async () => {
+    if (blockGuestAction()) return;
     setSaving(true);
     try {
       const res = await authFetch(`/api/royalty/${clientId}/months`, {
@@ -99,6 +107,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
   };
 
   const handleToggleReceived = async (val) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/royalty/${clientId}/months`, {
         method: 'PUT',
@@ -112,12 +121,17 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
   };
 
   const handleFileSelect = (e) => {
+    if (blockGuestAction()) {
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) setStagedFile(file);
     e.target.value = '';
   };
 
   const handleUploadToDrive = async () => {
+    if (blockGuestAction()) return;
     if (!stagedFile) return;
     setUploading(true);
     try {
@@ -301,7 +315,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             {!editing ? (
               <button
-                onClick={() => setEditing(true)}
+                onClick={() => { if (blockGuestAction()) return; setEditing(true); }}
                 style={{
                   padding: '8px 20px', background: '#2a3050', border: '1px solid #3a4060', borderRadius: '8px',
                   color: '#60a5fa', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
@@ -386,13 +400,21 @@ const YearSection = ({ clientId, yearData, authFetch, token, onUpdate, addToast 
 
 /* ────────── Client Detail Modal ────────── */
 const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToast }) => {
+  const { isGuest } = useAuth();
   const [addingYear, setAddingYear] = useState(null); // 'above' | 'below' | null
 
   const sortedYears = [...(client.years || [])].sort((a, b) => a.year - b.year);
   const minYear = sortedYears.length > 0 ? sortedYears[0].year : new Date().getFullYear();
   const maxYear = sortedYears.length > 0 ? sortedYears[sortedYears.length - 1].year : new Date().getFullYear();
 
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
+
   const handleAddYear = async (year) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/royalty/${client._id}/years`, {
         method: 'POST',
@@ -412,6 +434,7 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
   };
 
   const setDocumentsReceived = async (val) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/royalty/${client._id}`, {
         method: 'PUT',
@@ -428,12 +451,17 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
   const [stagedDocFile, setStagedDocFile] = useState(null);
 
   const handleDocFileSelect = (e) => {
+    if (blockGuestAction()) {
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) setStagedDocFile(file);
     e.target.value = '';
   };
 
   const handleDocUploadToDrive = async () => {
+    if (blockGuestAction()) return;
     if (!stagedDocFile) return;
     setDocUploading(true);
     try {
@@ -638,7 +666,7 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
    MAIN ROYALTY PAGE
    ════════════════════════════════════════════ */
 const Royalty = () => {
-  const { authFetch, token } = useAuth();
+  const { authFetch, token, isGuest } = useAuth();
   const { addToast } = useToast();
   const { setCached, invalidate } = useDataCache();
   const [selectedClient, setSelectedClient] = useState(null);
@@ -736,7 +764,14 @@ const Royalty = () => {
     onMissing: () => addToast('This music works client is no longer available.', 'error'),
   });
 
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
+
   const handleAddClient = async (entry) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch('/api/royalty', {
         method: 'POST',
@@ -760,6 +795,7 @@ const Royalty = () => {
   };
 
   const handleDeleteClient = async (clientId) => {
+    if (blockGuestAction()) return;
     try {
       await authFetch(`/api/royalty/${clientId}`, { method: 'DELETE' });
       setClients((prev) => prev.filter((c) => c._id !== clientId));
@@ -820,7 +856,7 @@ const Royalty = () => {
           </p>
         </div>
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }}
           style={{
             display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px',
             background: 'linear-gradient(135deg, #22c55e, #16a34a)', border: 'none',
@@ -919,7 +955,7 @@ const Royalty = () => {
                     {client.clientEmail && <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientEmail}</p>}
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); if (confirm('Delete this client?')) handleDeleteClient(client._id); }}
+                    onClick={(e) => { e.stopPropagation(); if (blockGuestAction()) return; if (confirm('Delete this client?')) handleDeleteClient(client._id); }}
                     style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px' }}
                   >
                     <Trash2 size={14} />

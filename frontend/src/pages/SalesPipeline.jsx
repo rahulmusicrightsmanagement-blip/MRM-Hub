@@ -1027,7 +1027,7 @@ const LeadCard = ({ lead, onClick }) => {
    MAIN SALES PIPELINE PAGE
    ═══════════════════════════════════════════ */
 const SalesPipeline = () => {
-  const { authFetch } = useAuth();
+  const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const { setCached, invalidate } = useDataCache();
@@ -1036,6 +1036,12 @@ const SalesPipeline = () => {
   const [selectedLead, setSelectedLead] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebouncedValue(searchQuery, 250);
+
+  const blockGuestAction = useCallback(() => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  }, [isGuest, addToast]);
 
   const leadsQ = useCachedFetch('leads:list', async () => {
     const r = await authFetch('/api/leads');
@@ -1073,6 +1079,7 @@ const SalesPipeline = () => {
   });
 
   const handleAddLead = async (form) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch('/api/leads', { method: 'POST', body: JSON.stringify(form) });
       const data = await res.json();
@@ -1087,6 +1094,7 @@ const SalesPipeline = () => {
   };
 
   const handleDeleteLead = async (leadId) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/leads/${leadId}`, { method: 'DELETE' });
       if (res.ok) { setLeads((p) => p.filter((l) => l._id !== leadId)); addToast('Lead deleted'); }
@@ -1095,6 +1103,7 @@ const SalesPipeline = () => {
   };
 
   const handleMoveNext = async (leadId) => {
+    if (blockGuestAction()) return;
     const lead = leads.find((l) => l._id === leadId);
     if (!lead) return;
     const idx = STAGES.indexOf(lead.stage);
@@ -1108,6 +1117,7 @@ const SalesPipeline = () => {
   };
 
   const handleUpdateLead = useCallback(async (leadId, fields) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify(fields) });
       const data = await res.json();
@@ -1116,9 +1126,10 @@ const SalesPipeline = () => {
         setSelectedLead((prev) => (prev && prev._id === leadId ? data.lead : prev));
       } else addToast('Failed to update lead', 'error');
     } catch (err) { console.error('Failed to update lead:', err); addToast('Failed to update lead', 'error'); }
-  }, [authFetch, addToast]);
+  }, [authFetch, addToast, blockGuestAction]);
 
   const handleToggleSubtask = async (leadId, taskId, done) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/leads/${leadId}/subtasks/${taskId}`, { method: 'PUT', body: JSON.stringify({ done }) });
       const data = await res.json();
@@ -1130,6 +1141,7 @@ const SalesPipeline = () => {
   };
 
   const handleAddSubtask = async (leadId, text, assignee) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/leads/${leadId}/subtasks`, { method: 'POST', body: JSON.stringify({ text, assignee }) });
       const data = await res.json();
@@ -1142,6 +1154,7 @@ const SalesPipeline = () => {
   };
 
   const handleMoveToOnboarding = async (lead, opts) => {
+    if (blockGuestAction()) return;
     try {
       // Create onboarding entry from the qualified lead
       const res = await authFetch('/api/onboarding', {
@@ -1180,6 +1193,7 @@ const SalesPipeline = () => {
   };
 
   const handleMarkNotQualified = async (leadId, reason) => {
+    if (blockGuestAction()) return;
     const lead = leads.find((l) => l._id === leadId);
     if (!lead) return;
     try {
@@ -1196,6 +1210,7 @@ const SalesPipeline = () => {
   };
 
   const handleRevertLead = async (leadId) => {
+    if (blockGuestAction()) return;
     const lead = leads.find((l) => l._id === leadId);
     if (!lead || !lead.previousStage) return;
     try {
@@ -1212,6 +1227,7 @@ const SalesPipeline = () => {
   };
 
   const handleRestartOnboarding = async (leadId) => {
+    if (blockGuestAction()) return;
     const lead = leads.find((l) => l._id === leadId);
     if (!lead) return;
     try {
@@ -1256,7 +1272,7 @@ const SalesPipeline = () => {
                 style={{ width: '220px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
               />
             </div>
-            <button type="button" onClick={() => setShowAddModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
+            <button type="button" onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
               <Plus style={{ width: '16px', height: '16px' }} /> New Lead
             </button>
           </div>

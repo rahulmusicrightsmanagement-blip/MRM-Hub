@@ -31,9 +31,10 @@ const navItems = [
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user, logout, isFullAccess, hasRole } = useAuth();
+  const { user, logout, isFullAccess, isGuest, hasRole } = useAuth();
 
   const visibleItems = navItems.filter((item) => {
+    if (isGuest) return true; // guests can view all pages
     if (item.fullAccessOnly) return isFullAccess;
     if (item.adminOnly) return hasRole('admin');
     return true;
@@ -48,8 +49,8 @@ const Sidebar = () => {
         .toUpperCase()
     : 'U';
 
-  const avatarColor =
-    user?.roles?.includes('admin') ? '#7c3aed' : user?.roles?.includes('lead') ? '#2563eb' : '#059669';
+  const avatarColor = isGuest ? '#6b7280'
+    : user?.roles?.includes('admin') ? '#7c3aed' : user?.roles?.includes('lead') ? '#2563eb' : '#059669';
 
   return (
     <aside
@@ -127,6 +128,25 @@ const Sidebar = () => {
           );
         })}
       </nav>
+
+      {/* Guest view-only banner */}
+      {isGuest && (
+        <div
+          style={{
+            margin: '0 12px 4px',
+            padding: '8px 12px',
+            background: 'rgba(107,114,128,0.12)',
+            border: '1px solid rgba(107,114,128,0.25)',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>👁️</span>
+          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>View-only access</span>
+        </div>
+      )}
 
       {/* User Profile + Logout */}
       <div

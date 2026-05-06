@@ -267,7 +267,7 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
   const [adding, setAdding] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [docNumbers, setDocNumbers] = useState({});
-  const { authFetch, token } = useAuth();
+  const { authFetch, token, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const docTypeSuggestions = getOptions('document_types');
@@ -306,6 +306,10 @@ const KYCVerificationView = ({ entry, onUpdate }) => {
   };
 
   const uploadFile = async (docId, file) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     setUploading((p) => ({ ...p, [docId]: true }));
     try {
       const fd = new FormData();
@@ -493,7 +497,7 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   const [renewalType, setRenewalType] = useState(entry.renewalType || '');
   const [renewalRemarks, setRenewalRemarks] = useState(entry.renewalRemarks || '');
   const [assignModalSociety, setAssignModalSociety] = useState(null);
-  const { authFetch, token } = useAuth();
+  const { authFetch, token, isGuest } = useAuth();
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -517,6 +521,10 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
   };
 
   const uploadContract = async (file) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
@@ -545,6 +553,10 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
 
   /* Toggle a society in the checklist — if ticking ON, open the assign modal */
   const handleSocietyToggle = (soc) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      return;
+    }
     if (selectedSocieties.includes(soc.key)) return; // Already assigned — locked
     // Ticking ON — open assign modal
     setAssignModalSociety(soc);
@@ -552,6 +564,11 @@ const ContractSigningView = ({ entry, onUpdate, teamMembers }) => {
 
   /* Confirm assign → save society selection + create society registration */
   const handleAssignConfirm = async ({ spoc, notes, startDate, deadline }) => {
+    if (isGuest) {
+      addToast('Guest users have view-only access', 'error');
+      setAssignModalSociety(null);
+      return;
+    }
     const soc = assignModalSociety;
     setAssignModalSociety(null);
     try {
@@ -1217,7 +1234,7 @@ const AddOnboardingModal = ({ onClose, onAdd, teamMembers, members, initialData 
    Detail Modal
    ═══════════════════════════════════════════════════════ */
 const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, onMoveStage, onNotQualified, teamMembers }) => {
-  const { authFetch } = useAuth();
+  const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const STAGES = getOptions('onboarding_stage');
@@ -1230,7 +1247,14 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
   const isCompleted = member.stage === 'Completed';
   const canAdvance = currentStageIdx >= 0 && currentStageIdx < STAGES.length - 2 && !isCompleted;
 
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
+
   const saveProgress = async () => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/onboarding/${member._id}`, {
         method: 'PUT',
@@ -1265,8 +1289,8 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
         <div style={{ padding: '24px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>Onboarding Details</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => onEdit(member)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><Edit3 style={{ width: '18px', height: '18px' }} /></button>
-            <button onClick={() => setConfirmDelete(true)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 style={{ width: '18px', height: '18px' }} /></button>
+            <button onClick={() => { if (blockGuestAction()) return; onEdit(member); }} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><Edit3 style={{ width: '18px', height: '18px' }} /></button>
+            <button onClick={() => { if (blockGuestAction()) return; setConfirmDelete(true); }} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 style={{ width: '18px', height: '18px' }} /></button>
             <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
           </div>
         </div>
@@ -1278,7 +1302,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
               <span style={{ fontSize: '13px', color: '#fca5a5' }}>Delete this entry permanently?</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button onClick={() => setConfirmDelete(false)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-                <button onClick={() => { onDelete(member._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
               </div>
             </div>
           </div>
@@ -1380,7 +1404,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button onClick={() => { setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
                 <button
-                  onClick={() => { onNotQualified(member._id, notQualifiedReason); setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }}
+                  onClick={() => { if (blockGuestAction()) return; onNotQualified(member._id, notQualifiedReason); setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }}
                   style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <XCircle style={{ width: '14px', height: '14px' }} /> Confirm Not Qualified
@@ -1392,13 +1416,13 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
           {/* Row 1 — secondary: Move to Stage + Not Qualified */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowMoveStage(!showMoveStage)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => { if (blockGuestAction()) return; setShowMoveStage(!showMoveStage); }} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 Move to Stage <ChevronDown style={{ width: '14px', height: '14px' }} />
               </button>
               {showMoveStage && (
                 <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '4px', background: '#1a1e2e', border: '1px solid #2d3348', borderRadius: '8px', overflow: 'hidden', zIndex: 20, minWidth: '200px' }}>
                   {STAGES.filter((s) => s !== member.stage).map((s) => (
-                    <div key={s} onClick={() => { onMoveStage(member._id, s); setShowMoveStage(false); }}
+                    <div key={s} onClick={() => { if (blockGuestAction()) return; onMoveStage(member._id, s); setShowMoveStage(false); }}
                       style={{ padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '13px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = '#1e2540')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStageDotColor(s, STAGES) }} />
@@ -1409,7 +1433,7 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
               )}
             </div>
             {!isCompleted && (
-              <button onClick={() => setShowNotQualifiedConfirm(true)} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #991b1b', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => { if (blockGuestAction()) return; setShowNotQualifiedConfirm(true); }} style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #991b1b', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <XCircle style={{ width: '15px', height: '15px' }} /> Not Qualified
               </button>
             )}
@@ -1422,13 +1446,13 @@ const OnboardingDetailModal = ({ member, onClose, onUpdate, onDelete, onEdit, on
                 {savedFlash ? <><CheckCircle style={{ width: '16px', height: '16px' }} /> Saved!</> : <><Save style={{ width: '16px', height: '16px' }} /> Save Progress</>}
               </button>
               {canAdvance && (
-                <button onClick={() => { onMoveStage(member._id, STAGES[currentStageIdx + 1]); }}
+                <button onClick={() => { if (blockGuestAction()) return; onMoveStage(member._id, STAGES[currentStageIdx + 1]); }}
                   style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   Advance Stage <ArrowRight style={{ width: '16px', height: '16px' }} />
                 </button>
               )}
               {!canAdvance && currentStageIdx === STAGES.indexOf('Contact Made') && (
-                <button onClick={() => { onMoveStage(member._id, 'Completed'); }} style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button onClick={() => { if (blockGuestAction()) return; onMoveStage(member._id, 'Completed'); }} style={{ padding: '10px 22px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CheckCircle style={{ width: '16px', height: '16px' }} /> Onboarding Complete
                 </button>
               )}
@@ -1483,7 +1507,7 @@ const MemberCard = ({ member, onClick }) => {
    Main Page
    ═══════════════════════════════════════════════════════ */
 const Onboarding = () => {
-  const { authFetch } = useAuth();
+  const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const { setCached, invalidate } = useDataCache();
@@ -1492,6 +1516,12 @@ const Onboarding = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebouncedValue(searchQuery, 250);
+
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
 
   const entriesQ = useCachedFetch('onboarding:list', async () => {
     const r = await authFetch('/api/onboarding');
@@ -1530,6 +1560,7 @@ const Onboarding = () => {
 
   /* CRUD helpers */
   const handleAddEntry = async (form) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch('/api/onboarding', { method: 'POST', body: JSON.stringify(form) });
       const data = await res.json();
@@ -1539,6 +1570,7 @@ const Onboarding = () => {
   };
 
   const handleEditEntry = (entry) => {
+    if (blockGuestAction()) return;
     setSelectedMember(null);
     setEditingEntry({
       _id: entry._id, name: entry.name, role: Array.isArray(entry.role) ? entry.role : [], email: entry.email,
@@ -1548,6 +1580,7 @@ const Onboarding = () => {
   };
 
   const handleEditSubmit = async (form) => {
+    if (blockGuestAction()) return;
     if (!editingEntry) return;
     try {
       const res = await authFetch(`/api/onboarding/${editingEntry._id}`, { method: 'PUT', body: JSON.stringify(form) });
@@ -1564,6 +1597,7 @@ const Onboarding = () => {
   };
 
   const handleDeleteEntry = async (entryId) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/onboarding/${entryId}`, { method: 'DELETE' });
       if (res.ok) { setEntries((p) => p.filter((e) => e._id !== entryId)); addToast('Entry deleted'); }
@@ -1572,6 +1606,7 @@ const Onboarding = () => {
   };
 
   const handleMoveStage = async (entryId, newStage) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/onboarding/${entryId}`, { method: 'PUT', body: JSON.stringify({ stage: newStage }) });
       const data = await res.json();
@@ -1584,6 +1619,7 @@ const Onboarding = () => {
   };
 
   const handleNotQualified = async (entryId, reason) => {
+    if (blockGuestAction()) return;
     try {
       const res = await authFetch(`/api/onboarding/${entryId}/not-qualified`, {
         method: 'POST',

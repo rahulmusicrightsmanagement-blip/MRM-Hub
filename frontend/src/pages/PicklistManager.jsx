@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { withApiBase } from '../utils/api';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 
 const SUPER_ADMIN_EMAIL = 'rahuljadhav0417@gmail.com';
 
@@ -57,6 +58,7 @@ const CATEGORIES = [
 const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRefresh }) => {
   const { getItems } = usePicklist();
   const { addToast } = useToast();
+  const { guardAction, blockGuestAction } = useGuestGuard();
   const items = getItems(categoryKey);
 
   const [expanded, setExpanded] = useState(false);
@@ -69,6 +71,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 
   const handleAdd = async () => {
+    if (blockGuestAction()) return;
     if (!newValue.trim()) return;
     setLoading(true);
     try {
@@ -91,6 +94,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
   };
 
   const handleEdit = async (id) => {
+    if (blockGuestAction()) return;
     if (!editValue.trim()) return;
     setLoading(true);
     try {
@@ -112,6 +116,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
   };
 
   const handleMove = async (index, direction) => {
+    if (blockGuestAction()) return;
     const dbItems = items.filter((i) => i._id);
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= dbItems.length) return;
@@ -141,6 +146,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
   };
 
   const handleDelete = async (id, value) => {
+    if (blockGuestAction()) return;
     if (!window.confirm(`Delete "${value}" from ${categoryLabel}?`)) return;
     setLoading(true);
     try {
@@ -160,6 +166,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
   };
 
   const handleSeedDefaults = async () => {
+    if (blockGuestAction()) return;
     if (!window.confirm(`Initialize default values for "${categoryLabel}"? Existing items will not be replaced.`)) return;
     setLoading(true);
     try {
@@ -202,7 +209,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-          <button style={{ ...BTN('#3b82f6'), fontSize: '12px', padding: '6px 12px' }} onClick={() => { setAdding(true); setExpanded(true); }}>
+          <button style={{ ...BTN('#3b82f6'), fontSize: '12px', padding: '6px 12px' }} onClick={() => guardAction(() => { setAdding(true); setExpanded(true); })}>
             <Plus style={{ width: '13px', height: '13px' }} /> Add
           </button>
           <span style={{ color: '#6b7280' }}>
@@ -299,7 +306,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                             </button>
                             <button
                               style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px', marginLeft: '4px' }}
-                              onClick={() => { setEditingId(item._id); setEditValue(item.value); }}
+                              onClick={() => guardAction(() => { setEditingId(item._id); setEditValue(item.value); })}
                               title="Edit"
                             >
                               <Edit3 style={{ width: '14px', height: '14px' }} />
@@ -333,9 +340,9 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
 };
 
 const PicklistManager = () => {
-  const { user, token } = useAuth();
+  const { user, token, isGuest } = useAuth();
   const { fetchPicklists, loading } = usePicklist();
-  const isSuperAdmin = user?.email === SUPER_ADMIN_EMAIL;
+  const isSuperAdmin = !isGuest && user?.email === SUPER_ADMIN_EMAIL;
 
   return (
     <div style={{ padding: '28px', maxWidth: '860px', margin: '0 auto' }}>

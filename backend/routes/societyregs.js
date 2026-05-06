@@ -4,10 +4,11 @@ const SocietyRegistration = require('../models/SocietyRegistration');
 const Task = require('../models/Task');
 const OnboardingEntry = require('../models/OnboardingEntry');
 const Member = require('../models/Member');
-const { auth } = require('../middleware/auth');
+const { auth, denyGuest } = require('../middleware/auth');
 const { fileFilter } = require('../middleware/uploadSanitizer');
 const { uploadFile } = require('../utils/gdrive');
 const notify = require('../utils/notify');
+const resolveMember = require('../utils/resolveMember');
 
 const router = express.Router();
 
@@ -54,13 +55,32 @@ const syncTaskCompletion = async (regId, society, completed) => {
   } catch (err) { console.error('syncTaskCompletion error:', err); }
 };
 
+// Find all onboarding entries for a member, using memberId-aware matching
+// so that alias / whitespace drift doesn't cause silent sync failures.
+const findOnboardingEntries = async (memberName) => {
+  // 1) Try exact name match first
+  let entries = await OnboardingEntry.find({ name: memberName });
+  if (entries.length) return entries;
+
+  // 2) Resolve through Member aliases (handles name drift)
+  const hit = await resolveMember({ name: memberName });
+  if (hit) {
+    entries = await OnboardingEntry.find({
+      $or: [{ memberId: hit._id }, { name: hit.name }],
+    });
+  }
+  return entries;
+};
+
 // Add society to onboarding entry's selectedSocieties (if entry exists)
 const syncSocietyToOnboarding = async (memberName, society) => {
   try {
-    const entry = await OnboardingEntry.findOne({ name: memberName });
-    if (entry && !entry.selectedSocieties.includes(society)) {
-      entry.selectedSocieties.push(society);
-      await entry.save();
+    const entries = await findOnboardingEntries(memberName);
+    for (const entry of entries) {
+      if (!entry.selectedSocieties.includes(society)) {
+        entry.selectedSocieties.push(society);
+        await entry.save();
+      }
     }
   } catch (err) { console.error('syncSocietyToOnboarding error:', err); }
 };
@@ -68,10 +88,12 @@ const syncSocietyToOnboarding = async (memberName, society) => {
 // Remove society from onboarding entry's selectedSocieties (if entry exists)
 const removeSocietyFromOnboarding = async (memberName, society) => {
   try {
-    const entry = await OnboardingEntry.findOne({ name: memberName });
-    if (entry && entry.selectedSocieties.includes(society)) {
-      entry.selectedSocieties = entry.selectedSocieties.filter((s) => s !== society);
-      await entry.save();
+    const entries = await findOnboardingEntries(memberName);
+    for (const entry of entries) {
+      if (entry.selectedSocieties.includes(society)) {
+        entry.selectedSocieties = entry.selectedSocieties.filter((s) => s !== society);
+        await entry.save();
+      }
     }
   } catch (err) { console.error('removeSocietyFromOnboarding error:', err); }
 };
@@ -79,10 +101,12 @@ const removeSocietyFromOnboarding = async (memberName, society) => {
 // Clear all selectedSocieties on onboarding entry (used when whole reg is deleted)
 const clearOnboardingSocieties = async (memberName) => {
   try {
-    const entry = await OnboardingEntry.findOne({ name: memberName });
-    if (entry && entry.selectedSocieties.length) {
-      entry.selectedSocieties = [];
-      await entry.save();
+    const entries = await findOnboardingEntries(memberName);
+    for (const entry of entries) {
+      if (entry.selectedSocieties.length) {
+        entry.selectedSocieties = [];
+        await entry.save();
+      }
     }
   } catch (err) { console.error('clearOnboardingSocieties error:', err); }
 };
@@ -115,7 +139,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/societyregs — start a new registration for a member+society
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, denyGuest, async (req, res) => {
   try {
     const { member, society, ipi, spoc, notes, deadline, startDate } = req.body;
     if (!member || !society) return res.status(400).json({ message: 'Member and society are required' });
@@ -195,7 +219,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // PUT /api/societyregs/:id — update a society's status or assignee
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -247,9 +271,13 @@ router.put('/:id', auth, async (req, res) => {
       syncTaskCompletion(reg._id, society, status === 'Registered');
     }
 
-    // Sync new society → onboarding selectedSocieties
-    if (society && status === 'In Progress') {
+    // Sync society → onboarding selectedSocieties for any active status
+    if (society && status && status !== 'N/A') {
       syncSocietyToOnboarding(reg.name, society);
+    }
+    // Remove from onboarding if status is set to N/A
+    if (society && status === 'N/A') {
+      removeSocietyFromOnboarding(reg.name, society);
     }
 
     // Sync registration count → Member
@@ -318,7 +346,7 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 // PUT /api/societyregs/:id/steps — update steps for a society
-router.put('/:id/steps', auth, async (req, res) => {
+router.put('/:id/steps', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -355,7 +383,7 @@ router.put('/:id/steps', auth, async (req, res) => {
 });
 
 // POST /api/societyregs/:id/remarks — add a remark to a society
-router.post('/:id/remarks', auth, async (req, res) => {
+router.post('/:id/remarks', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -405,7 +433,7 @@ router.post('/:id/remarks', auth, async (req, res) => {
 });
 
 // DELETE /api/societyregs/:id/remarks — delete a remark
-router.delete('/:id/remarks', auth, async (req, res) => {
+router.delete('/:id/remarks', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -453,7 +481,7 @@ const STEP_DISPLAY_NAMES = {
 };
 
 // POST /api/societyregs/:id/upload — upload file for a step
-router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
+router.post('/:id/upload', auth, denyGuest, upload.single('file'), async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -497,7 +525,7 @@ router.post('/:id/upload', auth, upload.single('file'), async (req, res) => {
 });
 
 // PUT /api/societyregs/:id/rename — rename a member registration
-router.put('/:id/rename', auth, async (req, res) => {
+router.put('/:id/rename', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -515,7 +543,7 @@ router.put('/:id/rename', auth, async (req, res) => {
 });
 
 // DELETE /api/societyregs/:id/society — remove a single society from a member's registration
-router.delete('/:id/society', auth, async (req, res) => {
+router.delete('/:id/society', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findById(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });
@@ -546,7 +574,7 @@ router.delete('/:id/society', auth, async (req, res) => {
 });
 
 // DELETE /api/societyregs/:id
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
     const reg = await SocietyRegistration.findByIdAndDelete(req.params.id);
     if (!reg) return res.status(404).json({ message: 'Registration not found' });

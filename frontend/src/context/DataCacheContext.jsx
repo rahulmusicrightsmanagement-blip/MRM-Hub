@@ -7,6 +7,8 @@ const DEFAULT_TTL = 300_000;
 export const DataCacheProvider = ({ children }) => {
   const cacheRef = useRef(new Map());
   const subsRef = useRef(new Map());
+  const fetchersRef = useRef(new Map());
+  const autoRefreshTimerRef = useRef(null);
 
   const notify = (key, data) => {
     const s = subsRef.current.get(key);
@@ -35,6 +37,21 @@ export const DataCacheProvider = ({ children }) => {
     return () => { s.delete(fn); if (s.size === 0) subsRef.current.delete(key); };
   }, []);
 
+  const registerFetcher = useCallback((key, fetcher) => {
+    const token = Symbol(key);
+    const entry = fetchersRef.current.get(key) || { fetcher, tokens: new Set() };
+    entry.fetcher = fetcher;
+    entry.tokens.add(token);
+    fetchersRef.current.set(key, entry);
+
+    return () => {
+      const current = fetchersRef.current.get(key);
+      if (!current) return;
+      current.tokens.delete(token);
+      if (current.tokens.size === 0) fetchersRef.current.delete(key);
+    };
+  }, []);
+
   const fetchWithCache = useCallback(async (key, fetcher, { ttl = DEFAULT_TTL, force = false } = {}) => {
     const entry = cacheRef.current.get(key);
     if (!force && entry && entry.data !== undefined && (Date.now() - entry.ts) < ttl) {
@@ -61,8 +78,46 @@ export const DataCacheProvider = ({ children }) => {
     }
   }, []);
 
+  const refreshKey = useCallback((key) => {
+    const entry = fetchersRef.current.get(key);
+    if (!entry?.fetcher) return Promise.resolve(undefined);
+    return fetchWithCache(key, entry.fetcher, { ttl: 0, force: true });
+  }, [fetchWithCache]);
+
+  const refreshActive = useCallback(() => {
+    const keys = Array.from(fetchersRef.current.keys());
+    keys.forEach((key) => {
+      refreshKey(key).catch(() => undefined);
+    });
+  }, [refreshKey]);
+
+  const scheduleRefreshActive = useCallback(() => {
+    if (autoRefreshTimerRef.current) window.clearTimeout(autoRefreshTimerRef.current);
+    autoRefreshTimerRef.current = window.setTimeout(() => {
+      autoRefreshTimerRef.current = null;
+      refreshActive();
+    }, 150);
+  }, [refreshActive]);
+
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') scheduleRefreshActive();
+    };
+
+    window.addEventListener('focus', scheduleRefreshActive);
+    window.addEventListener('mrm:data-mutated', scheduleRefreshActive);
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      if (autoRefreshTimerRef.current) window.clearTimeout(autoRefreshTimerRef.current);
+      window.removeEventListener('focus', scheduleRefreshActive);
+      window.removeEventListener('mrm:data-mutated', scheduleRefreshActive);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [scheduleRefreshActive]);
+
   return (
-    <DataCacheContext.Provider value={{ getCached, setCached, invalidate, subscribe, fetchWithCache }}>
+    <DataCacheContext.Provider value={{ getCached, setCached, invalidate, subscribe, fetchWithCache, registerFetcher, refreshKey, refreshActive }}>
       {children}
     </DataCacheContext.Provider>
   );
@@ -74,16 +129,27 @@ export const useDataCache = () => {
   return ctx;
 };
 
-export const useCachedFetch = (key, fetcher, { ttl = DEFAULT_TTL, enabled = true } = {}) => {
-  const { getCached, subscribe, fetchWithCache } = useDataCache();
+export const useCachedFetch = (key, fetcher, { ttl = DEFAULT_TTL, enabled = true, revalidateOnMount = true } = {}) => {
+  const { getCached, subscribe, fetchWithCache, registerFetcher } = useDataCache();
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
 
   const [data, setData] = useState(() => getCached(key));
   const [loading, setLoading] = useState(() => getCached(key) === undefined);
   const [error, setError] = useState(null);
 
-  useEffect(() => subscribe(key, (val) => setData(val)), [key, subscribe]);
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
+
+  useEffect(() => {
+    if (!key) return undefined;
+    return subscribe(key, (val) => setData(val));
+  }, [key, subscribe]);
+
+  useEffect(() => {
+    if (!enabled || !key) return undefined;
+    return registerFetcher(key, () => fetcherRef.current());
+  }, [key, enabled, registerFetcher]);
 
   useEffect(() => {
     if (!enabled || !key) return;
@@ -92,13 +158,13 @@ export const useCachedFetch = (key, fetcher, { ttl = DEFAULT_TTL, enabled = true
     if (cached !== undefined) { setData(cached); setLoading(false); }
     else setLoading(true);
 
-    fetchWithCache(key, () => fetcherRef.current(), { ttl })
+    fetchWithCache(key, () => fetcherRef.current(), { ttl, force: revalidateOnMount })
       .then(() => { if (alive) setError(null); })
       .catch((err) => { if (alive) setError(err); })
       .finally(() => { if (alive) setLoading(false); });
 
     return () => { alive = false; };
-  }, [key, enabled, ttl, fetchWithCache, getCached]);
+  }, [key, enabled, ttl, revalidateOnMount, fetchWithCache, getCached]);
 
   const refetch = useCallback(
     () => fetchWithCache(key, () => fetcherRef.current(), { ttl: 0, force: true }),

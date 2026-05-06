@@ -130,7 +130,7 @@ const TABS = [
 const MemberProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { authFetch } = useAuth();
+  const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
   const { invalidate } = useDataCache();
 
@@ -144,7 +144,14 @@ const MemberProfile = () => {
   const [copiedField, setCopiedField] = useState('');
   const [syncing, setSyncing] = useState(false);
 
+  const blockGuestAction = () => {
+    if (!isGuest) return false;
+    addToast('Guest users have view-only access', 'error');
+    return true;
+  };
+
   const handleSyncName = async () => {
+    if (blockGuestAction()) return;
     const previousName = window.prompt(
       `Sync "${member?.name}" across Sales, Onboarding, Society Reg, Music Works, and Client Tasks.\n\nOptional: enter the PREVIOUS name if records still show an older value (e.g. "Rahul Jadhav"). Leave blank to sync using current name only.`,
       '',
@@ -211,6 +218,7 @@ const MemberProfile = () => {
   };
 
   const handleDeleteRoyalty = async (royaltyId, royaltyName) => {
+    if (blockGuestAction()) return;
     if (!royaltyId || !window.confirm(`Delete Music Works entry for ${royaltyName || 'this client'}?`)) return;
     try {
       const res = await authFetch(`/api/royalty/${royaltyId}`, { method: 'DELETE' });

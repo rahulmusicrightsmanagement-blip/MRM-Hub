@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useGuestGuard } from '../hooks/useGuestGuard';
 import Pagination from '../components/Pagination';
 
 const fmtDateISO = (d) => {
@@ -299,6 +300,7 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
 
 /* ────────── Member Profile Modal ────────── */
 const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAddTask, onToggleTask, teamMembers }) => {
+  const { guardAction, blockGuestAction } = useGuestGuard();
   const [activeTab, setActiveTab] = useState('General Info');
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskText, setNewTaskText] = useState('');
@@ -314,10 +316,12 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
   const tabs = ['General Info', 'Additional Info', 'KYC', 'Unique IDs'];
 
   const toggleTask = (taskId) => {
+    if (blockGuestAction()) return;
     const task = member.subTasks.find((t) => t._id === taskId);
     if (task) onToggleTask(member._id, taskId, !task.done);
   };
   const addTask = () => {
+    if (blockGuestAction()) return;
     if (!newTaskText.trim()) return;
     onAddTask(member._id, newTaskText.trim(), newTaskAssignee);
     setNewTaskText('');
@@ -375,7 +379,7 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
           <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sub-Tasks</span>
           <span style={{ color: '#8892b0', fontSize: '13px' }}>{completedTasks}/{totalTasks}</span>
         </div>
-        <button onClick={() => setShowAddTask(true)} style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={() => guardAction(() => setShowAddTask(true))} style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Plus size={14} /> Add
         </button>
       </div>
@@ -449,8 +453,8 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>Member Profile</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => onEdit(member)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><Edit3 size={18} /></button>
-            <button onClick={() => setConfirmDelete(true)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 size={18} /></button>
+            <button onClick={() => guardAction(() => onEdit(member))} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><Edit3 size={18} /></button>
+            <button onClick={() => guardAction(() => setConfirmDelete(true))} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 size={18} /></button>
             <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
           </div>
         </div>
@@ -460,7 +464,7 @@ const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAdd
             <span style={{ fontSize: '13px', color: '#fca5a5' }}>Delete this member permanently?</span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setConfirmDelete(false)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => { onDelete(member._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
             </div>
           </div>
         )}
@@ -562,6 +566,7 @@ const Members = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const { setCached, invalidate } = useDataCache();
+  const { guardAction } = useGuestGuard();
   const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
   const getContractColor = (t) => CONTRACT_COLORS[t] || '';
   const [searchQuery, setSearchQuery] = useState('');
@@ -763,7 +768,7 @@ const Members = () => {
           <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>Member Management</h1>
           <p style={{ color: '#8892b0', fontSize: '14px', margin: '4px 0 0' }}>Manage member profiles, KYC, and unique identifiers</p>
         </div>
-        <button onClick={() => setShowAddModal(true)}
+        <button onClick={() => guardAction(() => setShowAddModal(true))}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
           <Plus size={16} /> Add Member
         </button>
@@ -845,7 +850,7 @@ const Members = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleEditMember(m); }}
+                    onClick={(e) => { e.stopPropagation(); guardAction(() => handleEditMember(m)); }}
                     title="Edit member"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = '#3b82f6')}
@@ -854,7 +859,7 @@ const Members = () => {
                     <Edit3 size={16} />
                   </button>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(m._id); }}
+                    onClick={(e) => { e.stopPropagation(); guardAction(() => setConfirmDeleteId(m._id)); }}
                     title="Delete member"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
