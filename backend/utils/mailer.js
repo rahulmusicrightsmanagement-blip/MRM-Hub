@@ -166,4 +166,80 @@ const sendTaskEmail = async ({ to, recipientLabel, tasks, mode }) => {
   return info;
 };
 
-module.exports = { sendTaskEmail, buildTaskEmail };
+/* ═══════════════════════════════════════════════
+   DAILY DRIVE COUNT REPORT
+   File counts for each drive folder and its cross-drive backup.
+   ═══════════════════════════════════════════════ */
+
+const fmtSize = (bytes) => {
+  if (bytes == null || isNaN(bytes)) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
+const buildDriveReportEmail = ({ folders = [] }) => {
+  const totalFiles = folders.reduce((n, f) => n + (f.count || 0), 0);
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  const subject = `MRM Hub — Daily Drive Count Report (${totalFiles})`;
+
+  const rows = folders.map((f, i) => `
+        <tr>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:13px;color:#111827;">${i + 1}</td>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:14px;color:#111827;font-weight:600;">${esc(f.label)}</td>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:18px;color:#111827;font-weight:700;text-align:right;">${f.count == null ? '⚠️ error' : f.count}</td>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:13px;color:#374151;text-align:right;white-space:nowrap;">${f.sizeBytes == null ? '—' : esc(fmtSize(f.sizeBytes))}</td>
+        </tr>`).join('');
+
+  const html = `
+    <div style="background:#f3f4f6;padding:28px 16px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+        <div style="padding:22px 28px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#ffffff;">
+          <div style="font-size:12px;letter-spacing:1px;text-transform:uppercase;opacity:0.9;">MRM Hub — Artist Portal</div>
+          <div style="font-size:22px;font-weight:700;margin-top:4px;">Daily Drive Count Report</div>
+          <div style="font-size:13px;opacity:0.9;margin-top:4px;">${esc(today)}</div>
+        </div>
+        <div style="padding:24px 28px;">
+          <div style="margin-bottom:18px;font-size:13px;color:#4b5563;">
+            File counts for each drive folder and its cross-drive backup.
+          </div>
+          <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+            <thead>
+              <tr style="background:#f9fafb;">
+                <th style="padding:10px 14px;border:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">#</th>
+                <th style="padding:10px 14px;border:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:left;text-transform:uppercase;letter-spacing:0.4px;">Folder</th>
+                <th style="padding:10px 14px;border:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:right;text-transform:uppercase;letter-spacing:0.4px;">Files</th>
+                <th style="padding:10px 14px;border:1px solid #e5e7eb;font-size:12px;color:#374151;text-align:right;text-transform:uppercase;letter-spacing:0.4px;">Size</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div style="margin-top:14px;font-size:11px;color:#9ca3af;">
+            Note: a backup count can be slightly lower than its original when the original holds byte-identical duplicate files — these collapse to one copy in the backup.
+          </div>
+          <div style="margin-top:18px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center;">
+            Generated automatically by MRM Hub
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const textLines = [
+    'MRM Hub — Daily Drive Count Report',
+    today,
+    '',
+    ...folders.map((f) => `  ${f.label}: ${f.count == null ? 'ERROR' : f.count} files${f.sizeBytes == null ? '' : ' · ' + fmtSize(f.sizeBytes)}`),
+  ];
+
+  return { subject, html, text: textLines.join('\n') };
+};
+
+const sendDriveReportEmail = async ({ to, folders }) => {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const { subject, html, text } = buildDriveReportEmail({ folders });
+  const info = await getTransporter().sendMail({ from, to, subject, html, text });
+  return info;
+};
+
+module.exports = { sendTaskEmail, buildTaskEmail, buildDriveReportEmail, sendDriveReportEmail };

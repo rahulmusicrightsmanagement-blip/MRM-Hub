@@ -24,6 +24,7 @@ const notificationRoutes = require('./routes/notifications');
 const picklistRoutes = require('./routes/picklists');
 const clientMessageRoutes = require('./routes/clientMessages');
 const { startTaskEmailCron } = require('./utils/taskEmailCron');
+const { startBackupCron } = require('./utils/backupCron');
 
 const app = express();
 
@@ -104,6 +105,7 @@ mongoose
   .then(() => {
     console.log('Connected to MongoDB');
     startTaskEmailCron();
+    startBackupCron();
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => {
