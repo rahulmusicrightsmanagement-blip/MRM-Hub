@@ -11,7 +11,7 @@ const cardStyle = {
   borderRadius: '12px',
   padding: '20px',
 };
-
+// 
 const labelStyle = {
   fontSize: '12px',
   color: '#9ca3af',
