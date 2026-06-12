@@ -90,6 +90,20 @@ const runBackupSync = async () => {
 
 /* ─── Email a count summary of all 4 folders (2 originals + 2 backups) ─── */
 const summarizeFolder = async (label, drive, folderId) => {
+  // Verify the folder actually exists FIRST. Querying a non-existent / wrong
+  // folder id (e.g. a stale .env) returns an empty list, NOT an error — which
+  // would otherwise be reported as a misleading "0 files". files.get on a bad
+  // id throws 404, so we can tell "misconfigured" apart from "genuinely empty".
+  try {
+    const meta = await drive.files.get({ fileId: folderId, fields: 'id, name, trashed, mimeType' });
+    if (meta.data.trashed || meta.data.mimeType !== 'application/vnd.google-apps.folder') {
+      return { label, count: null, sizeBytes: null, error: 'folder trashed or not a folder' };
+    }
+  } catch (err) {
+    console.error(`[backupCron] folder check failed for ${label} (id=${folderId}):`, err.message);
+    return { label, count: null, sizeBytes: null, error: `folder not found (${err.code || err.message})` };
+  }
+
   try {
     const files = await listAllFilesRecursive(drive, folderId);
     return { label, count: files.length, sizeBytes: files.reduce((s, f) => s + (f.size || 0), 0) };
@@ -134,11 +148,11 @@ const startBackupCron = () => {
   }, { timezone: 'Asia/Kolkata' });
   console.log('[backupCron] scheduled backup sync 02:00/10:00/18:00 Asia/Kolkata');
 
-  // Document report email daily 07:00 IST
-  cron.schedule('0 7 * * *', () => {
+  // Document report email — TEMP TEST TIME 13:30 IST (revert to '0 7 * * *' / 07:00 after testing)
+  cron.schedule('30 13 * * *', () => {
     runDriveReportEmail().catch((err) => console.error('[backupCron] report error:', err));
   }, { timezone: 'Asia/Kolkata' });
-  console.log('[backupCron] scheduled document report email 07:00 Asia/Kolkata');
+  console.log('[backupCron] scheduled document report email 13:30 Asia/Kolkata (TEMP TEST)');
 };
 
 module.exports = { startBackupCron, runBackupSync, runDriveReportEmail };

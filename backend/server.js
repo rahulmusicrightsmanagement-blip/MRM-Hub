@@ -25,6 +25,7 @@ const picklistRoutes = require('./routes/picklists');
 const clientMessageRoutes = require('./routes/clientMessages');
 const { startTaskEmailCron } = require('./utils/taskEmailCron');
 const { startBackupCron } = require('./utils/backupCron');
+const { verifyConfiguredFolders } = require('./utils/gdrive');
 
 const app = express();
 
@@ -106,6 +107,7 @@ mongoose
     console.log('Connected to MongoDB');
     startTaskEmailCron();
     startBackupCron();
+    verifyConfiguredFolders().catch((err) => console.error('[gdrive] folder health-check error:', err.message));
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => {

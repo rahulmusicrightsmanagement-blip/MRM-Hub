@@ -188,8 +188,8 @@ const buildDriveReportEmail = ({ folders = [] }) => {
         <tr>
           <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:13px;color:#111827;">${i + 1}</td>
           <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:14px;color:#111827;font-weight:600;">${esc(f.label)}</td>
-          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:18px;color:#111827;font-weight:700;text-align:right;">${f.count == null ? '⚠️ error' : f.count}</td>
-          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:13px;color:#374151;text-align:right;white-space:nowrap;">${f.sizeBytes == null ? '—' : esc(fmtSize(f.sizeBytes))}</td>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:18px;color:${f.count == null ? '#dc2626' : '#111827'};font-weight:700;text-align:right;">${f.count == null ? '⚠️' : f.count}</td>
+          <td style="padding:12px 14px;border:1px solid #e5e7eb;font-size:13px;color:${f.count == null ? '#dc2626' : '#374151'};text-align:right;white-space:nowrap;">${f.count == null ? esc(f.error || 'error') : esc(fmtSize(f.sizeBytes))}</td>
         </tr>`).join('');
 
   const html = `

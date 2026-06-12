@@ -32,13 +32,17 @@ const MUSIC_BACKUP_NAME = 'MRM_Backup_MusicDrive';       // folder in the BUSINE
 /* ─── Cache for ensured sub-folder IDs ─── */
 const folderCache = {};
 
+// Escape a value for use inside a single-quoted Drive query string. Without this,
+// a name containing an apostrophe (e.g. "O'Brien") breaks the files.list query.
+const escapeQ = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 /* ─── Ensure a named sub-folder exists under a parent ─── */
 async function ensureFolder(name, parentId, driveClient) {
   const cacheKey = `${parentId}/${name}`;
   if (folderCache[cacheKey]) return folderCache[cacheKey];
 
   const res = await driveClient.files.list({
-    q: `'${parentId}' in parents and name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    q: `'${parentId}' in parents and name = '${escapeQ(name)}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
     fields: 'files(id, name)',
     pageSize: 1,
   });
@@ -125,6 +129,36 @@ async function _liveBackup(destDrive, backupRootName, subFolder, fileBuffer, fil
   }
 }
 
+/* ─── Startup health-check: confirm the configured original folders are reachable.
+   A stale/wrong folder id (e.g. an out-of-date .env on the server) is the root
+   cause of "0 files" surprises — querying a bad parent returns empty, not an
+   error. This surfaces the misconfig LOUDLY at boot instead of silently later. ─── */
+async function verifyConfiguredFolders() {
+  const checks = [
+    { label: 'BUSINESS (GDRIVE_FOLDER_ID)', drive: businessDrive, id: BUSINESS_FOLDER_ID },
+    { label: 'MUSIC (GDRIVE_MUSIC_FOLDER_ID)', drive: musicDrive, id: MUSIC_FOLDER_ID },
+  ];
+  for (const c of checks) {
+    if (!c.id) {
+      console.error(`[gdrive] ⚠️  ${c.label} is NOT set in env — uploads/backup for this drive will be skipped.`);
+      continue;
+    }
+    try {
+      const meta = await c.drive.files.get({ fileId: c.id, fields: 'id, name, trashed, mimeType' });
+      if (meta.data.trashed) {
+        console.error(`[gdrive] ⚠️  ${c.label} folder "${meta.data.name}" (${c.id}) is in TRASH — fix the folder id.`);
+      } else if (meta.data.mimeType !== FOLDER_MIME) {
+        console.error(`[gdrive] ⚠️  ${c.label} id ${c.id} is not a folder.`);
+      } else {
+        console.log(`[gdrive] ✓ ${c.label} → "${meta.data.name}" reachable.`);
+      }
+    } catch (err) {
+      console.error(`[gdrive] ⚠️  ${c.label} folder id ${c.id} is UNREACHABLE (${err.code || err.message}). ` +
+        `Likely a stale/incorrect .env — reports will show errors and uploads may fail until this is fixed.`);
+    }
+  }
+}
+
 /* ─── Upload to BUSINESS Drive (with optional sub-folder) ─── */
 async function uploadFile(fileBuffer, originalName, mimeType, driveName, { subFolder } = {}) {
   let targetFolderId = BUSINESS_FOLDER_ID;
@@ -177,7 +211,7 @@ const FOLDER_MIME = 'application/vnd.google-apps.folder';
 /* ─── Find-or-create a top-level folder at the Drive root ─── */
 async function ensureRootFolder(driveClient, name) {
   const res = await driveClient.files.list({
-    q: `'root' in parents and name = '${name}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
+    q: `'root' in parents and name = '${escapeQ(name)}' and mimeType = '${FOLDER_MIME}' and trashed = false`,
     fields: 'files(id, name, webViewLink)',
     pageSize: 1,
   });
@@ -388,4 +422,5 @@ module.exports = {
   ensureRootFolder,
   listAllFilesRecursive,
   mirrorFolder,
+  verifyConfiguredFolders,
 };
