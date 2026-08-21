@@ -7,7 +7,9 @@ import { DataCacheProvider, useDataCache } from './context/DataCacheContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import SalesPipeline from './pages/SalesPipeline';
+import LeadDetail from './pages/LeadDetail';
 import Onboarding from './pages/Onboarding';
+import OnboardingDetail from './pages/OnboardingDetail';
 import SocietyReg from './pages/SocietyReg';
 import Royalty from './pages/Royalty';
 import Members from './pages/Members';
@@ -46,7 +48,9 @@ const ProtectedRoutes = () => {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/sales-pipeline" element={<SalesPipeline />} />
+        <Route path="/sales-pipeline/:id" element={<LeadDetail />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/onboarding/:id" element={<OnboardingDetail />} />
         <Route path="/society-reg" element={<SocietyReg />} />
         <Route path="/royalty" element={<Royalty />} />
         <Route path="/members" element={<Members />} />

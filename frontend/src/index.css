@@ -31,3 +31,9 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #4a5068;
 }
+
+/* Skeleton shimmer for loading table rows (studio.jsx <TableSkeleton />) */
+@keyframes studioPulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}

@@ -1,24 +1,25 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  Plus, Filter, X, Mail, Phone, MessageSquare, ArrowRight, Search,
-  CheckSquare, Square, ChevronRight, Briefcase, Clock,
-  CheckCircle, Circle, Trash2, Edit3, Save, Eye, XCircle, UserPlus,
+  Plus, X, ArrowRight, Search, CheckSquare, Square, ChevronRight,
+  CheckCircle, Circle, Trash2, Edit3, Save, Eye, XCircle, UserPlus, Download,
+  AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import * as XLSX from 'xlsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useUrlState } from '../hooks/useUrlState';
 import SearchableSelect from '../components/SearchableSelect';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
-
-const DEFAULT_STAGE_COLORS = { 'New Enquiry': '#3b82f6', 'Meeting Set': '#6366f1', 'Qualified Lead': '#10b981', 'Not Qualified': '#ef4444' };
-const STAGE_COLOR_PALETTE = ['#3b82f6', '#6366f1', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
-const getStageColor = (stage, stages) => {
-  if (DEFAULT_STAGE_COLORS[stage]) return DEFAULT_STAGE_COLORS[stage];
-  const idx = stages.indexOf(stage);
-  return STAGE_COLOR_PALETTE[idx % STAGE_COLOR_PALETTE.length];
-};
+import Pagination from '../components/Pagination';
+import { T, TONES, TD } from '../theme';
+import {
+  PageHeader, Button, IconButton, Segmented, Card, Pill, DistributionBar,
+  SearchInput, TH, EmptyState, Checkbox, SelectionBar, TableSkeleton, Banner, Panel,
+} from '../components/studio';
 
 /* ──────── shared styles ──────── */
 const INPUT = {
@@ -30,20 +31,15 @@ const LABEL = {
   fontSize: '11px', fontWeight: 600, color: '#9ca3af',
   letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block',
 };
-const FIELD_BOX = {
-  backgroundColor: '#161b2e', border: '1px solid #1e2540',
-  borderRadius: '10px', padding: '14px 16px',
-};
-const SECTION_TITLE = {
-  fontSize: '12px', fontWeight: 700, color: '#9ca3af',
-  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px',
-};
-const SMALL_LABEL = {
-  fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600, marginBottom: '6px',
-};
 
-const fmtDate = (d) =>
-  d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+const fmtDate = (d) => {
+  if (!d) return '';
+  const t = new Date(d);
+  // meetingDate is free text and imported records carry junk — never render "Invalid Date"
+  return Number.isNaN(t.getTime())
+    ? ''
+    : t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 const fmtDateISO = (d) => {
   const dt = new Date(d);
@@ -53,36 +49,114 @@ const fmtDateISO = (d) => {
   return `${y}-${m}-${dd}`;
 };
 
-const getDeadlineStatus = (deadline) => {
-  if (!deadline) return null;
+/* ──────── deadline, in plain English ──────── */
+const daysToDeadline = (lead) => {
+  if (!lead.deadline) return Infinity;
   const now = new Date(); now.setHours(0, 0, 0, 0);
-  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
-  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
-  if (diffDays < 0) return 'red';
-  if (diffDays <= 2) return 'yellow';
-  return 'green';
+  const dl = new Date(lead.deadline);
+  if (Number.isNaN(dl.getTime())) return Infinity;
+  dl.setHours(0, 0, 0, 0);
+  return Math.round((dl - now) / 86400000);
 };
 
-const DEADLINE_COLORS = {
-  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
-  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
-  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+/* How long until the deadline, said the way a person would say it. */
+const describeTiming = (lead) => {
+  const days = daysToDeadline(lead);
+  if (days === Infinity) return { text: '', late: false, soon: false };
+  if (days < 0) return { text: days === -1 ? 'was due yesterday' : `was due ${-days} days ago`, late: true, soon: false };
+  if (days === 0) return { text: 'due today', late: true, soon: false };
+  if (days === 1) return { text: 'due tomorrow', late: false, soon: true };
+  if (days <= 7) return { text: `due in ${days} days`, late: false, soon: true };
+  return { text: `due ${fmtDate(lead.deadline)}`, late: false, soon: false };
 };
 
-/* ──────── Priority Badge ──────── */
-const PriorityBadge = ({ priority }) => {
-  const map = {
-    high: { bg: '#991b1b', color: '#fca5a5' },
-    medium: { bg: '#854d0e', color: '#fde047' },
-    low: { bg: '#166534', color: '#86efac' },
-  };
-  const c = map[priority] || map.medium;
-  return (
-    <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: c.bg, color: c.color }}>
-      {priority}
-    </span>
-  );
+/* A lead still on our plate — not closed, not handed over. */
+const isOpenLead = (l) => l.stage !== 'Not Qualified' && !l.movedToOnboarding;
+
+/* One spreadsheet row per lead. Column order here is the column order in Excel. */
+const toExportRow = (lead) => ({
+  'Name': lead.name || '',
+  'Email': lead.email || '',
+  'Phone': lead.phone || '',
+  'Stage': lead.stage || '',
+  'Status': getStatus(lead).label,
+  'Owner': lead.spoc || '',
+  'Source': lead.source || '',
+  'Genre': lead.genre || '',
+  'Priority': lead.priority || '',
+  'Deadline': lead.deadline ? fmtDate(lead.deadline) : '',
+  'Added on': fmtDate(lead.createdAt) || '',
+  'Moved to onboarding': lead.movedToOnboarding ? 'Yes' : 'No',
+});
+
+/* Everything the page remembers about "what am I looking at", kept in the
+   query string so a view can be pasted to a colleague. */
+const VIEW_DEFAULTS = { q: '', stage: 'all', status: 'all', sort: 'createdAt', dir: 'desc', page: 1, size: 25 };
+
+/* ═══════════════════════════════════════════
+   THE STATUS COLUMN
+   One short phrase saying where this lead actually is, in plain words
+   rather than the internal stage jargon. `rank` is what the Status column
+   sorts by, so sorting groups live work above finished work.
+   ═══════════════════════════════════════════ */
+const getStatus = (lead) => {
+  if (lead.stage === 'Not Qualified') return { label: 'Not qualified', tone: 'grey', rank: 7 };
+  if (lead.movedToOnboarding) return { label: 'Onboarded', tone: 'green', rank: 6 };
+  if (lead.stage === 'New Enquiry') {
+    return lead.callDone
+      ? { label: 'Meeting to set', tone: 'amber', rank: 2 }
+      : { label: 'Call due', tone: 'amber', rank: 1 };
+  }
+  if (lead.stage === 'Meeting Set') {
+    return fmtDate(lead.meetingDate)
+      ? { label: 'Meeting booked', tone: 'blue', rank: 4 }
+      : { label: 'Date to set', tone: 'amber', rank: 3 };
+  }
+  if (lead.stage === 'Qualified Lead') return { label: 'Ready to onboard', tone: 'purple', rank: 5 };
+  return { label: lead.stage, tone: 'grey', rank: 5 };
 };
+
+const STAGE_TONES = {
+  'New Enquiry': 'blue',
+  'Meeting Set': 'indigo',
+  'Qualified Lead': 'green',
+  'Not Qualified': 'red',
+};
+const stageTone = (stage) => STAGE_TONES[stage] || 'grey';
+
+/* Sorting. Every comparator has to be NaN-free or the whole sort silently rots. */
+const text = (v) => (v || '').toString().toLowerCase();
+const blanksLast = (v) => (text(v) === '' ? 1 : 0);
+
+const COMPARATORS = {
+  name: (a, b) => text(a.name).localeCompare(text(b.name)),
+  stage: (a, b) => text(a.stage).localeCompare(text(b.stage)),
+  spoc: (a, b) => blanksLast(a.spoc) - blanksLast(b.spoc) || text(a.spoc).localeCompare(text(b.spoc)),
+  deadline: (a, b) => { const d = daysToDeadline(a) - daysToDeadline(b); return Number.isNaN(d) ? 0 : d; },
+  status: (a, b) => getStatus(a).rank - getStatus(b).rank,
+  createdAt: (a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0),
+};
+
+/* Stage and status were two columns saying nearly the same thing. They are now
+   one: the plain-English status leads, with the formal stage beneath it. */
+const COLUMNS = [
+  { key: 'name', label: 'Lead', width: 'auto' },
+  { key: 'status', label: 'Status', width: '190px' },
+  { key: 'spoc', label: 'Owner', width: '150px' },
+  { key: 'deadline', label: 'Timeline', width: '165px' },
+];
+
+/* The status pill row. "Overdue" deliberately overlaps "Needs action" —
+   these are shortcuts, not a partition. */
+const isOverdue = (l) => isOpenLead(l) && describeTiming(l).late;
+
+const STATUS_FILTERS = [
+  { id: 'all', label: 'All', icon: null, test: () => true },
+  { id: 'active', label: 'Needs action', test: isOpenLead },
+  { id: 'overdue', label: 'Overdue', test: isOverdue },
+  { id: 'onboarded', label: 'Onboarded', test: (l) => !!l.movedToOnboarding && l.stage !== 'Not Qualified' },
+  { id: 'closed', label: 'Not qualified', test: (l) => l.stage === 'Not Qualified' },
+];
 
 /* ═══════════════════════════════════════════
    ADD / EDIT LEAD MODAL
@@ -237,789 +311,80 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
 };
 
 /* ═══════════════════════════════════════════
-   CHECKLIST ROW  (native checkbox + label for reliable clicks)
+   ONE ROW OF THE TABLE
    ═══════════════════════════════════════════ */
-let checklistIdCounter = 0;
-const ChecklistRow = ({ checked, label, subtitle, badgeLabel, onToggle, borderBottom }) => {
-  const [localChecked, setLocalChecked] = useState(checked);
-  const [id] = useState(() => `chk-${++checklistIdCounter}`);
-
-  // sync with parent prop
-  useEffect(() => { setLocalChecked(checked); }, [checked]);
-
-  const handleChange = () => {
-    setLocalChecked((prev) => !prev);  // optimistic
-    onToggle();
-  };
-
-  const badgeColor = localChecked ? '#10b981' : (badgeLabel === 'No' ? '#ef4444' : '#f59e0b');
-  const badgeBg = localChecked ? '#052e16' : (badgeLabel === 'No' ? '#450a0a' : '#451a03');
+const LeadTableRow = ({ lead, onClick, selected, onToggleSelect }) => {
+  const status = getStatus(lead);
+  const live = isOpenLead(lead);
+  // a deadline on a finished lead is history — show it plainly, never as a warning
+  const timing = live ? describeTiming(lead) : { text: '', late: false, soon: false };
+  const dueColor = timing.late ? TONES.red.fg : timing.soon ? TONES.amber.fg : T.body;
 
   return (
-    <div style={{ borderBottom: borderBottom ? '1px solid #1e2540' : 'none' }}>
-      <input
-        type="checkbox"
-        id={id}
-        checked={localChecked}
-        onChange={handleChange}
-        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-      />
-      <label
-        htmlFor={id}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '10px 0', width: '100%', cursor: 'pointer',
-          userSelect: 'none',
-        }}
-      >
-        {localChecked
-          ? <CheckCircle style={{ width: '20px', height: '20px', color: '#10b981', flexShrink: 0 }} />
-          : <Circle style={{ width: '20px', height: '20px', color: '#6b7280', flexShrink: 0 }} />}
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: '14px', color: localChecked ? '#9ca3af' : '#e5e7eb', fontWeight: 500 }}>{label}</span>
-          {subtitle && <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{subtitle}</p>}
-        </div>
-        {badgeLabel && (
-          <span style={{
-            fontSize: '11px', fontWeight: 600, color: badgeColor,
-            padding: '2px 10px', borderRadius: '6px', background: badgeBg,
-          }}>
-            {localChecked ? (badgeLabel === 'No' ? 'Yes' : 'Verified') : badgeLabel}
-          </span>
-        )}
-      </label>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   VIEW DETAILS TOGGLE (expandable section)
-   ═══════════════════════════════════════════ */
-const ViewDetailsToggle = ({ title, children }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{ marginTop: '4px', marginBottom: '4px' }}>
-      <button
-        type="button"
-        onClick={() => setOpen((p) => !p)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: '#818cf8', fontSize: '12px', fontWeight: 600, padding: '4px 0',
-        }}
-      >
-        <Eye style={{ width: '14px', height: '14px' }} />
-        {open ? `Hide ${title}` : `View ${title}`}
-      </button>
-      {open && (
-        <div style={{
-          marginTop: '8px', padding: '14px', backgroundColor: '#111525',
-          border: '1px solid #1e2540', borderRadius: '10px',
-        }}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   MOVE TO ONBOARDING MODAL
-   ═══════════════════════════════════════════ */
-const MoveToOnboardingModal = ({ lead, teamMembers, onClose, onConfirm }) => {
-  const [spoc, setSpoc] = useState(lead.spoc || '');
-  const [contractType, setContractType] = useState('Retainer');
-  const [deadline, setDeadline] = useState('');
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}
-    >
-      <div
-        style={{ backgroundColor: '#1e2235', borderRadius: '14px', padding: '28px', width: '400px', border: '1px solid #2d3348' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'white', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UserPlus style={{ width: '18px', height: '18px', color: '#10b981' }} /> Move to Onboarding
-          </h3>
-          <X style={{ width: '18px', height: '18px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
-        </div>
-
-        <div style={{ padding: '12px 14px', backgroundColor: '#161b2e', borderRadius: '10px', border: '1px solid #1e2540', marginBottom: '16px' }}>
-          <p style={{ fontSize: '14px', fontWeight: 600, color: '#e5e7eb' }}>{lead.name}</p>
-          <p style={{ fontSize: '12px', color: '#9ca3af' }}>{lead.email}</p>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <label style={LABEL}>Assign SPOC</label>
-          <select
-            style={{ ...INPUT, cursor: 'pointer' }}
-            value={spoc}
-            onChange={(e) => setSpoc(e.target.value)}
-          >
-            <option value="">Select SPOC...</option>
-            {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '16px' }}>
-          <label style={LABEL}>Contract Type</label>
-          <select
-            style={{ ...INPUT, cursor: 'pointer' }}
-            value={contractType}
-            onChange={(e) => setContractType(e.target.value)}
-          >
-            {['Retainer', 'Royalty', 'Work-Based', 'Inhouse'].map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ marginBottom: '24px' }}>
-          <label style={LABEL}>Deadline</label>
-          <input
-            type="date"
-            style={{ ...INPUT, colorScheme: 'dark' }}
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-          />
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <button type="button" onClick={onClose} style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-          <button
-            type="button"
-            onClick={() => onConfirm({ spoc, contractType, deadline })}
-            style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <UserPlus style={{ width: '14px', height: '14px' }} /> Confirm & Move
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   SUB-TASK ROW  (native checkbox + label)
-   ═══════════════════════════════════════════ */
-let subTaskIdCounter = 0;
-const SubTaskRow = ({ task, leadId, onToggleSubtask }) => {
-  const [localDone, setLocalDone] = useState(task.done);
-  const [id] = useState(() => `stk-${++subTaskIdCounter}`);
-
-  useEffect(() => { setLocalDone(task.done); }, [task.done]);
-
-  const handleChange = () => {
-    setLocalDone((prev) => !prev);
-    onToggleSubtask(leadId, task._id, !task.done);
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <input
-          type="checkbox"
-          id={id}
-          checked={localDone}
-          onChange={handleChange}
-          style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-        />
-        <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
-          {localDone
-            ? <CheckSquare style={{ width: '18px', height: '18px', color: '#10b981' }} />
-            : <Square style={{ width: '18px', height: '18px', color: '#6b7280' }} />}
-          <span style={{ fontSize: '14px', color: localDone ? '#6b7280' : '#e5e7eb', textDecoration: localDone ? 'line-through' : 'none' }}>{task.text}</span>
-        </label>
-      </div>
-      {task.assignee && <span style={{ fontSize: '11px', color: '#9ca3af' }}>{task.assignee}</span>}
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   LEAD DETAIL MODAL
-   ═══════════════════════════════════════════ */
-const LeadDetailModal = ({
-  lead, onClose, onMoveNext, onUpdateLead,
-  onDeleteLead, onToggleSubtask,
-  onAddSubtask, teamMembers, onMoveToOnboarding, onMarkNotQualified, onRevertLead, onRestartOnboarding,
-}) => {
-  const { addToast } = useToast();
-  const { getOptions } = usePicklist();
-  const STAGES = getOptions('lead_stage');
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskText, setNewTaskText] = useState('');
-  const [newTaskAssignee, setNewTaskAssignee] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [showNotQualifiedConfirm, setShowNotQualifiedConfirm] = useState(false);
-  const [notQualifiedReason, setNotQualifiedReason] = useState('');
-
-  // editable text fields — save on blur
-  const [inquiryNotes, setInquiryNotes] = useState(lead.inquiryNotes || '');
-  const [meetingDate, setMeetingDate] = useState(lead.meetingDate || '');
-  const [meetingLink, setMeetingLink] = useState(lead.meetingLink || '');
-  const [meetingAssignedWith, setMeetingAssignedWith] = useState(lead.meetingAssignedWith || '');
-  const [meetingNotes, setMeetingNotes] = useState(lead.meetingNotes || '');
-
-  // keep local text state in sync when lead prop updates
-  useEffect(() => { setInquiryNotes(lead.inquiryNotes || ''); }, [lead.inquiryNotes]);
-  useEffect(() => { setMeetingDate(lead.meetingDate || ''); }, [lead.meetingDate]);
-  useEffect(() => { setMeetingLink(lead.meetingLink || ''); }, [lead.meetingLink]);
-  useEffect(() => { setMeetingAssignedWith(lead.meetingAssignedWith || ''); }, [lead.meetingAssignedWith]);
-  useEffect(() => { setMeetingNotes(lead.meetingNotes || ''); }, [lead.meetingNotes]);
-
-  const currentStageIdx = STAGES.indexOf(lead.stage);
-  const canMoveNext = currentStageIdx < STAGES.length - 1;
-  const nextStage = canMoveNext ? STAGES[currentStageIdx + 1] : null;
-  const subtasks = lead.subTasks || [];
-  const doneTasks = subtasks.filter((t) => t.done).length;
-  const date = fmtDate(lead.createdAt);
-
-  const update = useCallback(
-    (fields) => onUpdateLead(lead._id, fields),
-    [lead._id, onUpdateLead],
-  );
-
-  /* ── stage-specific task sections ── */
-  const renderStageTasks = () => {
-    if (lead.stage === 'New Enquiry') {
-      return (
-        <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-          <div style={{ ...FIELD_BOX, padding: '16px' }}>
-            <p style={SECTION_TITLE}>Inquiry Tasks</p>
-
-            <ChecklistRow
-              checked={!!lead.callDone}
-              label="Call Done?"
-              badgeLabel={lead.callDone ? 'Yes' : 'No'}
-              onToggle={() => update({ callDone: !lead.callDone })}
-              borderBottom
-            />
-
-            <div style={{ marginTop: '12px' }}>
-              <p style={SMALL_LABEL}>Inquiry Notes</p>
-              <textarea
-                value={inquiryNotes}
-                onChange={(e) => setInquiryNotes(e.target.value)}
-                onBlur={() => { if (inquiryNotes !== (lead.inquiryNotes || '')) update({ inquiryNotes }); }}
-                placeholder="Add notes from the inquiry call..."
-                style={{ ...INPUT, minHeight: '70px', resize: 'vertical' }}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (lead.stage === 'Meeting Set') {
-      return (
-        <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-          <div style={{ ...FIELD_BOX, padding: '16px' }}>
-            <p style={SECTION_TITLE}>Meeting Information</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div>
-                <p style={SMALL_LABEL}>Meeting Date</p>
-                <input type="date" value={meetingDate}
-                  onChange={(e) => setMeetingDate(e.target.value)}
-                  onBlur={() => { if (meetingDate !== (lead.meetingDate || '')) update({ meetingDate }); }}
-                  style={{ ...INPUT, colorScheme: 'dark' }} />
-              </div>
-              <div>
-                <p style={SMALL_LABEL}>Meeting Link</p>
-                <input value={meetingLink}
-                  onChange={(e) => setMeetingLink(e.target.value)}
-                  onBlur={() => { if (meetingLink !== (lead.meetingLink || '')) update({ meetingLink }); }}
-                  placeholder="https://meet.google.com/..."
-                  style={INPUT} />
-              </div>
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <p style={SMALL_LABEL}>Meeting Assigned With</p>
-              <input value={meetingAssignedWith}
-                onChange={(e) => setMeetingAssignedWith(e.target.value)}
-                onBlur={() => { if (meetingAssignedWith !== (lead.meetingAssignedWith || '')) update({ meetingAssignedWith }); }}
-                placeholder="e.g. John Doe, Rahul M."
-                style={INPUT} />
-            </div>
-            <div>
-              <p style={SMALL_LABEL}>Meeting Notes</p>
-              <textarea value={meetingNotes}
-                onChange={(e) => setMeetingNotes(e.target.value)}
-                onBlur={() => { if (meetingNotes !== (lead.meetingNotes || '')) update({ meetingNotes }); }}
-                placeholder="Agenda, discussion points, outcomes..."
-                style={{ ...INPUT, minHeight: '70px', resize: 'vertical' }} />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (lead.stage === 'Qualified Lead') {
-      return (
-        <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-          <div style={{ ...FIELD_BOX, padding: '16px' }}>
-            <p style={SECTION_TITLE}>Verification Checklist</p>
-
-            {/* Step 1 — Inquiry */}
-            <ChecklistRow
-              checked={!!lead.inquiryVerified}
-              label="Verify Inquiry (Step 1)"
-              subtitle={`Call: ${lead.callDone ? 'Done' : 'Not done'} · Notes: ${lead.inquiryNotes ? 'Added' : 'None'}`}
-              badgeLabel={lead.inquiryVerified ? 'Verified' : 'Pending'}
-              onToggle={() => update({ inquiryVerified: !lead.inquiryVerified })}
-              borderBottom
-            />
-            {/* View Inquiry Details */}
-            <ViewDetailsToggle title="Inquiry Details">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div><p style={SMALL_LABEL}>Call Done</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.callDone ? 'Yes' : 'No'}</p></div>
-                <div><p style={SMALL_LABEL}>Source</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.source || '—'}</p></div>
-              </div>
-              <div style={{ marginTop: '10px' }}>
-                <p style={SMALL_LABEL}>Inquiry Notes</p>
-                <p style={{ fontSize: '13px', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>{lead.inquiryNotes || 'No notes added'}</p>
-              </div>
-            </ViewDetailsToggle>
-
-            {/* Step 2 — Meeting */}
-            <div style={{ marginTop: '8px' }}>
-              <ChecklistRow
-                checked={!!lead.meetingVerified}
-                label="Verify Meeting (Step 2)"
-                subtitle={`Date: ${lead.meetingDate || 'Not set'} · Link: ${lead.meetingLink ? 'Added' : 'None'} · With: ${lead.meetingAssignedWith || 'N/A'}`}
-                badgeLabel={lead.meetingVerified ? 'Verified' : 'Pending'}
-                onToggle={() => update({ meetingVerified: !lead.meetingVerified })}
-              />
-            </div>
-            {/* View Meeting Details */}
-            <ViewDetailsToggle title="Meeting Details">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div><p style={SMALL_LABEL}>Meeting Date</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.meetingDate ? fmtDate(lead.meetingDate) : 'Not set'}</p></div>
-                <div><p style={SMALL_LABEL}>Assigned With</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.meetingAssignedWith || '—'}</p></div>
-              </div>
-              <div style={{ marginTop: '10px' }}>
-                <p style={SMALL_LABEL}>Meeting Link</p>
-                {lead.meetingLink
-                  ? <a href={lead.meetingLink} target="_blank" rel="noreferrer" style={{ fontSize: '13px', color: '#818cf8', wordBreak: 'break-all' }}>{lead.meetingLink}</a>
-                  : <p style={{ fontSize: '13px', color: '#6b7280' }}>No link added</p>}
-              </div>
-              <div style={{ marginTop: '10px' }}>
-                <p style={SMALL_LABEL}>Meeting Notes</p>
-                <p style={{ fontSize: '13px', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>{lead.meetingNotes || 'No notes added'}</p>
-              </div>
-            </ViewDetailsToggle>
-          </div>
-
-          {/* Onboarded Success Badge */}
-          {lead.movedToOnboarding && (
-            <div style={{ marginTop: '14px', background: 'rgba(16,185,129,0.12)', border: '1px solid #065f46', borderRadius: '10px', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <CheckCircle style={{ width: '18px', height: '18px', color: '#10b981' }} />
-                <span style={{ fontSize: '14px', fontWeight: 700, color: '#10b981' }}>Moved to Onboarding</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {lead.onboardingSpoc && (
-                  <div><p style={SMALL_LABEL}>Onboarding SPOC</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.onboardingSpoc}</p></div>
-                )}
-                {lead.onboardingContractType && (
-                  <div><p style={SMALL_LABEL}>Contract Type</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.onboardingContractType}</p></div>
-                )}
-              </div>
-              {lead.onboardedAt && (
-                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Onboarded on {fmtDate(lead.onboardedAt)}</p>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (lead.stage === 'Not Qualified') {
-      return (
-        <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-          <div style={{ ...FIELD_BOX, padding: '16px' }}>
-            <p style={SECTION_TITLE}>Lead Summary</p>
-            {lead.previousStage && (
-              <p style={{ fontSize: '12px', color: '#f87171', marginBottom: '8px' }}>
-                Moved from <span style={{ fontWeight: 700, color: '#fca5a5' }}>{lead.previousStage}</span>
-              </p>
-            )}
-            {lead.notQualifiedReason && (
-              <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(239,68,68,0.07)', border: '1px solid #991b1b', borderRadius: '8px' }}>
-                <p style={{ fontSize: '11px', fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Reason</p>
-                <p style={{ fontSize: '13px', color: '#fca5a5', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{lead.notQualifiedReason}</p>
-              </div>
-            )}
-
-            {/* Inquiry Summary */}
-            <div style={{ marginBottom: '12px', padding: '10px 12px', background: '#161b2e', borderRadius: '8px', border: '1px solid #2d3348' }}>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>Inquiry</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div><p style={SMALL_LABEL}>Call Done</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.callDone ? 'Yes' : 'No'}</p></div>
-                <div><p style={SMALL_LABEL}>Source</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.source || '—'}</p></div>
-              </div>
-              {lead.inquiryNotes && (
-                <div style={{ marginTop: '8px' }}>
-                  <p style={SMALL_LABEL}>Notes</p>
-                  <p style={{ fontSize: '13px', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>{lead.inquiryNotes}</p>
-                </div>
-              )}
-              <div style={{ marginTop: '6px' }}>
-                <p style={SMALL_LABEL}>Verified</p>
-                <p style={{ fontSize: '13px', color: lead.inquiryVerified ? '#10b981' : '#f87171' }}>{lead.inquiryVerified ? 'Yes' : 'No'}</p>
-              </div>
-            </div>
-
-            {/* Meeting Summary */}
-            <div style={{ marginBottom: '12px', padding: '10px 12px', background: '#161b2e', borderRadius: '8px', border: '1px solid #2d3348' }}>
-              <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>Meeting</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                <div><p style={SMALL_LABEL}>Date</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.meetingDate ? fmtDate(lead.meetingDate) : 'Not set'}</p></div>
-                <div><p style={SMALL_LABEL}>Assigned With</p><p style={{ fontSize: '13px', color: '#e5e7eb' }}>{lead.meetingAssignedWith || '—'}</p></div>
-              </div>
-              {lead.meetingLink && (
-                <div style={{ marginTop: '8px' }}>
-                  <p style={SMALL_LABEL}>Link</p>
-                  <a href={lead.meetingLink} target="_blank" rel="noreferrer" style={{ fontSize: '13px', color: '#818cf8', wordBreak: 'break-all' }}>{lead.meetingLink}</a>
-                </div>
-              )}
-              {lead.meetingNotes && (
-                <div style={{ marginTop: '8px' }}>
-                  <p style={SMALL_LABEL}>Notes</p>
-                  <p style={{ fontSize: '13px', color: '#e5e7eb', whiteSpace: 'pre-wrap' }}>{lead.meetingNotes}</p>
-                </div>
-              )}
-              <div style={{ marginTop: '6px' }}>
-                <p style={SMALL_LABEL}>Verified</p>
-                <p style={{ fontSize: '13px', color: lead.meetingVerified ? '#10b981' : '#f87171' }}>{lead.meetingVerified ? 'Yes' : 'No'}</p>
-              </div>
-            </div>
-
-            {/* Sub-tasks Summary */}
-            {(lead.subTasks || []).length > 0 && (
-              <div style={{ padding: '10px 12px', background: '#161b2e', borderRadius: '8px', border: '1px solid #2d3348' }}>
-                <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '8px' }}>Sub-Tasks</p>
-                {(lead.subTasks || []).map((t, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    {t.done
-                      ? <CheckSquare style={{ width: '14px', height: '14px', color: '#10b981' }} />
-                      : <Square style={{ width: '14px', height: '14px', color: '#6b7280' }} />}
-                    <span style={{ fontSize: '13px', color: t.done ? '#6b7280' : '#e5e7eb', textDecoration: t.done ? 'line-through' : 'none' }}>{t.text}</span>
-                    {t.assignee && <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: 'auto' }}>{t.assignee}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Revert Button */}
-            {lead.previousStage && (
-              <button
-                type="button"
-                onClick={() => { lead.movedToOnboarding ? onRestartOnboarding(lead._id) : onRevertLead(lead._id); onClose(); }}
-                style={{
-                  marginTop: '16px', width: '100%', padding: '10px 16px', borderRadius: '8px',
-                  border: '1px solid #6366f1', background: 'rgba(99,102,241,0.1)',
-                  color: '#818cf8', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}
-              >
-                <ArrowRight style={{ width: '14px', height: '14px', transform: 'rotate(180deg)' }} />
-                {lead.movedToOnboarding ? 'Re-start Onboarding' : `Revert to ${lead.previousStage}`}
-              </button>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
-    >
-      <div
-        style={{ backgroundColor: '#1e2235', borderRadius: '16px', width: '540px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* stage progress */}
-        <div style={{ padding: '20px 28px 0', display: 'flex', gap: '4px' }}>
-          {STAGES.map((s, i) => (
-            <div key={s} style={{ flex: 1, height: '4px', borderRadius: '2px', backgroundColor: i <= currentStageIdx ? '#6366f1' : '#2d3348' }} />
-          ))}
-        </div>
-
-        {/* header */}
-        <div style={{ padding: '20px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '44px', height: '44px', borderRadius: '50%',
-              background: lead.color || '#6366f1', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontWeight: 700, fontSize: '15px',
-            }}>
-              {lead.initials || lead.name?.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-            </div>
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>{lead.name}</h2>
-              <p style={{ fontSize: '13px', color: '#9ca3af' }}>{lead.genre}</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PriorityBadge priority={lead.priority} />
-            <button type="button" onClick={() => setConfirmDelete(true)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}>
-              <Trash2 style={{ width: '16px', height: '16px' }} />
-            </button>
-          </div>
-        </div>
-
-        {/* delete confirmation */}
-        {confirmDelete && (
-          <div style={{ padding: '0 28px', marginBottom: '12px' }}>
-            <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: '10px', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: '#fca5a5' }}>Delete this lead permanently?</span>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button type="button" onClick={() => setConfirmDelete(false)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-                <button type="button" onClick={() => { onDeleteLead(lead._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* info fields */}
-        <div style={{ padding: '0 28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          <div style={FIELD_BOX}><p style={SMALL_LABEL}>Source</p><p style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.source}</p></div>
-          <div style={FIELD_BOX}><p style={SMALL_LABEL}>Email</p><p style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.email}</p></div>
-        </div>
-        <div style={{ padding: '0 28px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          <div style={FIELD_BOX}><p style={SMALL_LABEL}>Phone</p><p style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.phone || '—'}</p></div>
-          <div style={FIELD_BOX}><p style={SMALL_LABEL}>Date</p><p style={{ fontSize: '14px', color: '#e5e7eb' }}>{date}</p></div>
-        </div>
-        <div style={{ padding: '0 28px', marginBottom: '12px' }}>
-          <div style={FIELD_BOX}><p style={SMALL_LABEL}>Notes</p><p style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.notes || 'No notes yet'}</p></div>
-        </div>
-        <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-          <div style={{ ...FIELD_BOX, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Assigned SPOC</p>
-            <div style={{ textAlign: 'right' }}>
-              {lead.spoc ? <span style={{ fontSize: '14px', color: '#e5e7eb' }}>{lead.spoc}</span> : <span style={{ fontSize: '13px', color: '#6b7280' }}>Unassigned</span>}
-              {lead.assignedDate && (
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>
-                  Assigned on {new Date(lead.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {lead.deadline && (() => {
-          const dlStatus = getDeadlineStatus(lead.deadline);
-          const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
-          return (
-            <div style={{ padding: '0 28px', marginBottom: '16px' }}>
-              <div style={{ ...FIELD_BOX, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <p style={{ fontSize: '11px', color: '#6b7280', textTransform: 'uppercase', fontWeight: 600 }}>Deadline</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{fmtDate(lead.deadline)}</span>
-                  {dlColor && (
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>
-                      {dlColor.label}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* stage tasks */}
-        {renderStageTasks()}
-
-        {/* sub-tasks */}
-        <div style={{ padding: '0 28px', marginBottom: '24px' }}>
-          <div style={{ ...FIELD_BOX, padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Sub-Tasks</span>
-                <span style={{ fontSize: '12px', color: '#6b7280' }}>{doneTasks}/{subtasks.length}</span>
-              </div>
-              <button type="button" onClick={() => setShowAddTask(true)} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer' }}>
-                <Plus style={{ width: '14px', height: '14px' }} /> Add
-              </button>
-            </div>
-
-            {subtasks.length > 0 && (
-              <div style={{ height: '4px', backgroundColor: '#2d3348', borderRadius: '2px', marginBottom: '14px' }}>
-                <div style={{ height: '100%', borderRadius: '2px', backgroundColor: '#6366f1', width: `${(doneTasks / subtasks.length) * 100}%`, transition: 'width 0.3s' }} />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {subtasks.map((task) => (
-                <SubTaskRow key={task._id} task={task} leadId={lead._id} onToggleSubtask={onToggleSubtask} />
-              ))}
-              {subtasks.length === 0 && !showAddTask && (
-                <p style={{ fontSize: '13px', color: '#6b7280', textAlign: 'center', padding: '8px 0' }}>No sub-tasks yet</p>
-              )}
-            </div>
-
-            {showAddTask && (
-              <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <input autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Describe the sub-task..." style={INPUT} />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}
-                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', cursor: 'pointer' }}>
-                    <option value="">Assign to...</option>
-                    {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-                  </select>
-                  <button type="button"
-                    onClick={() => { if (!newTaskText.trim()) return; onAddSubtask(lead._id, newTaskText.trim(), newTaskAssignee); setNewTaskText(''); setNewTaskAssignee(''); setShowAddTask(false); }}
-                    style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    Add Task
-                  </button>
-                  <button type="button"
-                    onClick={() => { setShowAddTask(false); setNewTaskText(''); setNewTaskAssignee(''); }}
-                    style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* footer */}
-        <div style={{ padding: '16px 28px', borderTop: '1px solid #2d3348', display: 'flex', justifyContent: 'flex-end', gap: '10px', flexWrap: 'wrap' }}>
-          <button type="button" onClick={onClose} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>Close</button>
-          <button type="button" onClick={() => {
-            update({ inquiryNotes, meetingDate, meetingLink, meetingAssignedWith, meetingNotes });
-            setSavedFlash(true);
-            setTimeout(() => setSavedFlash(false), 1500);
-            addToast('Progress saved successfully');
-          }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: savedFlash ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #374151, #4b5563)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', transition: 'background 0.3s' }}>
-            {savedFlash ? <><CheckCircle style={{ width: '16px', height: '16px' }} /> Saved!</> : <><Save style={{ width: '16px', height: '16px' }} /> Save Progress</>}
-          </button>
-
-          {/* Not Qualified — available for any stage except already Not Qualified or already onboarded */}
-          {lead.stage !== 'Not Qualified' && !lead.movedToOnboarding && (
-            <button type="button" onClick={() => setShowNotQualifiedConfirm(true)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <XCircle style={{ width: '16px', height: '16px' }} /> Not Qualified
-            </button>
-          )}
-
-          {/* Not Qualified confirmation panel */}
-          {showNotQualifiedConfirm && (
-            <div style={{ width: '100%', background: 'rgba(239,68,68,0.08)', border: '1px solid #991b1b', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-              <p style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 600, margin: 0 }}>⚠ Confirm: Mark as Not Qualified</p>
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' }}>Reason (optional)</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Budget constraints, not a good fit..."
-                  value={notQualifiedReason}
-                  onChange={(e) => setNotQualifiedReason(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', background: '#1a1f2e', border: '1px solid #991b1b', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => { setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); }} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-                <button type="button" onClick={() => { onMarkNotQualified(lead._id, notQualifiedReason); setShowNotQualifiedConfirm(false); setNotQualifiedReason(''); onClose(); }} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: 'white', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <XCircle style={{ width: '14px', height: '14px' }} /> Confirm Not Qualified
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Revert — only for Not Qualified with a previous stage */}
-          {lead.stage === 'Not Qualified' && lead.previousStage && (
-            <button type="button" onClick={() => { lead.movedToOnboarding ? onRestartOnboarding(lead._id) : onRevertLead(lead._id); onClose(); }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowRight style={{ width: '16px', height: '16px', transform: 'rotate(180deg)' }} /> {lead.movedToOnboarding ? 'Re-start Onboarding' : `Revert to ${lead.previousStage}`}
-            </button>
-          )}
-
-          {/* Move to Onboarding — only for Qualified Lead and not already onboarded */}
-          {lead.stage === 'Qualified Lead' && !lead.movedToOnboarding && (
-            <button type="button" onClick={() => setShowOnboardingModal(true)} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <UserPlus style={{ width: '16px', height: '16px' }} /> Move to Onboarding
-            </button>
-          )}
-
-          {/* Move to next stage — available for New Enquiry and Meeting Set */}
-          {canMoveNext && lead.stage !== 'Qualified Lead' && (
-            <button type="button" onClick={() => { onMoveNext(lead._id); onClose(); }} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowRight style={{ width: '16px', height: '16px' }} /> Move to {nextStage}
-            </button>
-          )}
-        </div>
-
-        {/* Move to Onboarding sub-modal */}
-        {showOnboardingModal && (
-          <MoveToOnboardingModal
-            lead={lead}
-            teamMembers={teamMembers}
-            onClose={() => setShowOnboardingModal(false)}
-            onConfirm={(opts) => { onMoveToOnboarding(lead, opts); setShowOnboardingModal(false); onClose(); }}
-          />
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════
-   LEAD CARD
-   ═══════════════════════════════════════════ */
-const LeadCard = ({ lead, onClick }) => {
-  const sourceIcon = {
-    'Website Form': <Mail style={{ width: '13px', height: '13px' }} />,
-    'LinkedIn Outreach': <Briefcase style={{ width: '13px', height: '13px' }} />,
-    'Instagram DM': <MessageSquare style={{ width: '13px', height: '13px' }} />,
-    'Industry Event': <Briefcase style={{ width: '13px', height: '13px' }} />,
-    'Referral': <ChevronRight style={{ width: '13px', height: '13px' }} />,
-    'Direct Outreach': <Phone style={{ width: '13px', height: '13px' }} />,
-  };
-  const date = fmtDate(lead.createdAt);
-  const dlStatus = getDeadlineStatus(lead.deadline);
-  const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
-
-  return (
-    <div
+    <tr
       onClick={() => onClick(lead)}
-      style={{ backgroundColor: '#161b2e', border: `1px solid ${dlColor ? dlColor.border : '#1e2540'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#3a3f60'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = dlColor ? dlColor.border : '#1e2540'; }}
+      style={{ cursor: 'pointer', transition: 'background 0.12s', background: selected ? TONES.indigo.bg : 'transparent' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = T.raised; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = selected ? TONES.indigo.bg : 'transparent'; }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <p style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{lead.name}</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {dlColor && (
-            <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>
-              {dlColor.label}
-            </span>
-          )}
-          <PriorityBadge priority={lead.priority} />
+      <td style={TD}>
+        <Checkbox checked={!!selected} onChange={onToggleSelect} label={`Select ${lead.name}`} />
+      </td>
+
+      <td style={TD}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
+          <div style={{
+            width: '34px', height: '34px', borderRadius: '9px', flexShrink: 0,
+            background: lead.color || T.accent, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff',
+          }}>
+            {lead.initials || (lead.name || '?').slice(0, 2).toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>{lead.name}</div>
+            <div style={{ fontSize: '12px', color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {[lead.email, lead.source].filter(Boolean).join('  ·  ')}
+            </div>
+          </div>
         </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-        <span style={{ color: '#6b7280' }}>{sourceIcon[lead.source] || <Mail style={{ width: '13px', height: '13px' }} />}</span>
-        <span style={{ fontSize: '12px', color: '#9ca3af' }}>{lead.source}</span>
-      </div>
-      <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>{lead.genre}</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        <Clock style={{ width: '12px', height: '12px', color: '#6b7280' }} />
-        <span style={{ fontSize: '11px', color: '#6b7280' }}>{date}</span>
-      </div>
-      {lead.movedToOnboarding && (
-        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'rgba(16,185,129,0.12)', borderRadius: '6px', width: 'fit-content' }}>
-          <CheckCircle style={{ width: '12px', height: '12px', color: '#10b981' }} />
-          <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Onboarded</span>
-        </div>
-      )}
-    </div>
+      </td>
+
+      <td style={TD}>
+        <Pill tone={status.tone} dot>{status.label}</Pill>
+        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '4px' }}>{lead.stage}</div>
+      </td>
+
+      <td style={TD}>
+        {lead.spoc
+          ? <span style={{ fontSize: '13.5px' }}>{lead.spoc}</span>
+          : <span style={{ color: T.faint, fontSize: '13.5px' }}>Unassigned</span>}
+      </td>
+
+      <td style={TD}>
+        {lead.deadline ? (
+          <>
+            <div style={{ fontSize: '13.5px', color: dueColor }}>
+              {timing.text && (timing.late || timing.soon) ? timing.text : `Due ${fmtDate(lead.deadline)}`}
+            </div>
+            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '3px' }}>Added {fmtDate(lead.createdAt) || '—'}</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '13.5px', color: T.faint }}>No deadline</div>
+            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '3px' }}>Added {fmtDate(lead.createdAt) || '—'}</div>
+          </>
+        )}
+      </td>
+
+      <td style={{ ...TD, textAlign: 'right' }}>
+        <IconButton
+          icon={Eye}
+          title={`Open ${lead.name}`}
+          tone="indigo"
+          onClick={(e) => { e.stopPropagation(); onClick(lead); }}
+        />
+      </td>
+    </tr>
   );
 };
 
@@ -1027,15 +392,38 @@ const LeadCard = ({ lead, onClick }) => {
    MAIN SALES PIPELINE PAGE
    ═══════════════════════════════════════════ */
 const SalesPipeline = () => {
+  const navigate = useNavigate();
   const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
   const { setCached, invalidate } = useDataCache();
   const STAGES = getOptions('lead_stage');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const openLead = useCallback((lead) => navigate(`/sales-pipeline/${lead._id}`), [navigate]);
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
   const debouncedQuery = useDebouncedValue(searchQuery, 250);
+  const [view, setView] = useUrlState(VIEW_DEFAULTS);
+  const [selected, setSelected] = useState(() => new Set());
+  const searchRef = useRef(null);
+
+  // the search box stays local so typing is instant, then lands in the URL
+  useEffect(() => {
+    if (debouncedQuery !== view.q) setView({ q: debouncedQuery, page: 1 });
+  }, [debouncedQuery, view.q, setView]);
+
+  // "/" jumps to the search box, the way most list tools behave
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      const tag = el && el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el && el.isContentEditable)) return;
+      e.preventDefault();
+      if (searchRef.current) searchRef.current.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const blockGuestAction = useCallback(() => {
     if (!isGuest) return false;
@@ -1059,7 +447,7 @@ const SalesPipeline = () => {
     return d.members || [];
   });
 
-  const leads = leadsQ.data || [];
+  const leads = useMemo(() => leadsQ.data || [], [leadsQ.data]);
   const teamMembers = teamQ.data || [];
   const members = membersQ.data || [];
   const loading = (leadsQ.loading && !leadsQ.data) || (teamQ.loading && !teamQ.data) || (membersQ.loading && !membersQ.data);
@@ -1074,7 +462,7 @@ const SalesPipeline = () => {
     expectedType: 'lead',
     records: leads,
     isReady: !loading,
-    onOpen: (lead) => setSelectedLead(lead),
+    onOpen: openLead,
     onMissing: () => addToast('This lead is no longer in the pipeline (deleted or moved to onboarding).', 'error'),
   });
 
@@ -1093,230 +481,240 @@ const SalesPipeline = () => {
     } catch (err) { console.error('Failed to add lead:', err); addToast('Failed to create lead', 'error'); }
   };
 
-  const handleDeleteLead = async (leadId) => {
-    if (blockGuestAction()) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}`, { method: 'DELETE' });
-      if (res.ok) { setLeads((p) => p.filter((l) => l._id !== leadId)); addToast('Lead deleted'); }
-      else addToast('Failed to delete lead', 'error');
-    } catch (err) { console.error('Failed to delete lead:', err); addToast('Failed to delete lead', 'error'); }
+  /* ── search → stage → status → sort ── */
+  const rows = useMemo(() => {
+    let list = leads;
+
+    const q = debouncedQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((l) =>
+        l.name.toLowerCase().includes(q) ||
+        (l._id && l._id.toLowerCase().includes(q)) ||
+        (l.email && l.email.toLowerCase().includes(q)) ||
+        (l.phone && l.phone.includes(q)) ||
+        (l.spoc && l.spoc.toLowerCase().includes(q)) ||
+        (l.source && l.source.toLowerCase().includes(q))
+      );
+    }
+    if (view.stage !== 'all') list = list.filter((l) => l.stage === view.stage);
+    const sf = STATUS_FILTERS.find((s) => s.id === view.status);
+    if (sf && sf.id !== 'all') list = list.filter(sf.test);
+
+    const cmp = COMPARATORS[view.sort] || COMPARATORS.createdAt;
+    return [...list].sort((a, b) => (view.dir === 'asc' ? cmp(a, b) : -cmp(a, b)));
+  }, [leads, debouncedQuery, view.stage, view.status, view.sort, view.dir]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / view.size));
+  const safePage = Math.min(Math.max(1, view.page), totalPages);
+  const pageRows = rows.slice((safePage - 1) * view.size, safePage * view.size);
+
+  const stageSegments = useMemo(() => STAGES.map((stage) => ({
+    id: stage,
+    label: stage,
+    tone: stageTone(stage),
+    value: leads.filter((l) => l.stage === stage).length,
+  })), [leads, STAGES]);
+
+  const statusOptions = STATUS_FILTERS.map((f) => ({
+    value: f.id, label: f.label, count: leads.filter(f.test).length,
+  }));
+
+  const overdueCount = leads.filter(isOverdue).length;
+  const filtersOn = !!searchQuery || view.stage !== 'all' || view.status !== 'all';
+  const resetAll = () => {
+    setSearchQuery('');
+    setView({ q: '', stage: 'all', status: 'all', page: 1 });
   };
+  const pickStage = (v) => setView({ stage: v, page: 1 });
+  const pickStatus = (v) => setView({ status: v, page: 1 });
+  const toggleSort = (key) => setView(
+    view.sort === key
+      ? { sort: key, dir: view.dir === 'asc' ? 'desc' : 'asc', page: 1 }
+      : { sort: key, dir: ['name', 'stage', 'spoc'].includes(key) ? 'asc' : 'desc', page: 1 },
+  );
 
-  const handleMoveNext = async (leadId) => {
-    if (blockGuestAction()) return;
-    const lead = leads.find((l) => l._id === leadId);
-    if (!lead) return;
-    const idx = STAGES.indexOf(lead.stage);
-    if (idx >= STAGES.length - 1) return;
+  /* ── ticking rows ── */
+  const pageIds = pageRows.map((l) => l._id);
+  const selectedOnPage = pageIds.filter((id) => selected.has(id)).length;
+  const allPageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+  const toggleRow = (id) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const togglePage = () => setSelected((prev) => {
+    const next = new Set(prev);
+    if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+    else pageIds.forEach((id) => next.add(id));
+    return next;
+  });
+
+  /* ── export what you are looking at, or just what you ticked ── */
+  const exportRows = (list, scope) => {
     try {
-      const res = await authFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify({ stage: STAGES[idx + 1] }) });
-      const data = await res.json();
-      if (res.ok) { setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l))); addToast(`Moved to ${STAGES[idx + 1]}`); }
-      else addToast('Failed to move lead', 'error');
-    } catch (err) { console.error('Failed to move lead:', err); addToast('Failed to move lead', 'error'); }
+      if (!list.length) { addToast('Nothing to export', 'error'); return; }
+      const data = list.map(toExportRow);
+      const sheet = XLSX.utils.json_to_sheet(data);
+      sheet['!cols'] = [{ wch: 26 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 18 },
+        { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 20 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Sales Pipeline');
+      const stamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `Sales_Pipeline_${scope}_${stamp}.xlsx`);
+      addToast(`Exported ${data.length} lead${data.length === 1 ? '' : 's'}`);
+    } catch (err) {
+      console.error('Export error:', err);
+      addToast('Failed to export Excel', 'error');
+    }
   };
-
-  const handleUpdateLead = useCallback(async (leadId, fields) => {
-    if (blockGuestAction()) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify(fields) });
-      const data = await res.json();
-      if (res.ok) {
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        setSelectedLead((prev) => (prev && prev._id === leadId ? data.lead : prev));
-      } else addToast('Failed to update lead', 'error');
-    } catch (err) { console.error('Failed to update lead:', err); addToast('Failed to update lead', 'error'); }
-  }, [authFetch, addToast, blockGuestAction]);
-
-  const handleToggleSubtask = async (leadId, taskId, done) => {
-    if (blockGuestAction()) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}/subtasks/${taskId}`, { method: 'PUT', body: JSON.stringify({ done }) });
-      const data = await res.json();
-      if (res.ok) {
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        setSelectedLead((prev) => (prev && prev._id === leadId ? data.lead : prev));
-      } else addToast('Failed to update task', 'error');
-    } catch (err) { console.error('Failed to toggle task:', err); addToast('Failed to update task', 'error'); }
-  };
-
-  const handleAddSubtask = async (leadId, text, assignee) => {
-    if (blockGuestAction()) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}/subtasks`, { method: 'POST', body: JSON.stringify({ text, assignee }) });
-      const data = await res.json();
-      if (res.ok) {
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        setSelectedLead((prev) => (prev && prev._id === leadId ? data.lead : prev));
-        addToast('Sub-task added');
-      } else addToast('Failed to add sub-task', 'error');
-    } catch (err) { console.error('Failed to add task:', err); addToast('Failed to add sub-task', 'error'); }
-  };
-
-  const handleMoveToOnboarding = async (lead, opts) => {
-    if (blockGuestAction()) return;
-    try {
-      // Create onboarding entry from the qualified lead
-      const res = await authFetch('/api/onboarding', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone || '',
-          role: [],
-          contractType: opts.contractType || 'Retainer',
-          spoc: opts.spoc || lead.spoc || '',
-          notes: lead.notes || '',
-          priority: lead.priority || 'medium',
-          deadline: opts.deadline || '',
-        }),
-      });
-      if (res.ok) {
-        invalidate('onboarding:list');
-        // Mark the lead as onboarded but keep it in Qualified Lead
-        const updateRes = await authFetch(`/api/leads/${lead._id}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            movedToOnboarding: true,
-            onboardingSpoc: opts.spoc || lead.spoc || '',
-            onboardingContractType: opts.contractType || 'Retainer',
-            onboardedAt: new Date().toISOString(),
-          }),
-        });
-        if (updateRes.ok) {
-          const data = await updateRes.json();
-          setLeads((p) => p.map((l) => (l._id === lead._id ? data.lead : l)));
-        }
-        addToast(`${lead.name} moved to Onboarding`);
-      } else addToast('Failed to create onboarding entry', 'error');
-    } catch (err) { console.error('Move to onboarding error:', err); addToast('Failed to move to onboarding', 'error'); }
-  };
-
-  const handleMarkNotQualified = async (leadId, reason) => {
-    if (blockGuestAction()) return;
-    const lead = leads.find((l) => l._id === leadId);
-    if (!lead) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ stage: 'Not Qualified', previousStage: lead.stage, notQualifiedReason: reason || '' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        addToast('Lead marked as Not Qualified');
-      } else addToast('Failed to update lead', 'error');
-    } catch (err) { console.error('Mark not qualified error:', err); addToast('Failed to update lead', 'error'); }
-  };
-
-  const handleRevertLead = async (leadId) => {
-    if (blockGuestAction()) return;
-    const lead = leads.find((l) => l._id === leadId);
-    if (!lead || !lead.previousStage) return;
-    try {
-      const res = await authFetch(`/api/leads/${leadId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ stage: lead.previousStage, previousStage: '' }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        addToast(`Lead reverted to ${lead.previousStage}`);
-      } else addToast('Failed to revert lead', 'error');
-    } catch (err) { console.error('Revert lead error:', err); addToast('Failed to revert lead', 'error'); }
-  };
-
-  const handleRestartOnboarding = async (leadId) => {
-    if (blockGuestAction()) return;
-    const lead = leads.find((l) => l._id === leadId);
-    if (!lead) return;
-    try {
-      const res = await authFetch(`/api/onboarding/restart/${leadId}`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        // Update lead in state (now back to qualified/onboarded)
-        setLeads((p) => p.map((l) => (l._id === leadId ? data.lead : l)));
-        invalidate('onboarding:list');
-        addToast(`${lead.name} re-added to Onboarding`);
-      } else addToast('Failed to restart onboarding', 'error');
-    } catch (err) { console.error('Restart onboarding error:', err); addToast('Failed to restart onboarding', 'error'); }
-  };
-
-  const filteredLeads = useMemo(() => {
-    if (!debouncedQuery.trim()) return leads;
-    const q = debouncedQuery.toLowerCase();
-    return leads.filter((l) =>
-      l.name.toLowerCase().includes(q) ||
-      (l._id && l._id.toLowerCase().includes(q)) ||
-      (l.email && l.email.toLowerCase().includes(q)) ||
-      (l.phone && l.phone.includes(q)) ||
-      (l.spoc && l.spoc.toLowerCase().includes(q)) ||
-      (l.source && l.source.toLowerCase().includes(q))
-    );
-  }, [leads, debouncedQuery]);
-
-  if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading pipeline...</div>;
 
   return (
-    <div style={{ padding: '32px 36px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Sales Pipeline</h1>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input
-                placeholder="Search by name, ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: '220px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
-              />
-            </div>
-            <button type="button" onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-              <Plus style={{ width: '16px', height: '16px' }} /> New Lead
-            </button>
-          </div>
-        </div>
-        <p style={{ fontSize: '14px', color: '#9ca3af' }}>Manage prospect enquiries from lead to qualification</p>
-      </div>
+    <div style={{ padding: '26px 30px 50px' }}>
+      <PageHeader
+        breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Sales Pipeline' }]}
+        title="Sales Pipeline"
+        subtitle="Track every enquiry from first contact through to onboarding."
+        actions={
+          <>
+            <Button variant="ghost" icon={Download} disabled={loading} onClick={() => exportRows(rows, 'view')}>
+              Export
+            </Button>
+            <Button icon={Plus} onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }}>
+              New Lead
+            </Button>
+          </>
+        }
+      />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', flex: 1, minHeight: 0 }}>
-        {STAGES.map((stage) => {
-          const stageLeads = filteredLeads.filter((l) => l.stage === stage);
-          return (
-            <div key={stage} style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '9px', height: '9px', borderRadius: '50%', backgroundColor: getStageColor(stage, STAGES) }} />
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{stage}</span>
-                </div>
-                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#1e2540', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#9ca3af' }}>{stageLeads.length}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, overflowY: 'auto' }}>
-                {stageLeads.map((lead) => <LeadCard key={lead._id} lead={lead} onClick={setSelectedLead} />)}
-              </div>
+      {/* A pointer, not a report: it says something needs attention and takes
+          you there. The number itself stays on the Overdue chip. */}
+      {!loading && leads.length > 0 && (
+        overdueCount > 0
+          ? (
+            <Banner
+              tone="amber"
+              icon={AlertTriangle}
+              action={<Button icon={ArrowRight} onClick={() => pickStatus('overdue')} style={{ padding: '8px 14px', fontSize: '13px' }}>Show them</Button>}
+            >
+              Some leads have passed their deadline.
+            </Banner>
+          )
+          : <Banner tone="green" icon={CheckCircle2}>Nothing is overdue. Everything here is on track.</Banner>
+      )}
+
+      {/* Where everything sits, and how to narrow it — one panel, no heading:
+          the page is named once, and each count appears once. */}
+      <Panel>
+        <DistributionBar
+          segments={stageSegments}
+          active={view.stage}
+          onSelect={pickStage}
+          emptyLabel="No leads yet"
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.border}` }}>
+          <Segmented options={statusOptions} value={view.status} onChange={pickStatus} tone="purple" />
+          <SearchInput
+            ref={searchRef}
+            icon={Search}
+            placeholder="Search name, email, phone or owner...    /"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ flex: '1 1 260px', maxWidth: '380px', marginLeft: 'auto' }}
+          />
+          {filtersOn && (
+            <Button variant="ghost" icon={X} onClick={resetAll} style={{ padding: '9px 14px', fontSize: '13px' }}>Reset</Button>
+          )}
+        </div>
+      </Panel>
+
+      {/* ── The list ── */}
+      <Card bodyStyle={{ padding: 0 }}>
+        {selected.size > 0 && (
+          <SelectionBar count={selected.size} onClear={() => setSelected(new Set())}>
+            <Button
+              variant="ghost"
+              icon={Download}
+              style={{ padding: '7px 13px', fontSize: '13px' }}
+              onClick={() => exportRows(leads.filter((l) => selected.has(l._id)), 'selected')}
+            >
+              Export selected
+            </Button>
+          </SelectionBar>
+        )}
+
+        {!loading && rows.length === 0 ? (
+          <EmptyState icon={Search} title={leads.length === 0 ? 'No leads yet' : 'Nothing matches these filters'}>
+            {leads.length === 0
+              ? 'Use “New Lead” above to add the first one.'
+              : <button type="button" onClick={resetAll} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '13.5px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset the filters</button>}
+          </EmptyState>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <TH width="44px">
+                      {!loading && pageIds.length > 0 && (
+                        <Checkbox
+                          checked={allPageSelected}
+                          indeterminate={selectedOnPage > 0 && !allPageSelected}
+                          onChange={togglePage}
+                          label="Select every lead on this page"
+                        />
+                      )}
+                    </TH>
+                    {COLUMNS.map((col) => (
+                      <TH
+                        key={col.key}
+                        sortable
+                        width={col.width}
+                        active={view.sort === col.key}
+                        dir={view.dir}
+                        onClick={() => toggleSort(col.key)}
+                      >
+                        {col.label}
+                      </TH>
+                    ))}
+                    <TH width="70px" align="right">Actions</TH>
+                  </tr>
+                </thead>
+                {loading ? (
+                  <TableSkeleton columns={['17px', '55%', '70%', '60%', '80%', '65%', '32px']} rows={7} />
+                ) : (
+                  <tbody>
+                    {pageRows.map((lead) => (
+                      <LeadTableRow
+                        key={lead._id}
+                        lead={lead}
+                        onClick={openLead}
+                        selected={selected.has(lead._id)}
+                        onToggleSelect={() => toggleRow(lead._id)}
+                      />
+                    ))}
+                  </tbody>
+                )}
+              </table>
             </div>
-          );
-        })}
-      </div>
+            {!loading && (
+              <div style={{ padding: '0 16px' }}>
+                <Pagination
+                  page={safePage}
+                  pageSize={view.size}
+                  total={rows.length}
+                  onPageChange={(p) => setView({ page: p })}
+                  onPageSizeChange={(n) => setView({ size: n, page: 1 })}
+                  pageSizeOptions={[25, 50, 100]}
+                  label="Rows per page"
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
 
       {showAddModal && <LeadFormModal onClose={() => setShowAddModal(false)} onSubmit={handleAddLead} teamMembers={teamMembers} members={members} />}
-      {selectedLead && (
-        <LeadDetailModal
-          lead={selectedLead}
-          onClose={() => setSelectedLead(null)}
-          onMoveNext={handleMoveNext}
-          onUpdateLead={handleUpdateLead}
-          onDeleteLead={handleDeleteLead}
-          onToggleSubtask={handleToggleSubtask}
-          onAddSubtask={handleAddSubtask}
-          teamMembers={teamMembers}
-          onMoveToOnboarding={handleMoveToOnboarding}
-          onMarkNotQualified={handleMarkNotQualified}
-          onRevertLead={handleRevertLead}
-          onRestartOnboarding={handleRestartOnboarding}
-        />
-      )}
     </div>
   );
 };

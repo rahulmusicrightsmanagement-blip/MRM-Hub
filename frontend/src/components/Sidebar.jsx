@@ -14,6 +14,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { APP_VERSION } from '../version';
 
 const navItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -197,6 +198,12 @@ const Sidebar = () => {
         >
           <LogOut style={{ width: '16px', height: '16px' }} />
         </button>
+      </div>
+
+      <div style={{ padding: '10px 20px 14px', textAlign: 'center' }}>
+        <span style={{ fontSize: '11px', color: '#4b5563', letterSpacing: '0.4px' }}>
+          version-{APP_VERSION}
+        </span>
       </div>
     </aside>
   );

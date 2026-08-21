@@ -1,23 +1,10 @@
-import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NotificationPanel from './NotificationPanel';
 
-const pageTitles = {
-  '/': 'Dashboard',
-  '/sales-pipeline': 'Sales Pipeline',
-  '/onboarding': 'Onboarding',
-  '/society-reg': 'Society Reg.',
-  '/royalty': 'Music Works',
-  '/members': 'Members',
-  '/tracker': 'Tracker',
-  '/analytics': 'Reports',
-  '/spoc-management': 'SPOC Management',
-};
-
+/* This bar used to repeat the page name, which the sidebar highlights and every
+   page prints as its own heading — three copies of the same word on screen at
+   once. It is a utility bar now: notifications and the date, nothing else. */
 const Layout = ({ children }) => {
-  const location = useLocation();
-  const title = pageTitles[location.pathname] || 'MRM Hub';
-
   const today = new Date();
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -32,14 +19,13 @@ const Layout = ({ children }) => {
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '18px 36px',
+            justifyContent: 'flex-end',
+            padding: '14px 30px',
             borderBottom: '1px solid #1e2540',
             backgroundColor: '#0f1117',
             flexShrink: 0,
           }}
         >
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{title}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <NotificationPanel />
             <span style={{ fontSize: '14px', color: '#9ca3af' }}>{dateStr}</span>
