@@ -11,6 +11,22 @@
  */
 import { T } from '../theme';
 
+/**
+ * The stages a client actually walks through.
+ *
+ * The `onboarding_stage` picklist carries 'Not Qualified' as a seventh entry,
+ * but nothing ever sits there: rejecting a client DELETES the onboarding entry
+ * and marks the *lead* Not Qualified instead. Left in, it put a locked
+ * "Not Qualified" tile on the end of the journey rail, made the banner read
+ * "Step 1 of 7", and — worse — broke the rule that advancing stops one short
+ * of "Completed", because that rule is written as `length - 2`.
+ *
+ * Kept here, in the one plain .js module both onboarding pages already import,
+ * so exporting it cannot trip `react-refresh/only-export-components`.
+ */
+export const EXIT_STAGES = ['Not Qualified'];
+export const journeyStages = (stages) => stages.filter((s) => !EXIT_STAGES.includes(s));
+
 export const fmtDateISO = (d) => {
   const dt = new Date(d);
   if (Number.isNaN(dt.getTime())) return '';
@@ -22,12 +38,12 @@ export const fmtDateISO = (d) => {
 export const inputStyle = {
   width: '100%', padding: '10px 13px', borderRadius: '9px',
   border: `1px solid ${T.border}`, backgroundColor: T.bg,
-  color: '#fff', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+  color: T.heading, fontSize: '14px', outline: 'none', boxSizing: 'border-box',
 };
 
 export const labelStyle = {
   fontSize: '11px', fontWeight: 700, color: T.faint, letterSpacing: '0.6px',
-  textTransform: 'uppercase', marginBottom: '7px', display: 'block',
+  textTransform: 'uppercase', marginBottom: '6px', display: 'block',
 };
 
 export const cardBg = T.bg;

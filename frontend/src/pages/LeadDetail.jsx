@@ -1,17 +1,20 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   User, Phone, Mail, CalendarCheck, ShieldCheck, Plus, Save, Trash2, ArrowRight,
   XCircle, UserPlus, CheckCircle, Circle, CheckSquare, Square, X, ExternalLink,
+  StickyNote, Video, Clock, Users, Flag, Milestone,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
-import { T, TONES, LABEL } from '../theme';
+import { T, TONES, LABEL, SP, ROW_PAD } from '../theme';
 import {
   PageHeader, Button, Card, Stepper, FormGrid, Input, Textarea, Select,
-  Pill, Field, FieldGrid, EmptyState, Banner,
+  Pill, Field, EmptyState, Banner,
+  SubHead, Avatar, PersonChip, ContactRow, Choice, DateTile, Ring, ActionTile, Summary,
+  PageBody, StagePicker, ListPanel, DecisionRow,
 } from '../components/studio';
 
 const fmtDate = (d) => {
@@ -27,6 +30,21 @@ const toDateInput = (d) => {
   const t = new Date(d);
   if (Number.isNaN(t.getTime())) return '';
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+
+/* "in 5 days" / "3 days ago" — a date you have to subtract from is a date
+   nobody reads. Returns '' for anything unparseable, because imported records
+   carry junk in their date fields. */
+const relDay = (d) => {
+  if (!d) return '';
+  const t = new Date(d);
+  if (Number.isNaN(t.getTime())) return '';
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(t) - startOf(new Date())) / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days === -1) return 'yesterday';
+  return days > 0 ? `in ${days} days` : `${-days} days ago`;
 };
 
 /* Which step the lead is actually sitting on, worked out from its stage.
@@ -69,6 +87,23 @@ const stateOf = (stepId, lead, current) => {
   return 'todo';
 };
 
+/* A step is locked when the lead has not reached it yet.
+   ─────────────────────────────────────────────────────────────
+   Locking follows where the RECORD is, never where you have browsed, so
+   going back to an earlier stage locks the later ones again. It is purely a
+   navigation rule: nothing is ever cleared, so anything already filled in on
+   a step that re-locks is still there when the lead returns to it.
+
+   "Lead details" is never locked — it is the lead itself, not a stage. Once
+   the journey is over the whole record is readable, because locking an
+   archived lead would only get in the way of reading it. */
+const lockedSteps = (lead) => {
+  if (!lead || lead.movedToOnboarding || lead.stage === 'Not Qualified') return new Set();
+  const here = STEP_ORDER.indexOf(currentStepOf(lead));
+  if (here < 0) return new Set();
+  return new Set(STEP_ORDER.filter((id, i) => i > here && id !== 'details'));
+};
+
 /* The fields the Save button writes. Anything not listed here is an action,
    not a form value, and is saved the moment it is clicked. */
 const EDITABLE = [
@@ -90,32 +125,24 @@ const draftFrom = (lead) => ({
   meetingNotes: lead.meetingNotes || '',
 });
 
-/* ═══════════════════════════════════════════
-   A TICKABLE CHECK
-   ═══════════════════════════════════════════ */
-const Check = ({ checked, label, subtitle, onToggle, disabled }) => (
-  <button
-    type="button"
-    onClick={onToggle}
-    disabled={disabled}
-    style={{
-      display: 'flex', alignItems: 'flex-start', gap: '11px', width: '100%',
-      textAlign: 'left', padding: '13px 14px', borderRadius: '10px',
-      background: T.bg, border: `1px solid ${checked ? TONES.green.bd : T.border}`,
-      cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1,
-      transition: 'border-color 0.15s',
-    }}
-  >
-    {checked
-      ? <CheckCircle style={{ width: '19px', height: '19px', color: TONES.green.fg, flexShrink: 0 }} />
-      : <Circle style={{ width: '19px', height: '19px', color: T.faint, flexShrink: 0 }} />}
-    <span style={{ flex: 1, minWidth: 0 }}>
-      <span style={{ display: 'block', fontSize: '14px', fontWeight: 500, color: checked ? T.muted : '#fff' }}>{label}</span>
-      {subtitle && <span style={{ display: 'block', fontSize: '12px', color: T.faint, marginTop: '3px' }}>{subtitle}</span>}
-    </span>
-    <Pill tone={checked ? 'green' : 'grey'}>{checked ? 'Done' : 'Pending'}</Pill>
-  </button>
-);
+/* Priority carries a meaning you can see. A <Select> hides all three options
+   behind a click and renders "High" in exactly the same grey as "Low". */
+const PRIORITY_CHOICES = [
+  { value: 'high', label: 'High', tone: 'red', hint: 'Chase this one first' },
+  { value: 'medium', label: 'Medium', tone: 'amber', hint: 'Normal pace' },
+  { value: 'low', label: 'Low', tone: 'teal', hint: 'No rush' },
+];
+
+/* An <a> dressed as a ghost button — for the two places a step offers to do
+   the thing it is asking about (ring them, join the call). It has to be a
+   link rather than a <Button>, and it has to sit outside the tick button,
+   since an anchor inside a button is neither valid nor clickable. */
+const LINK_BUTTON = {
+  display: 'inline-flex', alignItems: 'center', gap: '8px', flexShrink: 0,
+  padding: '10px 15px', borderRadius: '9px', textDecoration: 'none',
+  background: T.surface, border: `1px solid ${T.borderHi}`,
+  color: T.body, fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
+};
 
 /* ═══════════════════════════════════════════
    HAND OVER TO ONBOARDING
@@ -126,11 +153,11 @@ const HandoverPanel = ({ lead, teamMembers, onCancel, onConfirm }) => {
   const [deadline, setDeadline] = useState('');
 
   return (
-    <div style={{ background: T.bg, border: `1px solid ${TONES.green.bd}`, borderRadius: '12px', padding: '18px', marginTop: '14px' }}>
-      <p style={{ fontSize: '14px', fontWeight: 600, color: '#fff', marginBottom: '4px' }}>Move {lead.name} to Onboarding</p>
-      <p style={{ fontSize: '13px', color: T.muted, marginBottom: '16px' }}>
-        This creates the onboarding record. The lead stays here for reference.
-      </p>
+    <div style={{ background: T.bg, border: `1px solid ${TONES.green.bd}`, borderRadius: '12px', padding: '18px', marginTop: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <Avatar name={lead.name} size={34} />
+        <p style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>Move {lead.name} to Onboarding</p>
+      </div>
       <FormGrid min="200px">
         <Select label="Assign SPOC" value={spoc} onChange={(e) => setSpoc(e.target.value)}>
           <option value="">Select SPOC...</option>
@@ -139,7 +166,7 @@ const HandoverPanel = ({ lead, teamMembers, onCancel, onConfirm }) => {
         <Select label="Contract type" value={contractType} onChange={(e) => setContractType(e.target.value)}>
           {['Retainer', 'Royalty', 'Work-Based', 'Inhouse'].map((t) => <option key={t} value={t}>{t}</option>)}
         </Select>
-        <Input label="Deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={{ colorScheme: 'dark' }} />
+        <Input label="Deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={{ colorScheme: 'light' }} />
       </FormGrid>
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '16px' }}>
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
@@ -204,6 +231,13 @@ const LeadDetail = () => {
     setStep(currentStepOf(lead) || 'details');
   }
 
+  /* The handover and reject forms are raised from the rail but rendered at the
+     top of the work column, so they only exist once the flag is set — the
+     scroll has to happen after that render, not in the click handler. */
+  useEffect(() => {
+    if (showHandover || showReject) actionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [showHandover, showReject]);
+
   const blockGuestAction = useCallback(() => {
     if (!isGuest) return false;
     addToast('Guest users have view-only access', 'error');
@@ -267,18 +301,34 @@ const LeadDetail = () => {
   const handleMoveNext = async () => {
     const idx = STAGES.indexOf(lead.stage);
     if (idx < 0 || idx >= STAGES.length - 1) return;
-    await patchLead({ stage: STAGES[idx + 1] }, `Moved to ${STAGES[idx + 1]}`);
+    const next = STAGES[idx + 1];
+    if (await patchLead({ stage: next }, `Moved to ${next}`)) showStageFor(next);
   };
+
+  /* Move to any stage, in either direction. Going forward is still one step
+     at a time so nobody skips a stage by accident; going back is unrestricted,
+     because a stepper that will not let you return is the single most common
+     complaint about the pattern. Coming back out of "Not Qualified" also
+     forgets where it was closed from — that is what reverting means. */
+  const handleMoveToStage = async (stage) => {
+    if (!lead || stage === lead.stage) return;
+    const fields = { stage };
+    if (lead.stage === 'Not Qualified') fields.previousStage = '';
+    if (await patchLead(fields, `Moved to ${stage}`)) showStageFor(stage);
+  };
+
+  /* Moving the record moves what you are reading with it, forwards or back.
+     The step panel is only chosen for you here and on first load — clicking a
+     step on the rail still just changes the view, because that is a different
+     intent and merging the two is what made the stepper confusing before. */
+  function showStageFor(stage) {
+    setStep(STEP_BY_STAGE[stage] || 'details');
+  }
 
   const handleReject = async () => {
     await patchLead({ stage: 'Not Qualified', previousStage: lead.stage, notQualifiedReason: rejectReason }, 'Marked as not qualified');
     setShowReject(false);
     setRejectReason('');
-  };
-
-  const handleRevert = async () => {
-    if (!lead.previousStage) return;
-    await patchLead({ stage: lead.previousStage, previousStage: '' }, `Reverted to ${lead.previousStage}`);
   };
 
   const handleHandover = async (opts) => {
@@ -356,7 +406,13 @@ const LeadDetail = () => {
       { id: 'meeting', icon: CalendarCheck, title: 'Meeting', description: 'When you are meeting and what was said' },
       { id: 'handover', icon: ShieldCheck, title: 'Qualify & hand over', description: 'Final checks, then move them on' },
     ];
-    return defs.map((d) => ({ ...d, state: stateOf(d.id, lead, currentStepOf(lead)) }));
+    const shut = lockedSteps(lead);
+    return defs.map((d) => ({
+      ...d,
+      state: stateOf(d.id, lead, currentStepOf(lead)),
+      locked: shut.has(d.id),
+      lockedHint: `${d.title} unlocks when this lead reaches that stage`,
+    }));
   }, [lead]);
   const currentIdx = steps.findIndex((st) => st.id === current);
 
@@ -374,7 +430,7 @@ const LeadDetail = () => {
         <Card>
           <EmptyState icon={XCircle} title="This lead is no longer in the pipeline">
             It may have been deleted, or it belongs to a colleague.{' '}
-            <button type="button" onClick={() => navigate('/sales-pipeline')} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '13.5px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+            <button type="button" onClick={() => navigate('/sales-pipeline')} style={{ background: 'none', border: 'none', color: T.accent, fontSize: '13.5px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
               Back to the pipeline
             </button>
           </EmptyState>
@@ -405,19 +461,99 @@ const LeadDetail = () => {
   const runPrimaryAction = () => {
     if (!primaryAction) return;
     if (primaryAction.kind === 'next') { handleMoveNext(); return; }
-    // the handover form lives further down the page — open it and go to it
     setShowHandover(true);
-    if (actionsRef.current) actionsRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const subtasks = lead.subTasks || [];
   const doneTasks = subtasks.filter((t) => t.done).length;
-  const stageIdx = STAGES.indexOf(lead.stage);
-  const canMoveNext = stageIdx >= 0 && stageIdx < STAGES.length - 1 && lead.stage !== 'Qualified Lead';
-  const nextStage = canMoveNext ? STAGES[stageIdx + 1] : null;
+
+  /* The lead has left the pipeline — onboarded, or closed. */
+  const finished = !!lead.movedToOnboarding || lead.stage === 'Not Qualified';
+
+  /* A deadline only means something while the lead is still live. Roughly 240
+     of these records are bulk-imported archive whose deadline lapsed months
+     ago and never mattered, so a finished lead is shown no countdown at all. */
+  const deadlineRel = finished ? '' : relDay(draft.deadline);
+  const deadlineHint = deadlineRel
+    ? (
+      <span style={{ color: deadlineRel.endsWith('ago') || deadlineRel === 'yesterday' ? TONES.red.fg : TONES.amber.fg }}>
+        {deadlineRel.endsWith('ago') || deadlineRel === 'yesterday' ? `Overdue — was due ${deadlineRel}` : `Due ${deadlineRel}`}
+      </span>
+    )
+    : undefined;
+
+  /* The meeting, read at a glance. The date follows the draft so the tile
+     moves as you pick one; meetingDate is free text on imported records, so
+     an unparseable value is shown as itself rather than swallowed. */
+  const meetingRelText = relDay(draft.meetingDate);
+  const meetingHeadline = fmtDate(draft.meetingDate)
+    ? `Meeting on ${fmtDate(draft.meetingDate)}`
+    : draft.meetingDate || 'No meeting in the diary yet';
+  const meetingRel = !meetingRelText
+    ? null
+    : meetingRelText.endsWith('ago') || meetingRelText === 'yesterday'
+      ? { label: meetingRelText, tone: 'grey' }
+      : meetingRelText === 'today'
+        ? { label: 'today', tone: 'amber' }
+        : { label: meetingRelText, tone: 'teal' };
+
+  const checksDone = (lead.inquiryVerified ? 1 : 0) + (lead.meetingVerified ? 1 : 0);
+
+  /* Every way this lead can be moved on, each stated with its consequence.
+     Built once and rendered below the stepper on every step — a lead sitting
+     at step 2 must never have its next action buried in step 4. */
+  const moveActions = [];
+  if (lead.stage === 'Qualified Lead' && !lead.movedToOnboarding) moveActions.push({
+    key: 'handover', icon: UserPlus, tone: 'green', title: 'Move to Onboarding',
+    subtitle: 'Creates the onboarding record. The lead stays here for reference.',
+    onClick: () => setShowHandover(true),
+  });
+  /* Reverting a closed lead is now just "pick an earlier stage" in the picker,
+     so only the one thing the picker cannot do is left here. */
+  if (lead.stage === 'Not Qualified' && lead.previousStage && lead.movedToOnboarding) moveActions.push({
+    key: 'restart', icon: UserPlus, tone: 'teal', title: 'Re-start onboarding',
+    subtitle: 'Puts this artist back into the onboarding queue.',
+    onClick: handleRestartOnboarding,
+  });
+  if (lead.stage !== 'Not Qualified' && !lead.movedToOnboarding) moveActions.push({
+    key: 'reject', icon: XCircle, tone: 'red', title: 'Not qualified',
+    subtitle: 'Closes the lead. Reopen it any time from the stage list above.',
+    onClick: () => setShowReject(true),
+  });
+  /* Nothing in the app linked the two records together, so a handed-over lead
+     was a dead end. The Onboarding list reads ?q= on load, so this lands on
+     the artist rather than on 240 rows of archive. */
+  if (lead.movedToOnboarding) moveActions.push({
+    key: 'view', icon: ExternalLink, tone: 'teal', title: 'View in Onboarding',
+    subtitle: 'Opens the onboarding list filtered to this artist.',
+    to: `/onboarding?q=${encodeURIComponent(lead.name || '')}`,
+  });
+
+  /* "Not Qualified" is a stage, but closing a lead asks for a reason, so it is
+     not something the picker should do silently — it stays an action. */
+  const pipelineStages = STAGES.filter((st) => st !== 'Not Qualified');
+  const allowStage = (stage, i, here) => {
+    if (here < 0) return true;      // the lead is closed: any stage reopens it
+    if (i < here) return true;      // back to anywhere
+    if (i === here + 1) return true; // forward one at a time
+    return `Move to ${pipelineStages[here + 1]} first — a lead advances one stage at a time.`;
+  };
+
+  /* What became of a finished lead. None of this appeared anywhere in the app
+     before, and none of it repeats the banner at the top of the page. */
+  const finishedFacts = [];
+  if (lead.movedToOnboarding) {
+    finishedFacts.push({ key: 'when', icon: CalendarCheck, label: 'Handed over', value: fmtDate(lead.onboardedAt) || 'Date not recorded' });
+    finishedFacts.push({ key: 'spoc', icon: User, label: 'Onboarding SPOC', value: lead.onboardingSpoc || 'Unassigned' });
+    finishedFacts.push({ key: 'contract', icon: ShieldCheck, label: 'Contract', value: lead.onboardingContractType || 'Not set' });
+  }
+  if (lead.stage === 'Not Qualified' && lead.previousStage) {
+    finishedFacts.push({ key: 'was', icon: ArrowRight, label: 'Closed from', value: lead.previousStage });
+  }
 
   return (
-    <div style={{ padding: '26px 30px 50px' }}>
+    // capped, because a card stretched across 1600px reads as an empty rectangle
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
       <PageHeader
         breadcrumb={[
           { label: 'Dashboard', to: '/' },
@@ -429,7 +565,7 @@ const LeadDetail = () => {
         actions={
           <>
             <Button variant="ghost" onClick={() => navigate('/sales-pipeline')}>Back</Button>
-            <Button icon={Save} onClick={handleSave} disabled={!dirty || saving} style={!dirty || saving ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
+            <Button icon={Save} onClick={handleSave} disabled={!dirty || saving}>
               {saving ? 'Saving...' : 'Save changes'}
             </Button>
           </>
@@ -456,25 +592,144 @@ const LeadDetail = () => {
         {journey.text}
       </Banner>
 
-      <Stepper steps={steps} active={step} onSelect={setStep} />
+      <Stepper
+        steps={steps}
+        active={step}
+        onSelect={setStep}
+        onLocked={(st) => addToast(
+          `${st.title} is locked until this lead reaches that stage. Use the Stage panel on the right to move it on.`,
+          'error',
+        )}
+      />
 
-      {/* ═══ STEP 1 ═══ */}
-      {step === 'details' && draft && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          <Card icon={User} title="Lead details" description="Who they are, who owns them, and by when." tone="indigo">
-            {/* read-only facts, so they read as information rather than as
-                form boxes you are meant to fill in */}
-            <FieldGrid min="190px">
-              <Field icon={User} label="Name">{lead.name}</Field>
-              <Field icon={Mail} label="Email">{lead.email || '—'}</Field>
-              <Field icon={Phone} label="Phone">{lead.phone || 'Not recorded'}</Field>
-              <Field icon={CalendarCheck} label="Added on">{fmtDate(lead.createdAt) || '—'}</Field>
-            </FieldGrid>
-            <p style={{ fontSize: '12px', color: T.faint, margin: '10px 0 22px' }}>
-              Name, email and phone are managed on the Members page.
-            </p>
+      <PageBody
+        rail={(
+          <>
+            {/* Who this is, pinned. It used to live inside step 1, which meant
+                that from step 2 onward you could not see whose lead you were
+                working on. */}
+            <Card icon={User} title="Who this is" tone="indigo" bodyStyle={{ padding: '15px 17px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <Avatar name={lead.name} size={42} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '14.5px', fontWeight: 700, color: T.heading, lineHeight: 1.25, wordBreak: 'break-word' }}>
+                    {lead.name || 'Unnamed lead'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: T.faint, marginTop: '2px' }}>
+                    {draft.genre || 'No genre recorded'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: '2px' }}>
+                <ContactRow
+                  icon={Mail} label="Email" tone="blue" empty="No email"
+                  value={lead.email} href={lead.email ? `mailto:${lead.email}` : undefined}
+                />
+                <ContactRow
+                  icon={Phone} label="Phone" tone="teal" empty="No phone"
+                  value={lead.phone} href={lead.phone ? `tel:${lead.phone}` : undefined}
+                />
+                <ContactRow icon={CalendarCheck} label="Added on" tone="grey" empty="Unknown" value={fmtDate(lead.createdAt)} />
+              </div>
+              <p style={{ fontSize: '11px', color: T.faint, marginTop: '10px', lineHeight: 1.5 }}>
+                Name, email and phone are managed on the Members page.
+              </p>
+            </Card>
 
-            <FormGrid>
+            {/* Forward one, back to anywhere. */}
+            <Card
+              icon={Milestone} title="Stage" tone="amber"
+              description="Forward one step at a time; back to any earlier one."
+              bodyStyle={{ padding: '15px 17px' }}
+            >
+              <StagePicker
+                stages={pipelineStages}
+                current={lead.stage}
+                onSelect={handleMoveToStage}
+                allow={allowStage}
+                onBlocked={(stage, why) => addToast(why, 'error')}
+              />
+              {lead.stage === 'Not Qualified' && (
+                <p style={{ fontSize: '12px', color: T.faint, marginTop: '11px', lineHeight: 1.5 }}>
+                  This lead is closed. Picking any stage above reopens it.
+                </p>
+              )}
+
+              {moveActions.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                  {moveActions.map((a) => (
+                    <ActionTile
+                      key={a.key} icon={a.icon} tone={a.tone}
+                      title={a.title} subtitle={a.subtitle}
+                      onClick={a.onClick} to={a.to}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {finishedFacts.length > 0 && (
+                <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: `1px solid ${T.border}` }}>
+                  <SubHead icon={ShieldCheck}>On the record</SubHead>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {finishedFacts.map((f) => (
+                      <Field key={f.key} icon={f.icon} label={f.label}>{f.value}</Field>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Deleting stays a quiet line, never its own bordered card. */}
+              <div style={{ borderTop: `1px solid ${T.border}`, marginTop: '16px', paddingTop: '14px' }}>
+                {confirmDelete ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <span style={{ fontSize: '12.5px', color: TONES.red.fg, lineHeight: 1.5 }}>
+                      Delete {lead.name} permanently? This cannot be undone.
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <Button variant="ghost" icon={X} onClick={() => setConfirmDelete(false)} style={{ padding: '7px 13px', fontSize: '12.5px' }}>Cancel</Button>
+                      <Button variant="danger" icon={Trash2} onClick={handleDelete} style={{ padding: '7px 13px', fontSize: '12.5px' }}>Yes, delete</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: T.faint, fontSize: '12.5px', cursor: 'pointer', padding: 0 }}
+                  >
+                    <Trash2 style={{ width: '13px', height: '13px' }} /> Delete this lead
+                  </button>
+                )}
+              </div>
+            </Card>
+          </>
+        )}
+      >
+        {/* Raised from the rail, but rendered here — a three-field form does
+            not belong in a 330px column. */}
+        {(showHandover || showReject) && (
+          <div ref={actionsRef}>
+            {showHandover && (
+              <Card icon={UserPlus} title={`Move ${lead.name} to Onboarding`} tone="green" description="Creates the onboarding record. The lead stays here for reference.">
+                <HandoverPanel lead={lead} teamMembers={teamMembers} onCancel={() => setShowHandover(false)} onConfirm={handleHandover} />
+              </Card>
+            )}
+            {showReject && (
+              <Card icon={XCircle} title={`Mark ${lead.name} as not qualified?`} tone="red" description="Closes the lead. You can reopen it from the stage list at any time.">
+                <Textarea label="Reason (optional)" span placeholder="e.g. Budget constraints, not a good fit..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} style={{ minHeight: '70px' }} />
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                  <Button variant="ghost" onClick={() => { setShowReject(false); setRejectReason(''); }}>Cancel</Button>
+                  <Button variant="danger" icon={XCircle} onClick={handleReject}>Confirm</Button>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ═══ STEP 1 ═══ */}
+        {step === 'details' && draft && (
+          <Card icon={User} title="Lead details" description="Who owns this lead, and by when." tone="indigo">
+            <SubHead icon={Users}>Ownership</SubHead>
+            <FormGrid min="280px">
               <Select label="Owner (SPOC)" value={draft.spoc} onChange={(e) => set('spoc', e.target.value)}>
                 <option value="">Unassigned</option>
                 {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
@@ -483,217 +738,207 @@ const LeadDetail = () => {
                 <option value="">Not set</option>
                 {sourceList.map((sName) => <option key={sName} value={sName}>{sName}</option>)}
               </Select>
-              <Select label="Priority" value={draft.priority} onChange={(e) => set('priority', e.target.value)}>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </Select>
+            </FormGrid>
+
+            <SubHead icon={Flag} style={{ marginTop: '24px' }}>Priority &amp; timing</SubHead>
+            <FormGrid min="280px">
+              <Choice label="Priority" options={PRIORITY_CHOICES} value={draft.priority} onChange={(v) => set('priority', v)} />
+              <Input
+                label="Deadline" type="date" value={draft.deadline} hint={deadlineHint}
+                onChange={(e) => set('deadline', e.target.value)} style={{ colorScheme: 'light' }}
+              />
               <Input label="Genre" placeholder="e.g. Bollywood Playback" value={draft.genre} onChange={(e) => set('genre', e.target.value)} />
-              <Input label="Deadline" type="date" value={draft.deadline} onChange={(e) => set('deadline', e.target.value)} style={{ colorScheme: 'dark' }} />
-              <Textarea label="Notes" span placeholder="Anything worth remembering about this lead..." value={draft.notes} onChange={(e) => set('notes', e.target.value)} />
             </FormGrid>
-          </Card>
-        </div>
-      )}
 
-      {/* ═══ STEP 2 ═══ */}
-      {step === 'call' && draft && (
-        <Card icon={Phone} title="First call" description="Tick this off once you have actually spoken to them." tone="blue">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <Check
-              checked={!!lead.callDone}
-              label="Intro call done"
-              subtitle={lead.callDone ? 'Saved as soon as you tick it' : 'Nobody has spoken to them yet'}
-              onToggle={() => patchLead({ callDone: !lead.callDone }, lead.callDone ? 'Call marked as not done' : 'Call marked as done')}
+            <SubHead icon={StickyNote} style={{ marginTop: '24px' }}>Notes</SubHead>
+            <Textarea
+              span placeholder="Anything worth remembering about this lead..."
+              value={draft.notes} onChange={(e) => set('notes', e.target.value)}
             />
-            <FormGrid>
-              <Textarea
-                label="Call notes" span
-                placeholder="What did they ask for? What did you promise?"
-                value={draft.inquiryNotes}
-                onChange={(e) => set('inquiryNotes', e.target.value)}
-              />
-            </FormGrid>
-          </div>
-        </Card>
-      )}
-
-      {/* ═══ STEP 3 ═══ */}
-      {step === 'meeting' && draft && (
-        <Card icon={CalendarCheck} title="Meeting" description="Put the meeting in the diary and record what came out of it." tone="teal">
-          <FormGrid>
-            <Input label="Meeting date" type="date" value={toDateInput(draft.meetingDate) || draft.meetingDate} onChange={(e) => set('meetingDate', e.target.value)} style={{ colorScheme: 'dark' }} />
-            <Select label="Meeting with" value={draft.meetingAssignedWith} onChange={(e) => set('meetingAssignedWith', e.target.value)}>
-              <option value="">Not set</option>
-              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-            </Select>
-            <Input label="Meeting link" span placeholder="https://meet.google.com/..." value={draft.meetingLink} onChange={(e) => set('meetingLink', e.target.value)} />
-            <Textarea label="Meeting notes" span placeholder="What was agreed?" value={draft.meetingNotes} onChange={(e) => set('meetingNotes', e.target.value)} />
-          </FormGrid>
-          {lead.meetingLink && (
-            <a
-              href={lead.meetingLink} target="_blank" rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', marginTop: '14px', fontSize: '13px', color: '#818cf8' }}
-            >
-              <ExternalLink style={{ width: '14px', height: '14px' }} /> Open the saved meeting link
-            </a>
-          )}
-        </Card>
-      )}
-
-      {/* ═══ STEP 4 ═══ */}
-      {step === 'handover' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-          <Card icon={ShieldCheck} title="Final checks" description="Confirm the earlier steps really are complete." tone="green">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <Check
-                checked={!!lead.inquiryVerified}
-                label="Enquiry verified"
-                subtitle={`Call: ${lead.callDone ? 'done' : 'not done'} · Notes: ${lead.inquiryNotes ? 'added' : 'none'}`}
-                onToggle={() => patchLead({ inquiryVerified: !lead.inquiryVerified })}
-              />
-              <Check
-                checked={!!lead.meetingVerified}
-                label="Meeting verified"
-                subtitle={`Date: ${fmtDate(lead.meetingDate) || 'not set'} · Link: ${lead.meetingLink ? 'added' : 'none'} · With: ${lead.meetingAssignedWith || 'not set'}`}
-                onToggle={() => patchLead({ meetingVerified: !lead.meetingVerified })}
-              />
-            </div>
-            <div style={{ marginTop: '16px' }}>
-              <FieldGrid>
-                <Field icon={Phone} label="Call">{lead.callDone ? 'Done' : 'Not done'}</Field>
-                <Field icon={CalendarCheck} label="Meeting date">{fmtDate(lead.meetingDate) || 'Not set'}</Field>
-                <Field icon={User} label="Owner">{lead.spoc || 'Unassigned'}</Field>
-              </FieldGrid>
-            </div>
           </Card>
+        )}
 
-          <Card
-            icon={CheckSquare} title="Sub-tasks"
-            description={subtasks.length ? `${doneTasks} of ${subtasks.length} done` : 'Break the work down if it helps.'}
-            tone="indigo"
-            actions={<Button variant="ghost" icon={Plus} onClick={() => setAddingTask(true)} style={{ padding: '8px 14px', fontSize: '13px' }}>Add</Button>}
-          >
-            {subtasks.length > 0 && (
-              <div style={{ height: '4px', background: T.border, borderRadius: '2px', marginBottom: '16px' }}>
-                <div style={{ height: '100%', borderRadius: '2px', background: T.accent, width: `${(doneTasks / subtasks.length) * 100}%`, transition: 'width 0.3s' }} />
+        {/* ═══ STEP 2 ═══ */}
+        {step === 'call' && draft && (
+          <Card icon={Phone} title="First call" description="Answer the one question this step asks, then write down what came of it." tone="blue">
+            <ListPanel>
+              <DecisionRow
+                icon={Phone}
+                question="Has the intro call happened?"
+                help="Saves the moment you answer. Nothing else on this step needs it."
+                value={!!lead.callDone}
+                onChange={(v) => patchLead({ callDone: v }, v ? 'Call marked as done' : 'Call marked as not done')}
+                facts={[
+                  { label: 'Owner', value: lead.spoc || 'Unassigned', tone: lead.spoc ? undefined : 'grey' },
+                  { label: 'Notes', value: draft.inquiryNotes ? 'Written' : 'None yet', tone: draft.inquiryNotes ? 'green' : 'grey' },
+                ]}
+                action={lead.phone && (
+                  <a href={`tel:${lead.phone}`} className="sc-tile" style={LINK_BUTTON}>
+                    <Phone style={{ width: '15px', height: '15px' }} /> Call
+                  </a>
+                )}
+              />
+            </ListPanel>
+
+            <SubHead icon={StickyNote} style={{ marginTop: '24px' }}>What came of it</SubHead>
+            <Textarea
+              span placeholder="What did they ask for? What did you promise?"
+              value={draft.inquiryNotes} onChange={(e) => set('inquiryNotes', e.target.value)}
+            />
+          </Card>
+        )}
+
+        {/* ═══ STEP 3 ═══ */}
+        {step === 'meeting' && draft && (
+          <Card icon={CalendarCheck} title="Meeting" description="Put the meeting in the diary and record what came out of it." tone="teal">
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: SP.base, flexWrap: 'wrap',
+              background: T.bg, border: `1px solid ${T.border}`, borderRadius: '12px', padding: ROW_PAD,
+            }}>
+              <DateTile date={draft.meetingDate} tone="teal" />
+              <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                <div style={{ fontSize: '14.5px', fontWeight: 600, color: T.heading, wordBreak: 'break-word' }}>
+                  {meetingHeadline}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '9px' }}>
+                  {meetingRel && <Pill tone={meetingRel.tone} icon={Clock}>{meetingRel.label}</Pill>}
+                  <PersonChip name={draft.meetingAssignedWith} empty="Nobody assigned yet" />
+                </div>
               </div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {subtasks.map((task) => (
-                <button
-                  key={task._id}
-                  type="button"
-                  onClick={() => toggleSubtask(task._id, !task.done)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '11px', width: '100%', textAlign: 'left',
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0',
-                  }}
-                >
-                  {task.done
-                    ? <CheckSquare style={{ width: '17px', height: '17px', color: TONES.green.fg, flexShrink: 0 }} />
-                    : <Square style={{ width: '17px', height: '17px', color: T.faint, flexShrink: 0 }} />}
-                  <span style={{ flex: 1, fontSize: '14px', color: task.done ? T.faint : T.body, textDecoration: task.done ? 'line-through' : 'none' }}>
-                    {task.text}
-                  </span>
-                  {task.assignee && <span style={{ fontSize: '12px', color: T.faint }}>{task.assignee}</span>}
-                </button>
-              ))}
-              {subtasks.length === 0 && !addingTask && (
-                <p style={{ fontSize: '13.5px', color: T.faint, padding: '6px 0' }}>No sub-tasks yet.</p>
+              {/* the saved link, never the half-typed one in the draft */}
+              {lead.meetingLink && (
+                <a href={lead.meetingLink} target="_blank" rel="noreferrer" className="sc-tile" style={LINK_BUTTON}>
+                  <Video style={{ width: '15px', height: '15px' }} /> Join meeting
+                </a>
               )}
             </div>
 
-            {addingTask && (
-              <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <Input label="What needs doing?" autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Describe the sub-task..." />
-                <FormGrid min="200px">
-                  <Select label="Assign to" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
-                    <option value="">Nobody in particular</option>
-                    {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-                  </Select>
-                </FormGrid>
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <Button variant="ghost" onClick={() => { setAddingTask(false); setNewTaskText(''); setNewTaskAssignee(''); }}>Cancel</Button>
-                  <Button icon={Plus} onClick={addSubtask}>Add sub-task</Button>
-                </div>
-              </div>
-            )}
+            <SubHead icon={CalendarCheck} style={{ marginTop: '24px' }}>The diary entry</SubHead>
+            <FormGrid min="280px">
+              <Input label="Meeting date" type="date" value={toDateInput(draft.meetingDate) || draft.meetingDate} onChange={(e) => set('meetingDate', e.target.value)} style={{ colorScheme: 'light' }} />
+              <Select label="Meeting with" value={draft.meetingAssignedWith} onChange={(e) => set('meetingAssignedWith', e.target.value)}>
+                <option value="">Not set</option>
+                {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+              </Select>
+              <Input label="Meeting link" placeholder="https://meet.google.com/..." value={draft.meetingLink} onChange={(e) => set('meetingLink', e.target.value)} />
+            </FormGrid>
+
+            <SubHead icon={StickyNote} style={{ marginTop: '24px' }}>What was agreed</SubHead>
+            <Textarea span placeholder="What was agreed?" value={draft.meetingNotes} onChange={(e) => set('meetingNotes', e.target.value)} />
           </Card>
+        )}
 
-        </div>
-      )}
+        {/* ═══ STEP 4 ═══ */}
+        {step === 'handover' && (
+          <>
+            <Card icon={ShieldCheck} title="Final checks" description="Two questions. Answer both and this lead is ready to hand over." tone="green">
+              <Summary
+                left={<Ring value={checksDone} total={2} tone={checksDone === 2 ? 'green' : 'amber'} caption="checks" />}
+                headline={checksDone === 2 ? 'Ready to hand over.' : 'Not ready to hand over yet.'}
+                detail={checksDone === 2
+                  ? 'Both answers are yes. "Move to Onboarding" is in the Stage panel.'
+                  : 'Answer yes once you are satisfied the work behind each one was done.'}
+                right={(
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: '6px' }}>Owner</div>
+                    <PersonChip name={lead.spoc} size={26} />
+                  </div>
+                )}
+              />
 
-      {/* ═══ Always on show: whatever step you are reading, the ways to move
-             this lead on are right here. ═══ */}
-      <div ref={actionsRef} style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginTop: '18px' }}>
-        <Card icon={ArrowRight} title="Move this lead on" description="These take effect straight away." tone="amber">
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {canMoveNext && (
-              <Button icon={ArrowRight} onClick={handleMoveNext}>Move to {nextStage}</Button>
-            )}
-            {lead.stage === 'Qualified Lead' && !lead.movedToOnboarding && (
-              <Button icon={UserPlus} onClick={() => setShowHandover(true)}>Move to Onboarding</Button>
-            )}
-            {lead.stage === 'Not Qualified' && lead.previousStage && (
-              <Button
-                variant="ghost"
-                icon={ArrowRight}
-                onClick={lead.movedToOnboarding ? handleRestartOnboarding : handleRevert}
-              >
-                {lead.movedToOnboarding ? 'Re-start onboarding' : `Revert to ${lead.previousStage}`}
-              </Button>
-            )}
-            {lead.stage !== 'Not Qualified' && !lead.movedToOnboarding && (
-              <Button variant="ghost" icon={XCircle} onClick={() => setShowReject(true)} style={{ color: TONES.red.fg }}>
-                Not qualified
-              </Button>
-            )}
-          </div>
+              <ListPanel>
+                <DecisionRow
+                  icon={Phone}
+                  question="Is the enquiry verified?"
+                  help="The intro call happened, and what came of it is written down."
+                  value={!!lead.inquiryVerified}
+                  onChange={(v) => patchLead({ inquiryVerified: v })}
+                  facts={[
+                    { label: 'Call', value: lead.callDone ? 'Done' : 'Not done', tone: lead.callDone ? 'green' : 'red' },
+                    { label: 'Notes', value: lead.inquiryNotes ? 'Written' : 'None', tone: lead.inquiryNotes ? 'green' : 'grey' },
+                  ]}
+                />
+                <DecisionRow
+                  icon={CalendarCheck}
+                  question="Is the meeting verified?"
+                  help="The meeting is in the diary, with someone attached to it."
+                  value={!!lead.meetingVerified}
+                  onChange={(v) => patchLead({ meetingVerified: v })}
+                  facts={[
+                    {
+                      label: 'Date',
+                      value: fmtDate(lead.meetingDate) || (lead.meetingDate ? String(lead.meetingDate).slice(0, 20) : 'Not set'),
+                      tone: lead.meetingDate ? 'green' : 'red',
+                    },
+                    { label: 'Link', value: lead.meetingLink ? 'Added' : 'None', tone: lead.meetingLink ? 'green' : 'grey' },
+                    { label: 'With', value: lead.meetingAssignedWith || 'Nobody', tone: lead.meetingAssignedWith ? 'green' : 'grey' },
+                  ]}
+                />
+              </ListPanel>
+            </Card>
 
-          {showHandover && (
-            <HandoverPanel lead={lead} teamMembers={teamMembers} onCancel={() => setShowHandover(false)} onConfirm={handleHandover} />
-          )}
-
-          {showReject && (
-            <div style={{ background: T.bg, border: `1px solid ${TONES.red.bd}`, borderRadius: '12px', padding: '18px', marginTop: '14px' }}>
-              <p style={{ fontSize: '14px', fontWeight: 600, color: TONES.red.fg, marginBottom: '12px' }}>Mark {lead.name} as not qualified?</p>
-              <Textarea label="Reason (optional)" span placeholder="e.g. Budget constraints, not a good fit..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} style={{ minHeight: '70px' }} />
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '14px' }}>
-                <Button variant="ghost" onClick={() => { setShowReject(false); setRejectReason(''); }}>Cancel</Button>
-                <Button icon={XCircle} onClick={handleReject} style={{ background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>Confirm</Button>
+            <Card
+              icon={CheckSquare} title="Sub-tasks"
+              description={subtasks.length ? `${doneTasks} of ${subtasks.length} done` : 'Break the work down if it helps.'}
+              tone="indigo"
+              actions={<Button variant="ghost" icon={Plus} onClick={() => setAddingTask(true)} style={{ padding: '8px 14px', fontSize: '13px' }}>Add</Button>}
+            >
+              {subtasks.length > 0 && (
+                <div style={{
+                  height: '6px', background: T.bg, border: `1px solid ${T.border}`,
+                  borderRadius: '4px', marginBottom: '16px', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    height: '100%', background: T.accentGradient,
+                    width: `${(doneTasks / subtasks.length) * 100}%`, transition: 'width 0.35s ease',
+                  }} />
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {subtasks.map((task) => (
+                  <button
+                    key={task._id}
+                    type="button"
+                    className="sc-row"
+                    onClick={() => toggleSubtask(task._id, !task.done)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left',
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '9px 10px',
+                    }}
+                  >
+                    {task.done
+                      ? <CheckSquare style={{ width: '17px', height: '17px', color: TONES.green.fg, flexShrink: 0 }} />
+                      : <Square style={{ width: '17px', height: '17px', color: T.faint, flexShrink: 0 }} />}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '14px', color: task.done ? T.faint : T.body, textDecoration: task.done ? 'line-through' : 'none' }}>
+                      {task.text}
+                    </span>
+                    {task.assignee && <PersonChip name={task.assignee} size={20} />}
+                  </button>
+                ))}
+                {subtasks.length === 0 && !addingTask && (
+                  <p style={{ fontSize: '13.5px', color: T.faint, padding: '6px 0' }}>No sub-tasks yet.</p>
+                )}
               </div>
-            </div>
-          )}
 
-          {lead.notQualifiedReason && (
-            <p style={{ marginTop: '14px', fontSize: '13px', color: T.muted }}>
-              <span style={{ ...LABEL, marginRight: '8px' }}>Reason</span>{lead.notQualifiedReason}
-            </p>
-          )}
-          {/* Deleting had its own bordered card with a red icon chip — far too
-              much shouting for an action nobody uses twice. A quiet line now. */}
-          <div style={{ borderTop: `1px solid ${T.border}`, marginTop: '18px', paddingTop: '16px' }}>
-            {confirmDelete ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13.5px', color: TONES.red.fg }}>
-                  Delete {lead.name} permanently? This cannot be undone.
-                </span>
-                <Button variant="ghost" icon={X} onClick={() => setConfirmDelete(false)} style={{ padding: '7px 13px', fontSize: '13px' }}>Cancel</Button>
-                <Button icon={Trash2} onClick={handleDelete} style={{ padding: '7px 13px', fontSize: '13px', background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}>Yes, delete</Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', background: 'none', border: 'none', color: T.faint, fontSize: '13px', cursor: 'pointer', padding: 0 }}
-              >
-                <Trash2 style={{ width: '13px', height: '13px' }} /> Delete this lead
-              </button>
-            )}
-          </div>
-        </Card>
-      </div>
+              {addingTask && (
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <Input label="What needs doing?" autoFocus value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Describe the sub-task..." />
+                  <FormGrid min="200px">
+                    <Select label="Assign to" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
+                      <option value="">Nobody in particular</option>
+                      {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+                    </Select>
+                  </FormGrid>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                    <Button variant="ghost" onClick={() => { setAddingTask(false); setNewTaskText(''); setNewTaskAssignee(''); }}>Cancel</Button>
+                    <Button icon={Plus} onClick={addSubtask}>Add sub-task</Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+      </PageBody>
     </div>
   );
 };

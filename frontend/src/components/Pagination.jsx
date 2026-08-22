@@ -15,10 +15,10 @@ const Pagination = ({
   const to = Math.min(safePage * pageSize, total);
 
   const btn = (disabled) => ({
-    background: '#141720',
-    border: '1px solid #1e2540',
+    background: '#FFFFFF',
+    border: '1px solid rgba(165, 214, 167, 0.55)',
     borderRadius: '6px',
-    color: disabled ? '#4b5563' : '#e5e7eb',
+    color: disabled ? '#5B7362' : '#1B5E20',
     padding: '6px 10px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     display: 'flex',
@@ -27,12 +27,12 @@ const Pagination = ({
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 4px', flexWrap: 'wrap', gap: '12px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9ca3af', fontSize: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4A6851', fontSize: '12px' }}>
         <span>{label}:</span>
         <select
           value={pageSize}
           onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
-          style={{ background: '#1a1e2e', color: '#e5e7eb', border: '1px solid #2d3348', borderRadius: '6px', padding: '5px 8px', fontSize: '12px', cursor: 'pointer', outline: 'none' }}
+          style={{ background: '#FFFFFF', color: '#1B5E20', border: '1px solid #A5D6A7', borderRadius: '6px', padding: '5px 8px', fontSize: '12px', cursor: 'pointer', outline: 'none' }}
         >
           {pageSizeOptions.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -42,7 +42,7 @@ const Pagination = ({
         <button onClick={() => onPageChange(Math.max(1, safePage - 1))} disabled={safePage <= 1} style={btn(safePage <= 1)}>
           <ChevronLeft size={14} />
         </button>
-        <span style={{ color: '#e5e7eb', fontSize: '12px', padding: '0 8px', fontWeight: 600 }}>
+        <span style={{ color: '#1B5E20', fontSize: '12px', padding: '0 8px', fontWeight: 600 }}>
           {safePage} / {totalPages}
         </span>
         <button onClick={() => onPageChange(Math.min(totalPages, safePage + 1))} disabled={safePage >= totalPages} style={btn(safePage >= totalPages)}>

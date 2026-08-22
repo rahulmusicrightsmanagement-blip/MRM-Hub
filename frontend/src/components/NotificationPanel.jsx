@@ -84,17 +84,17 @@ const NotificationPanel = () => {
   };
 
   const typeColors = {
-    task_assigned: '#60a5fa',
-    lead_assigned: '#34d399',
-    onboarding_assigned: '#fbbf24',
-    society_assigned: '#f472b6',
-    stage_changed: '#a78bfa',
-    document_uploaded: '#2dd4bf',
-    remark_added: '#fb923c',
-    status_changed: '#e879f9',
-    task_completed: '#4ade80',
-    deadline_approaching: '#f87171',
-    general: '#9ca3af',
+    task_assigned: '#0D47A1',
+    lead_assigned: '#2E7D32',
+    onboarding_assigned: '#7A4400',
+    society_assigned: '#AD1457',
+    stage_changed: '#256B29',
+    document_uploaded: '#004D40',
+    remark_added: '#BF360C',
+    status_changed: '#256B29',
+    task_completed: '#2E7D32',
+    deadline_approaching: '#B71C1C',
+    general: '#4A6851',
   };
 
   const getNotificationRoute = (n) => {
@@ -127,7 +127,7 @@ const NotificationPanel = () => {
     <div ref={panelRef} style={{ position: 'relative' }}>
       {/* Bell Icon */}
       <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-        <Bell style={{ width: '20px', height: '20px', color: '#9ca3af' }} />
+        <Bell style={{ width: '20px', height: '20px', color: '#4A6851' }} />
         {unreadCount > 0 && (
           <span
             style={{
@@ -136,7 +136,7 @@ const NotificationPanel = () => {
               right: '-6px',
               minWidth: '18px',
               height: '18px',
-              backgroundColor: '#ef4444',
+              backgroundColor: '#C62828',
               borderRadius: '50%',
               fontSize: '10px',
               fontWeight: 700,
@@ -161,8 +161,8 @@ const NotificationPanel = () => {
             right: 0,
             width: '380px',
             maxHeight: '480px',
-            backgroundColor: '#141720',
-            border: '1px solid #1e2540',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid rgba(165, 214, 167, 0.55)',
             borderRadius: '12px',
             boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
             zIndex: 1000,
@@ -172,15 +172,15 @@ const NotificationPanel = () => {
           }}
         >
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #1e2540' }}>
-            <h4 style={{ color: 'white', fontSize: '14px', fontWeight: 700, margin: 0 }}>Notifications</h4>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
+            <h4 style={{ color: '#1B5E20', fontSize: '14px', fontWeight: 700, margin: 0 }}>Notifications</h4>
             <div style={{ display: 'flex', gap: '8px' }}>
               {unreadCount > 0 && (
-                <button onClick={markAllRead} title="Mark all read" style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                <button onClick={markAllRead} title="Mark all read" style={{ background: 'none', border: 'none', color: '#0D47A1', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
                   <CheckCheck style={{ width: '16px', height: '16px' }} />
                 </button>
               )}
-              <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
+              <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}>
                 <X style={{ width: '16px', height: '16px' }} />
               </button>
             </div>
@@ -189,7 +189,7 @@ const NotificationPanel = () => {
           {/* List */}
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {notifications.length === 0 ? (
-              <div style={{ padding: '40px 16px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>
+              <div style={{ padding: '40px 16px', textAlign: 'center', color: '#5B7362', fontSize: '13px' }}>
                 No notifications yet
               </div>
             ) : (
@@ -201,32 +201,32 @@ const NotificationPanel = () => {
                     display: 'flex',
                     gap: '10px',
                     padding: '12px 16px',
-                    borderBottom: '1px solid #1e2540',
-                    backgroundColor: n.read ? 'transparent' : 'rgba(59, 130, 246, 0.05)',
+                    borderBottom: '1px solid rgba(165, 214, 167, 0.55)',
+                    backgroundColor: n.read ? 'transparent' : 'rgba(30, 136, 229, 0.05)',
                     alignItems: 'flex-start',
                     cursor: 'pointer',
                   }}
                 >
                   {/* Dot */}
-                  <div style={{ marginTop: '6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: n.read ? '#374151' : (typeColors[n.type] || '#9ca3af'), flexShrink: 0 }} />
+                  <div style={{ marginTop: '6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: n.read ? '#F1F6F1' : (typeColors[n.type] || '#F1F6F1'), flexShrink: 0 }} />
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '13px', fontWeight: n.read ? 400 : 600, color: n.read ? '#9ca3af' : 'white', margin: 0, lineHeight: 1.4 }}>
+                    <p style={{ fontSize: '13px', fontWeight: n.read ? 400 : 600, color: n.read ? '#4A6851' : 'white', margin: 0, lineHeight: 1.4 }}>
                       {n.title}
                     </p>
-                    {n.message && <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0', lineHeight: 1.3 }}>{n.message}</p>}
-                    <p style={{ fontSize: '11px', color: '#4b5563', margin: '4px 0 0' }}>
+                    {n.message && <p style={{ fontSize: '12px', color: '#5B7362', margin: '2px 0 0', lineHeight: 1.3 }}>{n.message}</p>}
+                    <p style={{ fontSize: '11px', color: '#5B7362', margin: '4px 0 0' }}>
                       {n.triggeredBy ? `by ${n.triggeredBy} · ` : ''}{timeAgo(n.createdAt)}
                     </p>
                   </div>
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                     {!n.read && (
-                      <button onClick={(e) => { e.stopPropagation(); markRead(n._id); }} title="Mark read" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                      <button onClick={(e) => { e.stopPropagation(); markRead(n._id); }} title="Mark read" style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                         <Check style={{ width: '14px', height: '14px' }} />
                       </button>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); deleteNotif(n._id); }} title="Delete" style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+                    <button onClick={(e) => { e.stopPropagation(); deleteNotif(n._id); }} title="Delete" style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                       <Trash2 style={{ width: '14px', height: '14px' }} />
                     </button>
                   </div>

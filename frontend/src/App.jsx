@@ -26,8 +26,8 @@ const ProtectedRoutes = () => {
 
   if (loading) {
     return (
-      <div style={{ width: '100vw', height: '100vh', backgroundColor: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#6b7280', fontSize: '16px' }}>Loading...</div>
+      <div style={{ width: '100vw', height: '100vh', backgroundColor: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#5B7362', fontSize: '16px' }}>Loading...</div>
       </div>
     );
   }
@@ -94,9 +94,9 @@ const SessionTimeoutModal = () => {
         style={{
           width: '400px',
           padding: '36px',
-          backgroundColor: '#141720',
+          backgroundColor: '#FFFFFF',
           borderRadius: '16px',
-          border: '1px solid #1e2540',
+          border: '1px solid rgba(165, 214, 167, 0.55)',
           textAlign: 'center',
         }}
       >
@@ -105,22 +105,22 @@ const SessionTimeoutModal = () => {
           width: '64px',
           height: '64px',
           borderRadius: '50%',
-          background: 'rgba(245,158,11,0.12)',
+          background: 'rgba(249, 168, 37, 0.12)',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '20px',
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#7A4400" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
         </div>
 
-        <h3 style={{ color: 'white', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
+        <h3 style={{ color: '#1B5E20', fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
           Session Timed Out
         </h3>
-        <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px' }}>
+        <p style={{ color: '#4A6851', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px' }}>
           You have been logged out due to 30 minutes of inactivity. Please sign in again to continue.
         </p>
 
@@ -131,7 +131,7 @@ const SessionTimeoutModal = () => {
             padding: '12px',
             borderRadius: '10px',
             border: 'none',
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
             color: 'white',
             fontSize: '15px',
             fontWeight: 600,

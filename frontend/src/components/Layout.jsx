@@ -1,5 +1,6 @@
 import Sidebar from './Sidebar';
 import NotificationPanel from './NotificationPanel';
+import { T } from '../theme';
 
 /* This bar used to repeat the page name, which the sidebar highlights and every
    page prints as its own heading — three copies of the same word on screen at
@@ -11,7 +12,7 @@ const Layout = ({ children }) => {
   const dateStr = `${days[today.getDay()]}, ${String(today.getDate()).padStart(2, '0')} ${months[today.getMonth()]} ${today.getFullYear()}`;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: '#0f1117' }}>
+    <div style={{ display: 'flex', height: '100vh', width: '100vw', backgroundColor: T.page }}>
       <Sidebar />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Top Header Bar */}
@@ -21,17 +22,19 @@ const Layout = ({ children }) => {
             alignItems: 'center',
             justifyContent: 'flex-end',
             padding: '14px 30px',
-            borderBottom: '1px solid #1e2540',
-            backgroundColor: '#0f1117',
+            borderBottom: `1px solid ${T.border}`,
+            backgroundColor: T.page,
             flexShrink: 0,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <NotificationPanel />
-            <span style={{ fontSize: '14px', color: '#9ca3af' }}>{dateStr}</span>
+            <span style={{ fontSize: '14px', color: T.muted }}>{dateStr}</span>
           </div>
         </header>
-        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', backgroundColor: '#0f1117' }}>
+        {/* the canvas: near-white, so a white card reads as raised and a mint
+            control reads as inset. It was the same mint as both of them. */}
+        <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', backgroundColor: T.page }}>
           {children}
         </main>
       </div>

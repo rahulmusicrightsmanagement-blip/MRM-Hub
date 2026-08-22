@@ -9,8 +9,8 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
 const SUPER_ADMIN_EMAIL = 'rahuljadhav0417@gmail.com';
 
 const CARD = {
-  backgroundColor: '#141720',
-  border: '1px solid #1e2235',
+  backgroundColor: '#FFFFFF',
+  border: '1px solid rgba(165, 214, 167, 0.55)',
   borderRadius: '12px',
   padding: '20px',
   marginBottom: '16px',
@@ -20,15 +20,15 @@ const INPUT = {
   width: '100%',
   padding: '9px 13px',
   borderRadius: '8px',
-  border: '1px solid #2d3348',
-  backgroundColor: '#1a1e2e',
-  color: '#e5e7eb',
+  border: '1px solid #A5D6A7',
+  backgroundColor: '#FFFFFF',
+  color: '#1B5E20',
   fontSize: '14px',
   outline: 'none',
   boxSizing: 'border-box',
 };
 
-const BTN = (bg = '#3b82f6', hover) => ({
+const BTN = (bg = '#0D47A1', hover) => ({
   padding: '8px 16px',
   borderRadius: '8px',
   border: 'none',
@@ -197,22 +197,22 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
         onClick={() => setExpanded((p) => !p)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <List style={{ width: '16px', height: '16px', color: '#6366f1' }} />
-          <span style={{ fontSize: '15px', fontWeight: 600, color: 'white' }}>{categoryLabel}</span>
+          <List style={{ width: '16px', height: '16px', color: '#256B29' }} />
+          <span style={{ fontSize: '15px', fontWeight: 600, color: '#1B5E20' }}>{categoryLabel}</span>
           <span
             style={{
               fontSize: '12px', padding: '2px 8px', borderRadius: '12px',
-              backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: 600,
+              backgroundColor: 'rgba(46, 125, 50, 0.15)', color: '#256B29', fontWeight: 600,
             }}
           >
             {items.length} items
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
-          <button style={{ ...BTN('#3b82f6'), fontSize: '12px', padding: '6px 12px' }} onClick={() => guardAction(() => { setAdding(true); setExpanded(true); })}>
+          <button style={{ ...BTN('#0D47A1'), fontSize: '12px', padding: '6px 12px' }} onClick={() => guardAction(() => { setAdding(true); setExpanded(true); })}>
             <Plus style={{ width: '13px', height: '13px' }} /> Add
           </button>
-          <span style={{ color: '#6b7280' }}>
+          <span style={{ color: '#5B7362' }}>
             {expanded ? <ChevronUp style={{ width: '16px', height: '16px' }} /> : <ChevronDown style={{ width: '16px', height: '16px' }} />}
           </span>
         </div>
@@ -232,10 +232,10 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') { setAdding(false); setNewValue(''); } }}
                 autoFocus
               />
-              <button style={BTN('#10b981')} onClick={handleAdd} disabled={loading}>
+              <button style={BTN('#2E7D32')} onClick={handleAdd} disabled={loading}>
                 <Save style={{ width: '14px', height: '14px' }} />
               </button>
-              <button style={{ ...BTN('#374151'), padding: '8px 12px' }} onClick={() => { setAdding(false); setNewValue(''); }}>
+              <button style={{ ...BTN('#4A6851'), padding: '8px 12px' }} onClick={() => { setAdding(false); setNewValue(''); }}>
                 <X style={{ width: '14px', height: '14px' }} />
               </button>
             </div>
@@ -243,7 +243,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
 
           {/* Items list */}
           {items.length === 0 ? (
-            <p style={{ color: '#6b7280', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>
+            <p style={{ color: '#5B7362', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>
               No items yet. Click "Init Defaults" or "Add" to get started.
             </p>
           ) : (
@@ -257,7 +257,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 14px', borderRadius: '8px',
-                    backgroundColor: '#0f1117', border: '1px solid #1e2235',
+                    backgroundColor: '#E8F5E9', border: '1px solid rgba(165, 214, 167, 0.55)',
                   }}
                 >
                   {editingId === item._id ? (
@@ -269,27 +269,27 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                         onKeyDown={(e) => { if (e.key === 'Enter') handleEdit(item._id); if (e.key === 'Escape') setEditingId(null); }}
                         autoFocus
                       />
-                      <button style={{ ...BTN('#10b981'), padding: '6px 10px' }} onClick={() => handleEdit(item._id)} disabled={loading}>
+                      <button style={{ ...BTN('#2E7D32'), padding: '6px 10px' }} onClick={() => handleEdit(item._id)} disabled={loading}>
                         <Save style={{ width: '13px', height: '13px' }} />
                       </button>
-                      <button style={{ ...BTN('#374151'), padding: '6px 10px' }} onClick={() => setEditingId(null)}>
+                      <button style={{ ...BTN('#4A6851'), padding: '6px 10px' }} onClick={() => setEditingId(null)}>
                         <X style={{ width: '13px', height: '13px' }} />
                       </button>
                     </div>
                   ) : (
                     <>
-                      <span style={{ fontSize: '14px', color: '#e5e7eb' }}>
+                      <span style={{ fontSize: '14px', color: '#1B5E20' }}>
                         {item.metadata?.flag && <span style={{ marginRight: '6px' }}>{item.metadata.flag}</span>}
                         {item.label || item.value}
                         {item.label && item.label !== item.value && (
-                          <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '8px' }}>({item.value})</span>
+                          <span style={{ fontSize: '12px', color: '#5B7362', marginLeft: '8px' }}>({item.value})</span>
                         )}
                       </span>
                       <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         {item._id && (
                           <>
                             <button
-                              style={{ background: 'none', border: 'none', color: dbIdx === 0 ? '#2d3348' : '#6b7280', cursor: dbIdx === 0 ? 'default' : 'pointer', padding: '4px' }}
+                              style={{ background: 'none', border: 'none', color: dbIdx === 0 ? '#4A6851' : '#5B7362', cursor: dbIdx === 0 ? 'default' : 'pointer', padding: '4px' }}
                               onClick={() => dbIdx > 0 && handleMove(dbIdx, -1)}
                               title="Move up"
                               disabled={loading || dbIdx === 0}
@@ -297,7 +297,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                               <ArrowUp style={{ width: '13px', height: '13px' }} />
                             </button>
                             <button
-                              style={{ background: 'none', border: 'none', color: dbIdx === dbItems.length - 1 ? '#2d3348' : '#6b7280', cursor: dbIdx === dbItems.length - 1 ? 'default' : 'pointer', padding: '4px' }}
+                              style={{ background: 'none', border: 'none', color: dbIdx === dbItems.length - 1 ? '#4A6851' : '#5B7362', cursor: dbIdx === dbItems.length - 1 ? 'default' : 'pointer', padding: '4px' }}
                               onClick={() => dbIdx < dbItems.length - 1 && handleMove(dbIdx, 1)}
                               title="Move down"
                               disabled={loading || dbIdx === dbItems.length - 1}
@@ -305,7 +305,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                               <ArrowDown style={{ width: '13px', height: '13px' }} />
                             </button>
                             <button
-                              style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px', marginLeft: '4px' }}
+                              style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '4px', marginLeft: '4px' }}
                               onClick={() => guardAction(() => { setEditingId(item._id); setEditValue(item.value); })}
                               title="Edit"
                             >
@@ -315,7 +315,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                         )}
                         {isSuperAdmin && item._id && (
                           <button
-                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                            style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', padding: '4px' }}
                             onClick={() => handleDelete(item._id, item.value)}
                             title="Delete"
                           >
@@ -323,7 +323,7 @@ const CategorySection = ({ categoryKey, categoryLabel, isSuperAdmin, token, onRe
                           </button>
                         )}
                         {!item._id && (
-                          <span style={{ fontSize: '11px', color: '#4b5563', fontStyle: 'italic' }}>default</span>
+                          <span style={{ fontSize: '11px', color: '#5B7362', fontStyle: 'italic' }}>default</span>
                         )}
                       </div>
                     </>
@@ -348,10 +348,10 @@ const PicklistManager = () => {
     <div style={{ padding: '28px', maxWidth: '860px', margin: '0 auto' }}>
       {/* Page Header */}
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'white', marginBottom: '6px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1B5E20', marginBottom: '6px' }}>
           Picklist Manager
         </h1>
-        <p style={{ color: '#6b7280', fontSize: '14px' }}>
+        <p style={{ color: '#5B7362', fontSize: '14px' }}>
           Manage dropdown options used across the app. Admins can add and edit items.
           {isSuperAdmin
             ? ' You can also delete items.'
@@ -362,7 +362,7 @@ const PicklistManager = () => {
       {/* Refresh button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
         <button
-          style={{ ...BTN('#1a1e2e'), border: '1px solid #2d3348' }}
+          style={{ ...BTN('#1B5E20'), border: '1px solid #A5D6A7' }}
           onClick={fetchPicklists}
           disabled={loading}
         >

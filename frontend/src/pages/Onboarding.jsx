@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Search, Download, Eye, X, AlertTriangle, CheckCircle2, ArrowRight,
+  Search, Download, X, AlertTriangle, CheckCircle2, ArrowRight, ChevronRight,
+  Flame, Mail, Clock, CalendarClock,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
@@ -12,10 +13,12 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlState } from '../hooks/useUrlState';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 import Pagination from '../components/Pagination';
-import { T, TONES, TD } from '../theme';
+import { journeyStages } from '../components/onboardingStyles';
+import { T, TONES, TD, toneOf } from '../theme';
 import {
-  PageHeader, Button, IconButton, Segmented, Card, Pill, DistributionBar,
+  PageHeader, Button, Segmented, Card, Pill, DistributionBar,
   SearchInput, TH, EmptyState, Checkbox, SelectionBar, TableSkeleton, Banner, Panel,
+  Avatar, PersonChip,
 } from '../components/studio';
 
 const fmtDate = (d) => {
@@ -73,7 +76,6 @@ const buildComparators = (stages) => ({
   name: (a, b) => text(a.name).localeCompare(text(b.name)),
   stage: (a, b) => stageRank(a, stages) - stageRank(b, stages),
   spoc: (a, b) => blanksLast(a.spoc) - blanksLast(b.spoc) || text(a.spoc).localeCompare(text(b.spoc)),
-  contractType: (a, b) => text(a.contractType).localeCompare(text(b.contractType)),
   deadline: (a, b) => { const d = daysToDeadline(a) - daysToDeadline(b); return Number.isNaN(d) ? 0 : d; },
   createdAt: (a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0),
 });
@@ -114,42 +116,124 @@ const toExportRow = (e) => ({
   'Added on': fmtDate(e.createdAt) || '',
 });
 
+/* The one inline text link on this page. A link is not a control, so it takes
+   the accent colour and an underline rather than a border. */
+const LINK = {
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  color: T.accent, fontSize: '13.5px', fontWeight: 600, textDecoration: 'underline',
+};
+
+/**
+ * How far along this client is, as six little bars rather than the words
+ * "Step 3 of 6".
+ *
+ * It is the same fact, so nothing is being said twice — but a column of these
+ * has a shape you can read down the page in one sweep, which a column of
+ * sentences does not. The exact number is on the tooltip for anyone who wants
+ * it, and the whole thing costs 4px of height. It deliberately echoes the
+ * stepper on the detail page, so "where is this client" looks the same in both
+ * places.
+ */
+const StepRail = ({ index, total, tone }) => {
+  const c = toneOf(tone);
+  return (
+    <div
+      title={`Step ${index + 1} of ${total}`}
+      aria-label={`Step ${index + 1} of ${total}`}
+      style={{ display: 'flex', gap: '3px', marginTop: '6px', maxWidth: '132px' }}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          style={{
+            flex: 1, height: '4px', borderRadius: '2px',
+            background: i < index ? c.bd : i === index ? c.fg : T.border,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
 /* ═══════════════════════════════════════════
    ONE ROW OF THE TABLE
    ═══════════════════════════════════════════ */
 const ClientRow = ({ entry, stages, onOpen, selected, onToggleSelect }) => {
   const live = isActive(entry);
+  // a deadline on a finished client is history — show it plainly, never as a warning
   const timing = live ? describeTiming(entry) : { text: '', late: false, soon: false };
-  const dueColor = timing.late ? TONES.red.fg : timing.soon ? TONES.amber.fg : T.body;
+  const dueTone = timing.late ? 'red' : timing.soon ? 'amber' : null;
   const idx = stages.indexOf(entry.stage);
+  // only "high" earns a marker; flagging medium as well would flag most of the table
+  const urgent = live && entry.priority === 'high';
+  const name = entry.name || 'Unnamed client';
+
+  /* The row is the click target, so it carries the whole hover — a faint wash
+     plus a brand edge on the leading side. `T.raised` was far too saturated a
+     fill for a hover on the light theme. */
+  const rest = selected ? TONES.indigo.bg : 'transparent';
+  const edge = selected ? T.accent : 'transparent';
 
   return (
     <tr
       onClick={() => onOpen(entry)}
-      style={{ cursor: 'pointer', transition: 'background 0.12s', background: selected ? TONES.indigo.bg : 'transparent' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = T.raised; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = selected ? TONES.indigo.bg : 'transparent'; }}
+      title={`Open ${name}`}
+      style={{
+        cursor: 'pointer', background: rest,
+        boxShadow: `inset 3px 0 0 ${edge}`,
+        transition: 'background 0.14s ease, box-shadow 0.14s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = TONES.grey.bg;
+        e.currentTarget.style.boxShadow = `inset 3px 0 0 ${T.borderHi}`;
+        const chev = e.currentTarget.querySelector('[data-chev]');
+        if (chev) { chev.style.opacity = '1'; chev.style.transform = 'translateX(0)'; }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = rest;
+        e.currentTarget.style.boxShadow = `inset 3px 0 0 ${edge}`;
+        const chev = e.currentTarget.querySelector('[data-chev]');
+        if (chev) { chev.style.opacity = '0'; chev.style.transform = 'translateX(-4px)'; }
+      }}
     >
-      <td style={TD}>
-        <Checkbox checked={!!selected} onChange={onToggleSelect} label={`Select ${entry.name}`} />
+      {/* ticking a box is not "open this client" — without this, selecting a
+          row navigated away from the list you were selecting in */}
+      <td style={TD} onClick={(e) => e.stopPropagation()}>
+        <Checkbox checked={!!selected} onChange={onToggleSelect} label={`Select ${name}`} />
       </td>
 
       <td style={TD}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-          <div style={{
-            width: '34px', height: '34px', borderRadius: '9px', flexShrink: 0,
-            background: entry.color || T.accent, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff',
-          }}>
-            {entry.initials || (entry.name || '?').slice(0, 2).toUpperCase()}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <Avatar name={name} size={36} tone="auto" />
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>{entry.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+              <span style={{
+                fontSize: '14px', fontWeight: 600, color: T.heading,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {name}
+              </span>
+              {urgent && (
+                <span title="High priority" style={{ display: 'inline-flex', flexShrink: 0, color: TONES.red.fg }}>
+                  <Flame style={{ width: '13px', height: '13px' }} />
+                </span>
+              )}
               {entry.contractType && <Pill tone="teal">{entry.contractType}</Pill>}
             </div>
-            <div style={{ fontSize: '12px', color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
-              {[entry.clientNumber, entry.email].filter(Boolean).join('  ·  ')}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px',
+              fontSize: '12px', color: T.muted, minWidth: 0,
+            }}>
+              {entry.email && <Mail style={{ width: '11px', height: '11px', flexShrink: 0, color: T.faint }} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {entry.email || 'No email'}
+              </span>
+              {entry.clientNumber && (
+                <>
+                  <span style={{ color: T.faint, flexShrink: 0 }}>·</span>
+                  <span style={{ flexShrink: 0, color: T.faint }}>MRM {entry.clientNumber}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -157,33 +241,52 @@ const ClientRow = ({ entry, stages, onOpen, selected, onToggleSelect }) => {
 
       <td style={TD}>
         <Pill tone={stageTone(entry.stage)} dot>{entry.stage}</Pill>
-        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '4px' }}>
-          {idx >= 0 ? `Step ${idx + 1} of ${stages.length}` : 'Unknown stage'}
-        </div>
+        {idx >= 0
+          ? <StepRail index={idx} total={stages.length} tone={stageTone(entry.stage)} />
+          : (
+            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '5px' }}>
+              Not one of the configured stages
+            </div>
+          )}
       </td>
 
       <td style={TD}>
-        {entry.spoc
-          ? <span style={{ fontSize: '13.5px' }}>{entry.spoc}</span>
-          : <span style={{ color: T.faint, fontSize: '13.5px' }}>Unassigned</span>}
+        <PersonChip name={entry.spoc} size={24} empty="Unassigned" />
       </td>
 
       <td style={TD}>
-        <div style={{ fontSize: '13.5px', color: entry.deadline ? dueColor : T.faint }}>
-          {entry.deadline
-            ? (timing.text && (timing.late || timing.soon) ? timing.text : `Due ${fmtDate(entry.deadline)}`)
-            : 'No deadline'}
+        {entry.deadline ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {dueTone
+              ? <Pill tone={dueTone} icon={Clock}>{timing.text}</Pill>
+              : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: T.body }}>
+                  <CalendarClock style={{ width: '13px', height: '13px', color: T.faint }} />
+                  {fmtDate(entry.deadline)}
+                </span>
+              )}
+          </div>
+        ) : (
+          <span style={{ fontSize: '13.5px', color: T.faint }}>No deadline</span>
+        )}
+        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '5px' }}>
+          Added {fmtDate(entry.createdAt) || 'unknown'}
         </div>
-        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '3px' }}>Added {fmtDate(entry.createdAt) || '—'}</div>
       </td>
 
+      {/* The row itself opens the client; this is the affordance that says so,
+          which is why it appears on hover rather than sitting there always. */}
       <td style={{ ...TD, textAlign: 'right' }}>
-        <IconButton
-          icon={Eye}
-          title={`Open ${entry.name}`}
-          tone="indigo"
-          onClick={(e) => { e.stopPropagation(); onOpen(entry); }}
-        />
+        <span
+          data-chev
+          aria-hidden
+          style={{
+            display: 'inline-flex', color: T.accent, opacity: 0,
+            transform: 'translateX(-4px)', transition: 'opacity 0.14s ease, transform 0.14s ease',
+          }}
+        >
+          <ChevronRight style={{ width: '17px', height: '17px' }} />
+        </span>
       </td>
     </tr>
   );
@@ -197,7 +300,7 @@ const Onboarding = () => {
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const { getOptions } = usePicklist();
-  const STAGES = getOptions('onboarding_stage');
+  const STAGES = useMemo(() => journeyStages(getOptions('onboarding_stage')), [getOptions]);
 
   const [view, setView] = useUrlState(VIEW_DEFAULTS);
   const [selected, setSelected] = useState(() => new Set());
@@ -250,7 +353,7 @@ const Onboarding = () => {
     const q = debouncedQuery.trim().toLowerCase();
     if (q) {
       list = list.filter((e) =>
-        e.name.toLowerCase().includes(q) ||
+        (e.name || '').toLowerCase().includes(q) ||
         (e._id && e._id.toLowerCase().includes(q)) ||
         (e.clientNumber && e.clientNumber.toLowerCase().includes(q)) ||
         (e.email && e.email.toLowerCase().includes(q)) ||
@@ -290,7 +393,7 @@ const Onboarding = () => {
   const toggleSort = (key) => setView(
     view.sort === key
       ? { sort: key, dir: view.dir === 'asc' ? 'desc' : 'asc', page: 1 }
-      : { sort: key, dir: ['name', 'stage', 'spoc', 'contractType'].includes(key) ? 'asc' : 'desc', page: 1 },
+      : { sort: key, dir: ['name', 'stage', 'spoc'].includes(key) ? 'asc' : 'desc', page: 1 },
   );
 
   const pageIds = pageRows.map((e) => e._id);
@@ -327,13 +430,21 @@ const Onboarding = () => {
   };
 
   return (
-    <div style={{ padding: '26px 30px 50px' }}>
+    // capped, because a table stretched across 1600px puts the owner column
+    // an inch from the name it belongs to
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
       <PageHeader
         breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Onboarding' }]}
         title="Onboarding"
         subtitle="Track every client from document submission through to an active membership."
         actions={
-          <Button variant="ghost" icon={Download} disabled={loading} onClick={() => exportRows(rows, 'view')}>
+          <Button
+            variant="ghost"
+            icon={Download}
+            disabled={loading || rows.length === 0}
+            title={rows.length ? `Download these ${rows.length} client${rows.length === 1 ? '' : 's'} as Excel` : 'Nothing to export'}
+            onClick={() => exportRows(rows, 'view')}
+          >
             Export
           </Button>
         }
@@ -347,7 +458,16 @@ const Onboarding = () => {
             <Banner
               tone="amber"
               icon={AlertTriangle}
-              action={<Button icon={ArrowRight} onClick={() => pickStatus('overdue')} style={{ padding: '8px 14px', fontSize: '13px' }}>Show them</Button>}
+              action={(
+                <Button
+                  icon={ArrowRight}
+                  onClick={() => pickStatus('overdue')}
+                  title="Filter the list down to the clients past their deadline"
+                  style={{ padding: '8px 14px', fontSize: '13px' }}
+                >
+                  Show them
+                </Button>
+              )}
             >
               Some clients have passed their deadline.
             </Banner>
@@ -367,16 +487,33 @@ const Onboarding = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.border}` }}>
           <Segmented options={statusOptions} value={view.status} onChange={pickStatus} tone="purple" />
-          <SearchInput
-            ref={searchRef}
-            icon={Search}
-            placeholder="Search name, MRM ID, email or owner...    /"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ flex: '1 1 260px', maxWidth: '380px', marginLeft: 'auto' }}
-          />
+          <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '400px', marginLeft: 'auto' }}>
+            <SearchInput
+              ref={searchRef}
+              icon={Search}
+              placeholder="Search name, MRM ID, email or owner"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%' }}
+            />
+            {/* the shortcut, shown as a key rather than smuggled into the
+                placeholder where it read as part of the sentence */}
+            {!searchQuery && (
+              <kbd
+                aria-hidden
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  padding: '2px 7px', borderRadius: '5px', pointerEvents: 'none',
+                  background: T.bg, border: `1px solid ${T.border}`,
+                  color: T.faint, fontSize: '11px', fontWeight: 700, fontFamily: 'inherit',
+                }}
+              >
+                /
+              </kbd>
+            )}
+          </div>
           {filtersOn && (
-            <Button variant="ghost" icon={X} onClick={resetAll} style={{ padding: '9px 14px', fontSize: '13px' }}>Reset</Button>
+            <Button variant="ghost" icon={X} onClick={resetAll} title="Clear the search, the stage and the status filter" style={{ padding: '9px 14px', fontSize: '13px' }}>Reset</Button>
           )}
         </div>
       </Panel>
@@ -387,6 +524,7 @@ const Onboarding = () => {
             <Button
               variant="ghost"
               icon={Download}
+              title={`Download the ${selected.size} ticked client${selected.size === 1 ? '' : 's'} as Excel`}
               style={{ padding: '7px 13px', fontSize: '13px' }}
               onClick={() => exportRows(entries.filter((e) => selected.has(e._id)), 'selected')}
             >
@@ -398,13 +536,18 @@ const Onboarding = () => {
         {!loading && rows.length === 0 ? (
           <EmptyState icon={Search} title={entries.length === 0 ? 'Nobody is being onboarded yet' : 'Nothing matches these filters'}>
             {entries.length === 0
-              ? 'Clients arrive here when a qualified lead is moved over from the Sales Pipeline.'
-              : <button type="button" onClick={resetAll} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '13.5px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset the filters</button>}
+              ? (
+                <>
+                  Clients arrive here when a qualified lead is handed over.{' '}
+                  <button type="button" onClick={() => navigate('/sales-pipeline')} style={LINK}>Open the Sales Pipeline</button>
+                </>
+              )
+              : <button type="button" onClick={resetAll} style={LINK}>Reset the filters</button>}
           </EmptyState>
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', minWidth: '1020px', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     <TH width="44px">
@@ -429,11 +572,11 @@ const Onboarding = () => {
                         {col.label}
                       </TH>
                     ))}
-                    <TH width="70px" align="right">Actions</TH>
+                    <TH width="56px" align="right" />
                   </tr>
                 </thead>
                 {loading ? (
-                  <TableSkeleton columns={['17px', '55%', '70%', '60%', '50%', '80%', '32px']} rows={7} />
+                  <TableSkeleton columns={['17px', '60%', '70%', '55%', '65%', '18px']} rows={8} />
                 ) : (
                   <tbody>
                     {pageRows.map((entry) => (

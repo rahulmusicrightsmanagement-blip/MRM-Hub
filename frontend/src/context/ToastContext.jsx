@@ -31,9 +31,9 @@ export const ToastProvider = ({ children }) => {
 };
 
 const typeStyles = {
-  success: { bg: '#065f46', border: '#10b981', color: '#a7f3d0', icon: '✓' },
-  error: { bg: '#7f1d1d', border: '#ef4444', color: '#fecaca', icon: '✕' },
-  info: { bg: '#1e3a5f', border: '#3b82f6', color: '#bfdbfe', icon: 'ℹ' },
+  success: { bg: '#E8F5E9', border: '#66BB6A', color: '#2E7D32', icon: '✓' },
+  error: { bg: '#FFEBEE', border: '#FFCDD2', color: '#1B5E20', icon: '✕' },
+  info: { bg: '#E3F2FD', border: '#BBDEFB', color: '#1B5E20', icon: 'ℹ' },
 };
 
 const ToastItem = ({ toast, onClose }) => {

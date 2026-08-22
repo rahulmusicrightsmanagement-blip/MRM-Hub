@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Music, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { T } from '../theme';
 
 const Login = () => {
   const { login } = useAuth();
@@ -95,7 +96,7 @@ const Login = () => {
       style={{
         width: '100vw',
         height: '100vh',
-        backgroundColor: '#0f1117',
+        backgroundColor: '#E8F5E9',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -107,45 +108,40 @@ const Login = () => {
           width: '100%',
           maxWidth: '420px',
           padding: '40px',
-          backgroundColor: '#141720',
+          backgroundColor: '#FFFFFF',
           borderRadius: '16px',
-          border: '1px solid #1e2540',
+          border: '1px solid rgba(165, 214, 167, 0.55)',
         }}
       >
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', justifyContent: 'center' }}>
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Music style={{ width: '22px', height: '22px', color: 'white' }} />
-          </div>
-          <div>
-            <h1 style={{ color: 'white', fontWeight: 700, fontSize: '20px', lineHeight: '1.2' }}>MRM Hub</h1>
-            <p style={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '2px' }}>CRM Portal</p>
-          </div>
+        {/* Logo — the full lockup. It already carries the "MRMHub" wordmark,
+            so there is no heading text beside it; the <h1> wraps the image and
+            takes its name from the alt text. */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px' }}>
+          <h1 style={{ margin: 0, lineHeight: 0 }}>
+            <img
+              src="/MRMHub%20Logo.png"
+              alt="MRM Hub"
+              style={{ width: '190px', maxWidth: '100%', height: 'auto', display: 'block' }}
+            />
+          </h1>
+          <p style={{ color: T.faint, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '2px', marginTop: '-14px' }}>
+            CRM Portal
+          </p>
         </div>
 
         {!otpStep ? (
           <>
-            <h2 style={{ color: 'white', fontSize: '22px', fontWeight: 700, textAlign: 'center', marginBottom: '6px' }}>Welcome Back</h2>
-            <p style={{ color: '#6b7280', fontSize: '14px', textAlign: 'center', marginBottom: '28px' }}>Sign in to manage your workspace</p>
+            <h2 style={{ color: '#1B5E20', fontSize: '22px', fontWeight: 700, textAlign: 'center', marginBottom: '6px' }}>Welcome Back</h2>
+            <p style={{ color: '#5B7362', fontSize: '14px', textAlign: 'center', marginBottom: '24px' }}>Sign in to manage your workspace</p>
           </>
         ) : (
           <>
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(59,130,246,0.15)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <ShieldCheck style={{ width: '26px', height: '26px', color: '#60a5fa' }} />
+              <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'rgba(30, 136, 229, 0.15)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                <ShieldCheck style={{ width: '26px', height: '26px', color: '#0D47A1' }} />
               </div>
-              <h2 style={{ color: 'white', fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>Two-Factor Authentication</h2>
-              <p style={{ color: '#6b7280', fontSize: '13px' }}>Enter the 6-digit code from your authenticator app</p>
+              <h2 style={{ color: '#1B5E20', fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>Two-Factor Authentication</h2>
+              <p style={{ color: '#5B7362', fontSize: '13px' }}>Enter the 6-digit code from your authenticator app</p>
             </div>
           </>
         )}
@@ -154,12 +150,12 @@ const Login = () => {
           <div
             style={{
               padding: '12px 14px',
-              marginBottom: '18px',
+              marginBottom: '16px',
               borderRadius: '8px',
-              backgroundColor: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
+              backgroundColor: 'rgba(229, 57, 53, 0.12)',
+              border: '1px solid rgba(229, 57, 53, 0.25)',
               fontSize: '13px',
-              color: '#f87171',
+              color: '#B71C1C',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -173,8 +169,8 @@ const Login = () => {
         <form onSubmit={handleSubmit}>
           {!otpStep ? (
             <>
-              <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#4A6851', marginBottom: '6px' }}>
                   Email
                 </label>
                 <input
@@ -185,10 +181,10 @@ const Login = () => {
                   style={{
                     width: '100%',
                     padding: '10px 14px',
-                    backgroundColor: '#0f1117',
-                    border: '1px solid #1e2540',
+                    backgroundColor: '#E8F5E9',
+                    border: '1px solid rgba(165, 214, 167, 0.55)',
                     borderRadius: '8px',
-                    color: 'white',
+                    color: '#1B5E20',
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
@@ -197,7 +193,7 @@ const Login = () => {
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#4A6851', marginBottom: '6px' }}>
                   Password
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -209,10 +205,10 @@ const Login = () => {
                     style={{
                       width: '100%',
                       padding: '10px 40px 10px 14px',
-                      backgroundColor: '#0f1117',
-                      border: '1px solid #1e2540',
+                      backgroundColor: '#E8F5E9',
+                      border: '1px solid rgba(165, 214, 167, 0.55)',
                       borderRadius: '8px',
-                      color: 'white',
+                      color: '#1B5E20',
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
@@ -228,7 +224,7 @@ const Login = () => {
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
-                      color: '#6b7280',
+                      color: '#5B7362',
                       cursor: 'pointer',
                       padding: '2px',
                     }}
@@ -241,7 +237,7 @@ const Login = () => {
           ) : (
             <>
               {/* OTP 6-digit input */}
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '28px' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '24px' }}>
                 {otpDigits.map((digit, i) => (
                   <input
                     key={i}
@@ -259,16 +255,16 @@ const Login = () => {
                       textAlign: 'center',
                       fontSize: '22px',
                       fontWeight: 700,
-                      color: 'white',
-                      backgroundColor: '#0f1117',
-                      border: `2px solid ${digit ? '#3b82f6' : '#1e2540'}`,
+                      color: '#1B5E20',
+                      backgroundColor: '#E8F5E9',
+                      border: `2px solid ${digit ? '#BBDEFB' : 'rgba(165, 214, 167, 0.55)'}`,
                       borderRadius: '10px',
                       outline: 'none',
-                      caretColor: '#3b82f6',
+                      caretColor: '#0D47A1',
                       transition: 'border-color 0.15s',
                     }}
-                    onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; }}
-                    onBlur={(e) => { if (!digit) e.target.style.borderColor = '#1e2540'; }}
+                    onFocus={(e) => { e.target.style.borderColor = '#0D47A1'; }}
+                    onBlur={(e) => { if (!digit) e.target.style.borderColor = '#5B7362'; }}
                   />
                 ))}
               </div>
@@ -283,10 +279,10 @@ const Login = () => {
                   gap: '6px',
                   background: 'none',
                   border: 'none',
-                  color: '#6b7280',
+                  color: '#5B7362',
                   fontSize: '13px',
                   cursor: 'pointer',
-                  marginBottom: '18px',
+                  marginBottom: '16px',
                   padding: 0,
                 }}
               >
@@ -304,7 +300,7 @@ const Login = () => {
               padding: '12px',
               borderRadius: '10px',
               border: 'none',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
               color: 'white',
               fontSize: '15px',
               fontWeight: 600,

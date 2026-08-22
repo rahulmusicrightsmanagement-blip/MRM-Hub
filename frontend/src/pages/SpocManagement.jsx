@@ -4,18 +4,18 @@ import { useToast } from '../context/ToastContext';
 import { Plus, Search, Edit2, Trash2, X, Eye, EyeOff, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 
 const ROLE_META = {
-  admin: { label: 'Admin', bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa', avatar: '#7c3aed' },
-  lead: { label: 'Lead', bg: 'rgba(59, 130, 246, 0.15)', text: '#60a5fa', avatar: '#2563eb' },
-  onboarding_manager: { label: 'Onboarding Mgr', bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399', avatar: '#059669' },
-  society_manager: { label: 'Society Mgr', bg: 'rgba(245, 158, 11, 0.15)', text: '#fbbf24', avatar: '#d97706' },
-  music_work_manager: { label: 'Music Work Mgr', bg: 'rgba(236, 72, 153, 0.15)', text: '#f472b6', avatar: '#db2777' },
-  guest: { label: 'Guest', bg: 'rgba(107, 114, 128, 0.15)', text: '#9ca3af', avatar: '#6b7280' },
+  admin: { label: 'Admin', bg: 'rgba(27, 94, 32, 0.15)', text: '#256B29', avatar: '#1B5E20' },
+  lead: { label: 'Lead', bg: 'rgba(30, 136, 229, 0.15)', text: '#0D47A1', avatar: '#0D47A1' },
+  onboarding_manager: { label: 'Onboarding Mgr', bg: 'rgba(67, 160, 71, 0.15)', text: '#2E7D32', avatar: '#2E7D32' },
+  society_manager: { label: 'Society Mgr', bg: 'rgba(249, 168, 37, 0.15)', text: '#7A4400', avatar: '#7A4400' },
+  music_work_manager: { label: 'Music Work Mgr', bg: 'rgba(216, 27, 96, 0.15)', text: '#AD1457', avatar: '#AD1457' },
+  guest: { label: 'Guest', bg: 'rgba(92, 132, 99, 0.15)', text: '#4A6851', avatar: '#5B7362' },
 };
 
 const getAvatarColor = (roles) => {
-  if (roles.includes('admin')) return '#7c3aed';
-  if (roles.includes('lead')) return '#2563eb';
-  return ROLE_META[roles[0]]?.avatar || '#059669';
+  if (roles.includes('admin')) return '#1B5E20';
+  if (roles.includes('lead')) return '#0D47A1';
+  return ROLE_META[roles[0]]?.avatar || '#2E7D32';
 };
 
 const SpocManagement = () => {
@@ -77,7 +77,7 @@ const SpocManagement = () => {
 
   if (!isFullAccess && !isGuest) {
     return (
-      <div style={{ padding: '40px', color: '#6b7280', textAlign: 'center', fontSize: '16px' }}>
+      <div style={{ padding: '40px', color: '#5B7362', textAlign: 'center', fontSize: '16px' }}>
         Access denied. Admin or Lead only.
       </div>
     );
@@ -88,8 +88,8 @@ const SpocManagement = () => {
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'white', marginBottom: '4px' }}>SPOC Management</h2>
-          <p style={{ fontSize: '13px', color: '#6b7280' }}>{users.length} team member{users.length !== 1 ? 's' : ''}</p>
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1B5E20', marginBottom: '4px' }}>SPOC Management</h2>
+          <p style={{ fontSize: '13px', color: '#5B7362' }}>{users.length} team member{users.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => {
@@ -104,7 +104,7 @@ const SpocManagement = () => {
             padding: '10px 18px',
             borderRadius: '10px',
             border: 'none',
-            background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+            background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
             color: 'white',
             fontSize: '14px',
             fontWeight: 600,
@@ -118,7 +118,7 @@ const SpocManagement = () => {
 
       {/* Search */}
       <div style={{ position: 'relative', maxWidth: '360px', marginBottom: '20px' }}>
-        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#6b7280' }} />
+        <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#5B7362' }} />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -126,10 +126,10 @@ const SpocManagement = () => {
           style={{
             width: '100%',
             padding: '10px 14px 10px 36px',
-            backgroundColor: '#141720',
-            border: '1px solid #1e2540',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid rgba(165, 214, 167, 0.55)',
             borderRadius: '8px',
-            color: 'white',
+            color: '#1B5E20',
             fontSize: '13px',
             outline: 'none',
             boxSizing: 'border-box',
@@ -140,7 +140,7 @@ const SpocManagement = () => {
       {/* Stats cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(155px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         {[
-          { label: 'Total Members', value: users.length, color: '#60a5fa' },
+          { label: 'Total Members', value: users.length, color: '#0D47A1' },
           ...Object.entries(ROLE_META).map(([key, meta]) => ({
             label: meta.label + 's',
             value: users.filter((u) => (u.roles || []).includes(key)).length,
@@ -151,12 +151,12 @@ const SpocManagement = () => {
             key={s.label}
             style={{
               padding: '18px 20px',
-              backgroundColor: '#141720',
+              backgroundColor: '#FFFFFF',
               borderRadius: '12px',
-              border: '1px solid #1e2540',
+              border: '1px solid rgba(165, 214, 167, 0.55)',
             }}
           >
-            <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>{s.label}</p>
+            <p style={{ fontSize: '12px', color: '#5B7362', marginBottom: '4px' }}>{s.label}</p>
             <p style={{ fontSize: '26px', fontWeight: 700, color: s.color }}>{s.value}</p>
           </div>
         ))}
@@ -164,21 +164,21 @@ const SpocManagement = () => {
 
       {/* Table */}
       {loading ? (
-        <p style={{ color: '#6b7280', textAlign: 'center', padding: '40px' }}>Loading...</p>
+        <p style={{ color: '#5B7362', textAlign: 'center', padding: '40px' }}>Loading...</p>
       ) : filtered.length === 0 ? (
-        <p style={{ color: '#6b7280', textAlign: 'center', padding: '40px' }}>No members found.</p>
+        <p style={{ color: '#5B7362', textAlign: 'center', padding: '40px' }}>No members found.</p>
       ) : (
         <div
           style={{
-            backgroundColor: '#141720',
+            backgroundColor: '#FFFFFF',
             borderRadius: '12px',
-            border: '1px solid #1e2540',
+            border: '1px solid rgba(165, 214, 167, 0.55)',
             overflow: 'hidden',
           }}
         >
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #1e2540' }}>
+              <tr style={{ borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
                 {['Name', 'Email', 'Roles', 'Department', 'Status', 'Actions'].map((h) => (
                   <th
                     key={h}
@@ -187,7 +187,7 @@ const SpocManagement = () => {
                       textAlign: 'left',
                       fontSize: '12px',
                       fontWeight: 600,
-                      color: '#6b7280',
+                      color: '#5B7362',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
                     }}
@@ -207,7 +207,7 @@ const SpocManagement = () => {
                   .slice(0, 2)
                   .toUpperCase();
                 return (
-                  <tr key={u._id} style={{ borderBottom: '1px solid #1e2540' }}>
+                  <tr key={u._id} style={{ borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
                     {/* Name */}
                     <td style={{ padding: '14px 18px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -228,11 +228,11 @@ const SpocManagement = () => {
                         >
                           {initials}
                         </div>
-                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'white' }}>{u.name}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: '#1B5E20' }}>{u.name}</span>
                       </div>
                     </td>
                     {/* Email */}
-                    <td style={{ padding: '14px 18px', fontSize: '13px', color: '#9ca3af' }}>{u.email}</td>
+                    <td style={{ padding: '14px 18px', fontSize: '13px', color: '#4A6851' }}>{u.email}</td>
                     {/* Roles */}
                     <td style={{ padding: '14px 18px' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -247,7 +247,7 @@ const SpocManagement = () => {
                       </div>
                     </td>
                     {/* Department */}
-                    <td style={{ padding: '14px 18px', fontSize: '13px', color: '#9ca3af' }}>{u.department || '—'}</td>
+                    <td style={{ padding: '14px 18px', fontSize: '13px', color: '#4A6851' }}>{u.department || '—'}</td>
                     {/* Status */}
                     <td style={{ padding: '14px 18px' }}>
                       <span
@@ -257,7 +257,7 @@ const SpocManagement = () => {
                           gap: '6px',
                           fontSize: '12px',
                           fontWeight: 500,
-                          color: u.isActive ? '#34d399' : '#f87171',
+                          color: u.isActive ? '#2E7D32' : '#B71C1C',
                         }}
                       >
                         <span
@@ -265,7 +265,7 @@ const SpocManagement = () => {
                             width: '7px',
                             height: '7px',
                             borderRadius: '50%',
-                            backgroundColor: u.isActive ? '#34d399' : '#f87171',
+                            backgroundColor: u.isActive ? '#E8F5E9' : '#FFEBEE',
                           }}
                         />
                         {u.isActive ? 'Active' : 'Inactive'}
@@ -283,9 +283,9 @@ const SpocManagement = () => {
                             style={{
                               padding: '6px 8px',
                               borderRadius: '6px',
-                              border: '1px solid #1e2540',
+                              border: '1px solid rgba(165, 214, 167, 0.55)',
                               backgroundColor: 'transparent',
-                              color: '#60a5fa',
+                              color: '#0D47A1',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -299,9 +299,9 @@ const SpocManagement = () => {
                               style={{
                                 padding: '6px 8px',
                                 borderRadius: '6px',
-                                border: '1px solid #1e2540',
+                                border: '1px solid rgba(165, 214, 167, 0.55)',
                                 backgroundColor: 'transparent',
-                                color: '#f87171',
+                                color: '#B71C1C',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -312,7 +312,7 @@ const SpocManagement = () => {
                           )}
                         </div>
                       ) : (
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>—</span>
+                        <span style={{ fontSize: '12px', color: '#5B7362' }}>—</span>
                       )}
                     </td>
                   </tr>
@@ -345,14 +345,14 @@ const SpocManagement = () => {
             style={{
               width: '420px',
               padding: '30px',
-              backgroundColor: '#141720',
+              backgroundColor: '#FFFFFF',
               borderRadius: '14px',
-              border: '1px solid #1e2540',
+              border: '1px solid rgba(165, 214, 167, 0.55)',
             }}
           >
-            <h3 style={{ color: 'white', fontSize: '17px', fontWeight: 700, marginBottom: '10px' }}>Delete Member</h3>
-            <p style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '24px' }}>
-              Are you sure you want to delete <strong style={{ color: 'white' }}>{deleteConfirm.name}</strong>? They will lose all access immediately.
+            <h3 style={{ color: '#1B5E20', fontSize: '17px', fontWeight: 700, marginBottom: '10px' }}>Delete Member</h3>
+            <p style={{ color: '#4A6851', fontSize: '14px', marginBottom: '24px' }}>
+              Are you sure you want to delete <strong style={{ color: '#1B5E20' }}>{deleteConfirm.name}</strong>? They will lose all access immediately.
             </p>
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
@@ -360,9 +360,9 @@ const SpocManagement = () => {
                 style={{
                   padding: '9px 18px',
                   borderRadius: '8px',
-                  border: '1px solid #1e2540',
+                  border: '1px solid rgba(165, 214, 167, 0.55)',
                   backgroundColor: 'transparent',
-                  color: '#9ca3af',
+                  color: '#4A6851',
                   fontSize: '14px',
                   cursor: 'pointer',
                 }}
@@ -375,7 +375,7 @@ const SpocManagement = () => {
                   padding: '9px 18px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: '#ef4444',
+                  backgroundColor: '#C62828',
                   color: 'white',
                   fontSize: '14px',
                   fontWeight: 600,
@@ -518,16 +518,16 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
   const inputStyle = (field) => ({
     width: '100%',
     padding: '10px 14px',
-    backgroundColor: '#0f1117',
-    border: `1px solid ${fieldErrors[field] ? '#ef4444' : '#1e2540'}`,
+    backgroundColor: '#E8F5E9',
+    border: `1px solid ${fieldErrors[field] ? '#FFCDD2' : 'rgba(165, 214, 167, 0.55)'}`,
     borderRadius: '8px',
-    color: 'white',
+    color: '#1B5E20',
     fontSize: '14px',
     outline: 'none',
     boxSizing: 'border-box',
   });
 
-  const fieldErrorStyle = { fontSize: '12px', color: '#f87171', marginTop: '4px' };
+  const fieldErrorStyle = { fontSize: '12px', color: '#B71C1C', marginTop: '4px' };
 
   return (
     <div
@@ -548,9 +548,9 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
           maxHeight: '90vh',
           overflowY: 'auto',
           padding: '30px',
-          backgroundColor: '#141720',
+          backgroundColor: '#FFFFFF',
           borderRadius: '14px',
-          border: '1px solid #1e2540',
+          border: '1px solid rgba(165, 214, 167, 0.55)',
         }}
       >
         {/* QR Code View (shown after creating a new member or resetting 2FA) */}
@@ -558,19 +558,19 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-              <h3 style={{ color: 'white', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShieldCheck style={{ width: '22px', height: '22px', color: '#4ade80' }} />
+              <h3 style={{ color: '#1B5E20', fontSize: '18px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ShieldCheck style={{ width: '22px', height: '22px', color: '#2E7D32' }} />
                 {isEdit ? 'Reset 2FA' : 'Setup Authenticator'}
               </h3>
-              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px' }}>
+              <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '4px' }}>
                 <X style={{ width: '18px', height: '18px' }} />
               </button>
             </div>
 
             {/* Description */}
-            <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '24px', lineHeight: 1.6 }}>
+            <p style={{ color: '#4A6851', fontSize: '13px', marginBottom: '24px', lineHeight: 1.6 }}>
               Ask the team member to scan this QR code with their authenticator app
-              <br /><span style={{ color: '#6b7280', fontSize: '12px' }}>(Google Authenticator, Microsoft Authenticator, etc.)</span>
+              <br /><span style={{ color: '#5B7362', fontSize: '12px' }}>(Google Authenticator, Microsoft Authenticator, etc.)</span>
             </p>
 
             {/* QR Code */}
@@ -581,18 +581,18 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
             {/* Manual Secret */}
             {manualSecret && (
               <div style={{ marginBottom: '20px' }}>
-                <p style={{ color: '#6b7280', fontSize: '12px', marginBottom: '8px' }}>Or enter this code manually:</p>
+                <p style={{ color: '#5B7362', fontSize: '12px', marginBottom: '8px' }}>Or enter this code manually:</p>
                 <div style={{
                   padding: '10px 14px',
-                  backgroundColor: '#0f1117',
-                  border: '1px solid #1e2540',
+                  backgroundColor: '#E8F5E9',
+                  border: '1px solid rgba(165, 214, 167, 0.55)',
                   borderRadius: '8px',
                   overflowX: 'auto',
                   whiteSpace: 'nowrap',
                   maxWidth: '100%',
                 }}>
                   <code style={{
-                    color: '#60a5fa',
+                    color: '#0D47A1',
                     fontSize: '13px',
                     fontWeight: 600,
                     letterSpacing: '1.5px',
@@ -607,8 +607,8 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
             {/* Warning */}
             <div style={{
               padding: '12px 16px',
-              backgroundColor: 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.2)',
+              backgroundColor: 'rgba(249, 168, 37, 0.08)',
+              border: '1px solid rgba(249, 168, 37, 0.2)',
               borderRadius: '10px',
               marginBottom: '24px',
               display: 'flex',
@@ -616,8 +616,8 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
               gap: '10px',
               textAlign: 'left',
             }}>
-              <AlertCircle style={{ width: '18px', height: '18px', color: '#fbbf24', flexShrink: 0 }} />
-              <p style={{ color: '#fbbf24', fontSize: '12px', fontWeight: 500, lineHeight: 1.5 }}>
+              <AlertCircle style={{ width: '18px', height: '18px', color: '#7A4400', flexShrink: 0 }} />
+              <p style={{ color: '#7A4400', fontSize: '12px', fontWeight: 500, lineHeight: 1.5 }}>
                 This QR code will not be shown again. Make sure it is scanned before closing.
               </p>
             </div>
@@ -630,7 +630,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                 padding: '12px',
                 borderRadius: '10px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                background: 'linear-gradient(135deg, #2E7D32, #2E7D32)',
                 color: 'white',
                 fontSize: '15px',
                 fontWeight: 600,
@@ -646,14 +646,14 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
         ) : (
         <>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <h3 style={{ color: 'white', fontSize: '17px', fontWeight: 700 }}>{isEdit ? 'Edit Member' : 'Add New Member'}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}>
+          <h3 style={{ color: '#1B5E20', fontSize: '17px', fontWeight: 700 }}>{isEdit ? 'Edit Member' : 'Add New Member'}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer' }}>
             <X style={{ width: '18px', height: '18px' }} />
           </button>
         </div>
 
         {error && (
-          <div style={{ padding: '12px 14px', marginBottom: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', fontSize: '13px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '12px 14px', marginBottom: '16px', borderRadius: '8px', backgroundColor: 'rgba(229, 57, 53, 0.12)', border: '1px solid rgba(229, 57, 53, 0.25)', fontSize: '13px', color: '#B71C1C', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle style={{ width: '16px', height: '16px', flexShrink: 0 }} />
             {error}
           </div>
@@ -662,21 +662,21 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Name */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.name ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Full Name *</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.name ? '#B71C1C' : '#4A6851', marginBottom: '6px' }}>Full Name *</label>
             <input value={form.name} onChange={(e) => handleChange('name', e.target.value)} placeholder="Enter full name" style={inputStyle('name')} />
             {fieldErrors.name && <p style={fieldErrorStyle}>{fieldErrors.name}</p>}
           </div>
 
           {/* Email */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.email ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Email *</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.email ? '#B71C1C' : '#4A6851', marginBottom: '6px' }}>Email *</label>
             <input type="email" value={form.email} onChange={(e) => handleChange('email', e.target.value)} placeholder="name@mrmhub.com" style={inputStyle('email')} />
             {fieldErrors.email && <p style={fieldErrorStyle}>{fieldErrors.email}</p>}
           </div>
 
           {/* Password */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.password ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.password ? '#B71C1C' : '#4A6851', marginBottom: '6px' }}>
               Password {isEdit ? '(leave blank to keep current)' : '*'}
             </label>
             <div style={{ position: 'relative' }}>
@@ -690,7 +690,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
-                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer' }}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer' }}
               >
                 {showPw ? <EyeOff style={{ width: '16px', height: '16px' }} /> : <Eye style={{ width: '16px', height: '16px' }} />}
               </button>
@@ -700,7 +700,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
 
           {/* Roles (multi-select checkboxes) */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.roles ? '#f87171' : '#9ca3af', marginBottom: '8px' }}>Roles *</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.roles ? '#B71C1C' : '#4A6851', marginBottom: '8px' }}>Roles *</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {Object.entries(ROLE_META).map(([key, meta]) => {
                 const selected = form.roles.includes(key);
@@ -712,9 +712,9 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                     style={{
                       padding: '6px 14px',
                       borderRadius: '8px',
-                      border: `1px solid ${selected ? meta.text : '#1e2540'}`,
+                      border: `1px solid ${selected ? meta.text : '#5B7362'}`,
                       backgroundColor: selected ? meta.bg : 'transparent',
-                      color: selected ? meta.text : '#6b7280',
+                      color: selected ? meta.text : '#5B7362',
                       fontSize: '13px',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -731,13 +731,13 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
 
           {/* Department */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Department</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#4A6851', marginBottom: '6px' }}>Department</label>
             <input value={form.department} onChange={(e) => handleChange('department', e.target.value)} placeholder="e.g. Rights Mgmt" style={inputStyle('department')} />
           </div>
 
           {/* Phone */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.phone ? '#f87171' : '#9ca3af', marginBottom: '6px' }}>Phone</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: fieldErrors.phone ? '#B71C1C' : '#4A6851', marginBottom: '6px' }}>Phone</label>
             <input value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} placeholder="+91 XXXXX XXXXX" style={inputStyle('phone')} />
             {fieldErrors.phone && <p style={fieldErrorStyle}>{fieldErrors.phone}</p>}
           </div>
@@ -745,7 +745,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
           {/* Reset 2FA (edit only) */}
           {isEdit && (
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#9ca3af', marginBottom: '6px' }}>Two-Factor Authentication</label>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#4A6851', marginBottom: '6px' }}>Two-Factor Authentication</label>
               <button
                 type="button"
                 onClick={handleResetTotp}
@@ -756,9 +756,9 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                   gap: '8px',
                   padding: '8px 14px',
                   borderRadius: '8px',
-                  border: '1px solid rgba(245,158,11,0.3)',
-                  backgroundColor: 'rgba(245,158,11,0.08)',
-                  color: '#fbbf24',
+                  border: '1px solid rgba(249, 168, 37, 0.3)',
+                  backgroundColor: 'rgba(249, 168, 37, 0.08)',
+                  color: '#7A4400',
                   fontSize: '13px',
                   fontWeight: 600,
                   cursor: resettingTotp ? 'not-allowed' : 'pointer',
@@ -774,7 +774,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
           {/* Active toggle (edit only) */}
           {isEdit && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 500, color: '#9ca3af' }}>Active</label>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#4A6851' }}>Active</label>
               <button
                 type="button"
                 onClick={() => handleChange('isActive', !form.isActive)}
@@ -783,7 +783,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                   height: '24px',
                   borderRadius: '12px',
                   border: 'none',
-                  backgroundColor: form.isActive ? '#059669' : '#374151',
+                  backgroundColor: form.isActive ? '#2E7D32' : '#F1F6F1',
                   position: 'relative',
                   cursor: 'pointer',
                   transition: 'background-color 0.2s',
@@ -802,7 +802,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
                   }}
                 />
               </button>
-              <span style={{ fontSize: '13px', color: form.isActive ? '#34d399' : '#f87171' }}>
+              <span style={{ fontSize: '13px', color: form.isActive ? '#2E7D32' : '#B71C1C' }}>
                 {form.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -816,7 +816,7 @@ const UserModal = ({ user, onClose, onSaved, authFetch }) => {
               padding: '12px',
               borderRadius: '10px',
               border: 'none',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
               color: 'white',
               fontSize: '15px',
               fontWeight: 600,

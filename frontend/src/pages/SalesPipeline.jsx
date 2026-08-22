@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Plus, X, ArrowRight, Search, CheckSquare, Square, ChevronRight,
-  CheckCircle, Circle, Trash2, Edit3, Save, Eye, XCircle, UserPlus, Download,
-  AlertTriangle, CheckCircle2,
+  Plus, X, ArrowRight, Search, ChevronRight, Edit3, Download,
+  AlertTriangle, CheckCircle2, Flame, CalendarClock, Mail, Users, Clock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -17,20 +16,10 @@ import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
 import Pagination from '../components/Pagination';
 import { T, TONES, TD } from '../theme';
 import {
-  PageHeader, Button, IconButton, Segmented, Card, Pill, DistributionBar,
-  SearchInput, TH, EmptyState, Checkbox, SelectionBar, TableSkeleton, Banner, Panel,
+  PageHeader, Button, Segmented, Card, Pill, DistributionBar, SearchInput, TH,
+  EmptyState, Checkbox, SelectionBar, TableSkeleton, Banner, Panel,
+  Avatar, PersonChip, SubHead, FormGrid, Input, Select, Textarea,
 } from '../components/studio';
-
-/* ──────── shared styles ──────── */
-const INPUT = {
-  width: '100%', padding: '10px 14px', borderRadius: '8px',
-  border: '1px solid #2d3348', backgroundColor: '#1a1e2e',
-  color: '#e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
-};
-const LABEL = {
-  fontSize: '11px', fontWeight: 600, color: '#9ca3af',
-  letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block',
-};
 
 const fmtDate = (d) => {
   if (!d) return '';
@@ -172,138 +161,184 @@ const LeadFormModal = ({ onClose, onSubmit, teamMembers, members, initialData })
   );
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
+  /* Escape closes, and so does the backdrop. The old dialog had neither, which
+     left the only way out a 20px × icon in the corner. */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const handleMemberSelect = (memberName) => {
     if (!memberName) { setForm((p) => ({ ...p, name: '', genre: '', email: '', phone: '', source: '' })); return; }
     const m = members.find((x) => x.name === memberName);
     if (m) setForm((p) => ({ ...p, name: m.name, genre: m.genre || '', email: m.email || '', phone: m.phone || '', source: m.leadSource || '' }));
   };
 
+  const canSubmit = !!form.name;
   const handleSubmit = () => {
-    if (!form.name) return;
+    if (!canSubmit) return;
     onSubmit(form);
     onClose();
   };
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+      onClick={onClose}
+      role="presentation"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(27, 94, 32, 0.28)',
+        backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 50, padding: '24px',
+      }}
     >
       <div
-        style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '520px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? `Edit ${form.name}` : 'Add a new lead'}
         onClick={(e) => e.stopPropagation()}
+        style={{
+          background: T.surface, borderRadius: '16px', width: '100%', maxWidth: '560px',
+          maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+          border: `1px solid ${T.border}`, boxShadow: '0 24px 60px rgba(27, 94, 32, 0.18)',
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{isEdit ? 'Edit Lead' : 'Add New Lead'}</h2>
-          <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
+        {/* header — the same icon-chip + title + description shape as a Card,
+            so a dialog reads as part of the app rather than a separate thing */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: '12px',
+          padding: '20px 22px', borderBottom: `1px solid ${T.border}`,
+        }}>
+          {isEdit
+            ? <Avatar name={form.name} size={38} tone="auto" />
+            : (
+              <span style={{
+                width: '38px', height: '38px', borderRadius: '11px', flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                background: TONES.purple.bg, border: `1px solid ${TONES.purple.bd}`, color: TONES.purple.fg,
+              }}>
+                <Plus style={{ width: '18px', height: '18px' }} />
+              </span>
+            )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: T.heading }}>
+              {isEdit ? form.name || 'Edit lead' : 'Add a new lead'}
+            </h2>
+            <p style={{ fontSize: '13px', color: T.muted, marginTop: '3px' }}>
+              {isEdit
+                ? 'Ownership, timing and notes. Contact details come from Members.'
+                : 'Pick an existing member, then say who owns the lead and by when.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
+              background: 'transparent', border: `1px solid ${T.border}`,
+              color: T.muted, cursor: 'pointer',
+            }}
+          >
+            <X style={{ width: '15px', height: '15px' }} />
+          </button>
         </div>
 
-        {isEdit ? (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={LABEL}>Name *</label>
-                <input
-                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
-                  value={form.name}
-                  readOnly
-                  title="Edit from the Members page"
-                />
-                <p style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>Name is managed from the Members page.</p>
-              </div>
-              <div><label style={LABEL}>Genre</label><input style={INPUT} placeholder="e.g. Bollywood Playback" value={form.genre} onChange={(e) => set('genre', e.target.value)} /></div>
-            </div>
+        <div style={{ padding: '20px 22px', overflowY: 'auto', flex: 1 }}>
+          {isEdit ? (
+            <>
+              <SubHead icon={Users}>Who they are</SubHead>
+              <FormGrid min="230px">
+                <Input label="Name" value={form.name} readOnly title="Edit from the Members page" hint="Managed on the Members page." />
+                <Input label="Genre" placeholder="e.g. Bollywood Playback" value={form.genre} onChange={(e) => set('genre', e.target.value)} />
+                <Input label="Email" value={form.email} readOnly placeholder="email@example.com" title="Edit from the Members page" />
+                <Input label="Phone" value={form.phone} readOnly placeholder="+91 98xxx xxxxx" title="Edit from the Members page" />
+              </FormGrid>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={LABEL}>Email *</label>
-                <input
-                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
-                  placeholder="email@example.com"
-                  value={form.email}
-                  readOnly
-                  title="Edit from the Members page"
-                />
-              </div>
-              <div>
-                <label style={LABEL}>Phone</label>
-                <input
-                  style={{ ...INPUT, backgroundColor: '#141823', cursor: 'not-allowed', opacity: 0.8 }}
-                  placeholder="+91 98xxx xxxxx"
-                  value={form.phone}
-                  readOnly
-                  title="Edit from the Members page"
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={LABEL}>Lead Source</label>
-                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
-                  {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={LABEL}>Priority</label>
-                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.priority} onChange={(e) => set('priority', e.target.value)}>
-                  <option value="high">high</option><option value="medium">medium</option><option value="low">low</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={LABEL}>Assign SPOC</label>
-              <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
-                <option value="">Select a team member..</option>
-                {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <label style={LABEL}>Deadline</label>
-              <input style={{ ...INPUT, colorScheme: 'dark' }} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
-            </div>
-
-            <div style={{ marginBottom: '28px' }}>
-              <label style={LABEL}>Notes</label>
-              <textarea style={{ ...INPUT, minHeight: '90px', resize: 'vertical' }} placeholder="Add initial notes about this lead..." value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <SearchableSelect label="Select Member" required options={members} value={form.name} onChange={handleMemberSelect} placeholder="Search member..." emptyMessage="No members found. Add members first." />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-              <div>
-                <label style={LABEL}>Lead Source</label>
-                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.source} onChange={(e) => set('source', e.target.value)}>
-                  <option value="">Select source...</option>
-                  {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={LABEL}>Assign SPOC</label>
-                <select style={{ ...INPUT, cursor: 'pointer' }} value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
-                  <option value="">Select a team member..</option>
+              <SubHead icon={Users} style={{ marginTop: '24px' }}>Ownership &amp; priority</SubHead>
+              <FormGrid min="230px">
+                <Select label="Owner (SPOC)" value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
+                  <option value="">Unassigned</option>
                   {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-                </select>
-              </div>
-            </div>
+                </Select>
+                <Select label="Lead source" value={form.source} onChange={(e) => set('source', e.target.value)}>
+                  <option value="">Not set</option>
+                  {sourceList.map((src) => <option key={src} value={src}>{src}</option>)}
+                </Select>
+                <Select label="Priority" value={form.priority} onChange={(e) => set('priority', e.target.value)}>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </Select>
+                <Input label="Deadline" type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} style={{ colorScheme: 'light' }} />
+              </FormGrid>
 
-            <div style={{ marginBottom: '28px' }}>
-              <label style={LABEL}>Deadline</label>
-              <input style={{ ...INPUT, colorScheme: 'dark' }} type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
-            </div>
-          </>
-        )}
+              <SubHead icon={Edit3} style={{ marginTop: '24px' }}>Notes</SubHead>
+              <Textarea span placeholder="Anything worth remembering about this lead..." value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+            </>
+          ) : (
+            <>
+              <SubHead icon={Users}>The artist</SubHead>
+              <SearchableSelect
+                label="Select member"
+                required
+                options={members}
+                value={form.name}
+                onChange={handleMemberSelect}
+                placeholder="Search member..."
+                emptyMessage="No members found. Add members first."
+              />
+              {form.name && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px',
+                  padding: '12px 14px', borderRadius: '11px',
+                  background: T.bg, border: `1px solid ${T.border}`,
+                }}>
+                  <Avatar name={form.name} size={34} tone="auto" />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: T.heading }}>{form.name}</div>
+                    <div style={{ fontSize: '12px', color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {[form.email, form.phone].filter(Boolean).join('  ·  ') || 'No contact details on file'}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button type="button" onClick={onClose} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-          <button type="button" onClick={handleSubmit} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {isEdit ? <><Edit3 style={{ width: '16px', height: '16px' }} /> Save Changes</> : <><Plus style={{ width: '16px', height: '16px' }} /> Create Lead</>}
-          </button>
+              <SubHead icon={CalendarClock} style={{ marginTop: '24px' }}>Ownership &amp; timing</SubHead>
+              <FormGrid min="230px">
+                <Select label="Owner (SPOC)" value={form.spoc} onChange={(e) => set('spoc', e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
+                </Select>
+                <Select label="Lead source" value={form.source} onChange={(e) => set('source', e.target.value)}>
+                  <option value="">Not set</option>
+                  {sourceList.map((src) => <option key={src} value={src}>{src}</option>)}
+                </Select>
+                <Input label="Deadline" type="date" value={form.deadline} onChange={(e) => set('deadline', e.target.value)} style={{ colorScheme: 'light' }} />
+              </FormGrid>
+            </>
+          )}
+        </div>
+
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+          padding: '16px 22px', borderTop: `1px solid ${T.border}`, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '12px', color: T.faint }}>
+            {canSubmit ? 'Press Esc to cancel.' : 'Pick a member to continue.'}
+          </span>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button
+              icon={isEdit ? Edit3 : Plus}
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+            >
+              {isEdit ? 'Save changes' : 'Create lead'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -318,32 +353,73 @@ const LeadTableRow = ({ lead, onClick, selected, onToggleSelect }) => {
   const live = isOpenLead(lead);
   // a deadline on a finished lead is history — show it plainly, never as a warning
   const timing = live ? describeTiming(lead) : { text: '', late: false, soon: false };
-  const dueColor = timing.late ? TONES.red.fg : timing.soon ? TONES.amber.fg : T.body;
+  const dueTone = timing.late ? 'red' : timing.soon ? 'amber' : null;
+  // only "high" earns a marker; flagging medium as well would flag most of the table
+  const urgent = live && lead.priority === 'high';
+
+  /* The row is the click target, so it carries the whole hover — a faint wash
+     plus a brand edge on the leading side, which reads as "this one" without
+     the heavy fill a saturated tint would give. */
+  const rest = selected ? TONES.indigo.bg : 'transparent';
+  const edge = selected ? T.accent : 'transparent';
 
   return (
     <tr
       onClick={() => onClick(lead)}
-      style={{ cursor: 'pointer', transition: 'background 0.12s', background: selected ? TONES.indigo.bg : 'transparent' }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = T.raised; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = selected ? TONES.indigo.bg : 'transparent'; }}
+      title={`Open ${lead.name}`}
+      style={{
+        cursor: 'pointer', background: rest,
+        boxShadow: `inset 3px 0 0 ${edge}`,
+        transition: 'background 0.14s ease, box-shadow 0.14s ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = TONES.grey.bg;
+        e.currentTarget.style.boxShadow = `inset 3px 0 0 ${T.borderHi}`;
+        const chev = e.currentTarget.querySelector('[data-chev]');
+        if (chev) { chev.style.opacity = '1'; chev.style.transform = 'translateX(0)'; }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = rest;
+        e.currentTarget.style.boxShadow = `inset 3px 0 0 ${edge}`;
+        const chev = e.currentTarget.querySelector('[data-chev]');
+        if (chev) { chev.style.opacity = '0'; chev.style.transform = 'translateX(-4px)'; }
+      }}
     >
-      <td style={TD}>
+      <td style={TD} onClick={(e) => e.stopPropagation()}>
         <Checkbox checked={!!selected} onChange={onToggleSelect} label={`Select ${lead.name}`} />
       </td>
 
       <td style={TD}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', minWidth: 0 }}>
-          <div style={{
-            width: '34px', height: '34px', borderRadius: '9px', flexShrink: 0,
-            background: lead.color || T.accent, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff',
-          }}>
-            {lead.initials || (lead.name || '?').slice(0, 2).toUpperCase()}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <Avatar name={lead.name} size={36} tone="auto" />
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>{lead.name}</div>
-            <div style={{ fontSize: '12px', color: T.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {[lead.email, lead.source].filter(Boolean).join('  ·  ')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+              <span style={{
+                fontSize: '14px', fontWeight: 600, color: T.heading,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {lead.name || 'Unnamed lead'}
+              </span>
+              {urgent && (
+                <span title="High priority" style={{ display: 'inline-flex', flexShrink: 0, color: TONES.red.fg }}>
+                  <Flame style={{ width: '13px', height: '13px' }} />
+                </span>
+              )}
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px',
+              fontSize: '12px', color: T.muted, minWidth: 0,
+            }}>
+              {lead.email && <Mail style={{ width: '11px', height: '11px', flexShrink: 0, color: T.faint }} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {lead.email || 'No email'}
+              </span>
+              {lead.source && (
+                <>
+                  <span style={{ color: T.faint, flexShrink: 0 }}>·</span>
+                  <span style={{ flexShrink: 0, color: T.faint }}>{lead.source}</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -351,38 +427,46 @@ const LeadTableRow = ({ lead, onClick, selected, onToggleSelect }) => {
 
       <td style={TD}>
         <Pill tone={status.tone} dot>{status.label}</Pill>
-        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '4px' }}>{lead.stage}</div>
+        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '5px' }}>{lead.stage}</div>
       </td>
 
       <td style={TD}>
-        {lead.spoc
-          ? <span style={{ fontSize: '13.5px' }}>{lead.spoc}</span>
-          : <span style={{ color: T.faint, fontSize: '13.5px' }}>Unassigned</span>}
+        <PersonChip name={lead.spoc} size={24} empty="Unassigned" />
       </td>
 
       <td style={TD}>
         {lead.deadline ? (
-          <>
-            <div style={{ fontSize: '13.5px', color: dueColor }}>
-              {timing.text && (timing.late || timing.soon) ? timing.text : `Due ${fmtDate(lead.deadline)}`}
-            </div>
-            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '3px' }}>Added {fmtDate(lead.createdAt) || '—'}</div>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {dueTone
+              ? <Pill tone={dueTone} icon={Clock}>{timing.text}</Pill>
+              : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: T.body }}>
+                  <CalendarClock style={{ width: '13px', height: '13px', color: T.faint }} />
+                  {fmtDate(lead.deadline)}
+                </span>
+              )}
+          </div>
         ) : (
-          <>
-            <div style={{ fontSize: '13.5px', color: T.faint }}>No deadline</div>
-            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '3px' }}>Added {fmtDate(lead.createdAt) || '—'}</div>
-          </>
+          <span style={{ fontSize: '13.5px', color: T.faint }}>No deadline</span>
         )}
+        <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '5px' }}>
+          Added {fmtDate(lead.createdAt) || 'unknown'}
+        </div>
       </td>
 
+      {/* The row itself opens the lead; this is the affordance that says so,
+          which is why it appears on hover rather than sitting there always. */}
       <td style={{ ...TD, textAlign: 'right' }}>
-        <IconButton
-          icon={Eye}
-          title={`Open ${lead.name}`}
-          tone="indigo"
-          onClick={(e) => { e.stopPropagation(); onClick(lead); }}
-        />
+        <span
+          data-chev
+          aria-hidden
+          style={{
+            display: 'inline-flex', color: T.accent, opacity: 0,
+            transform: 'translateX(-4px)', transition: 'opacity 0.14s ease, transform 0.14s ease',
+          }}
+        >
+          <ChevronRight style={{ width: '17px', height: '17px' }} />
+        </span>
       </td>
     </tr>
   );
@@ -569,17 +653,29 @@ const SalesPipeline = () => {
   };
 
   return (
-    <div style={{ padding: '26px 30px 50px' }}>
+    // capped, because a table stretched across 1600px puts the owner column
+    // an inch from the name it belongs to
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
       <PageHeader
         breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Sales Pipeline' }]}
         title="Sales Pipeline"
         subtitle="Track every enquiry from first contact through to onboarding."
         actions={
           <>
-            <Button variant="ghost" icon={Download} disabled={loading} onClick={() => exportRows(rows, 'view')}>
+            <Button
+              variant="ghost"
+              icon={Download}
+              disabled={loading || rows.length === 0}
+              title={rows.length ? `Download these ${rows.length} lead${rows.length === 1 ? '' : 's'} as Excel` : 'Nothing to export'}
+              onClick={() => exportRows(rows, 'view')}
+            >
               Export
             </Button>
-            <Button icon={Plus} onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }}>
+            <Button
+              icon={Plus}
+              title="Add a lead for an existing member"
+              onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }}
+            >
               New Lead
             </Button>
           </>
@@ -614,14 +710,31 @@ const SalesPipeline = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.border}` }}>
           <Segmented options={statusOptions} value={view.status} onChange={pickStatus} tone="purple" />
-          <SearchInput
-            ref={searchRef}
-            icon={Search}
-            placeholder="Search name, email, phone or owner...    /"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ flex: '1 1 260px', maxWidth: '380px', marginLeft: 'auto' }}
-          />
+          <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '400px', marginLeft: 'auto' }}>
+            <SearchInput
+              ref={searchRef}
+              icon={Search}
+              placeholder="Search name, email, phone or owner"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%' }}
+            />
+            {/* the shortcut, shown as a key rather than smuggled into the
+                placeholder where it read as part of the sentence */}
+            {!searchQuery && (
+              <kbd
+                aria-hidden
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  padding: '2px 7px', borderRadius: '5px', pointerEvents: 'none',
+                  background: T.bg, border: `1px solid ${T.border}`,
+                  color: T.faint, fontSize: '11px', fontWeight: 700, fontFamily: 'inherit',
+                }}
+              >
+                /
+              </kbd>
+            )}
+          </div>
           {filtersOn && (
             <Button variant="ghost" icon={X} onClick={resetAll} style={{ padding: '9px 14px', fontSize: '13px' }}>Reset</Button>
           )}
@@ -647,7 +760,7 @@ const SalesPipeline = () => {
           <EmptyState icon={Search} title={leads.length === 0 ? 'No leads yet' : 'Nothing matches these filters'}>
             {leads.length === 0
               ? 'Use “New Lead” above to add the first one.'
-              : <button type="button" onClick={resetAll} style={{ background: 'none', border: 'none', color: '#818cf8', fontSize: '13.5px', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset the filters</button>}
+              : <button type="button" onClick={resetAll} style={{ background: 'none', border: 'none', color: T.accent, fontSize: '13.5px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset the filters</button>}
           </EmptyState>
         ) : (
           <>
@@ -677,11 +790,11 @@ const SalesPipeline = () => {
                         {col.label}
                       </TH>
                     ))}
-                    <TH width="70px" align="right">Actions</TH>
+                    <TH width="56px" align="right" />
                   </tr>
                 </thead>
                 {loading ? (
-                  <TableSkeleton columns={['17px', '55%', '70%', '60%', '80%', '65%', '32px']} rows={7} />
+                  <TableSkeleton columns={['17px', '60%', '70%', '55%', '65%', '18px']} rows={8} />
                 ) : (
                   <tbody>
                     {pageRows.map((lead) => (

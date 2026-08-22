@@ -14,10 +14,10 @@ const STATUS = {
 };
 
 const statusColors = {
-  [STATUS.NEW]: { bg: 'rgba(59,130,246,0.14)', fg: '#60a5fa', border: 'rgba(59,130,246,0.3)' },
-  [STATUS.IN_PROGRESS]: { bg: 'rgba(245,158,11,0.14)', fg: '#fbbf24', border: 'rgba(245,158,11,0.3)' },
-  [STATUS.COMPLETED]: { bg: 'rgba(16,185,129,0.14)', fg: '#34d399', border: 'rgba(16,185,129,0.3)' },
-  [STATUS.NOT_COMPLETED]: { bg: 'rgba(239,68,68,0.14)', fg: '#f87171', border: 'rgba(239,68,68,0.3)' },
+  [STATUS.NEW]: { bg: 'rgba(30, 136, 229, 0.14)', fg: '#0D47A1', border: 'rgba(30, 136, 229, 0.3)' },
+  [STATUS.IN_PROGRESS]: { bg: 'rgba(249, 168, 37, 0.14)', fg: '#7A4400', border: 'rgba(249, 168, 37, 0.3)' },
+  [STATUS.COMPLETED]: { bg: 'rgba(67, 160, 71, 0.14)', fg: '#2E7D32', border: 'rgba(67, 160, 71, 0.3)' },
+  [STATUS.NOT_COMPLETED]: { bg: 'rgba(229, 57, 53, 0.14)', fg: '#B71C1C', border: 'rgba(229, 57, 53, 0.3)' },
 };
 
 const fmt = (iso) => {
@@ -34,9 +34,9 @@ const deadlineBadge = (iso, status) => {
   const d = new Date(iso);
   d.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-  if (diffDays < 0) return { text: 'Overdue', color: '#f87171', bg: 'rgba(239,68,68,0.14)' };
-  if (diffDays === 0) return { text: 'Due today', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)' };
-  if (diffDays === 1) return { text: 'Due tomorrow', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)' };
+  if (diffDays < 0) return { text: 'Overdue', color: '#B71C1C', bg: 'rgba(229, 57, 53, 0.14)' };
+  if (diffDays === 0) return { text: 'Due today', color: '#7A4400', bg: 'rgba(249, 168, 37, 0.14)' };
+  if (diffDays === 1) return { text: 'Due tomorrow', color: '#7A4400', bg: 'rgba(249, 168, 37, 0.14)' };
   return null;
 };
 
@@ -252,15 +252,15 @@ const ClientChat = () => {
   }), [messages]);
 
   return (
-    <div style={{ padding: '32px 36px', color: 'white' }}>
+    <div style={{ padding: '32px 36px', color: '#1B5E20' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <MessageSquare style={{ width: '26px', height: '26px', color: '#60a5fa' }} />
+            <MessageSquare style={{ width: '26px', height: '26px', color: '#0D47A1' }} />
             Client Task
           </h1>
-          <p style={{ color: '#9ca3af', fontSize: '14px' }}>
+          <p style={{ color: '#4A6851', fontSize: '14px' }}>
             Track client tasks, deadlines, and progress with SPOC remarks
           </p>
         </div>
@@ -274,7 +274,7 @@ const ClientChat = () => {
               padding: '10px 18px',
               borderRadius: '10px',
               border: 'none',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
               color: 'white',
               fontWeight: 600,
               fontSize: '14px',
@@ -293,7 +293,7 @@ const ClientChat = () => {
               padding: '10px 18px',
               borderRadius: '10px',
               border: 'none',
-              background: 'linear-gradient(135deg, #10b981, #14b8a6)',
+              background: 'linear-gradient(135deg, #2E7D32, #00695C)',
               color: 'white',
               fontWeight: 600,
               fontSize: '14px',
@@ -307,15 +307,15 @@ const ClientChat = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <StatCard label="Active Tasks" value={counts.all} icon={<Inbox size={18} />} color="#60a5fa" />
-        <StatCard label="New" value={counts.new} icon={<AlertCircle size={18} />} color="#60a5fa" />
-        <StatCard label="In Progress" value={counts.progress} icon={<Loader2 size={18} />} color="#fbbf24" />
-        <StatCard label="Completed" value={counts.completed} icon={<CheckCircle2 size={18} />} color="#34d399" />
-        <StatCard label="Not Completed" value={counts.not_completed} icon={<XCircle size={18} />} color="#f87171" />
+        <StatCard label="Active Tasks" value={counts.all} icon={<Inbox size={18} />} color="#0D47A1" />
+        <StatCard label="New" value={counts.new} icon={<AlertCircle size={18} />} color="#0D47A1" />
+        <StatCard label="In Progress" value={counts.progress} icon={<Loader2 size={18} />} color="#7A4400" />
+        <StatCard label="Completed" value={counts.completed} icon={<CheckCircle2 size={18} />} color="#2E7D32" />
+        <StatCard label="Not Completed" value={counts.not_completed} icon={<XCircle size={18} />} color="#B71C1C" />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '6px', backgroundColor: '#141720', padding: '4px', borderRadius: '10px', border: '1px solid #1e2235' }}>
+        <div style={{ display: 'flex', gap: '6px', backgroundColor: '#FFFFFF', padding: '4px', borderRadius: '10px', border: '1px solid rgba(165, 214, 167, 0.55)' }}>
           <TabBtn active={view === 'active'} onClick={() => { setView('active'); setFilter('all'); }} icon={<Inbox size={14} />}>
             Active
           </TabBtn>
@@ -326,7 +326,7 @@ const ClientChat = () => {
 
         {view === 'active' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={14} style={{ color: '#6b7280' }} />
+            <Filter size={14} style={{ color: '#5B7362' }} />
             <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')}>All</FilterBtn>
             <FilterBtn active={filter === 'new'} onClick={() => setFilter('new')}>New</FilterBtn>
             <FilterBtn active={filter === 'progress'} onClick={() => setFilter('progress')}>In Progress</FilterBtn>
@@ -337,7 +337,7 @@ const ClientChat = () => {
       </div>
 
       {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0', backgroundColor: '#141720', borderRadius: '12px', border: '1px solid #1e2235' }}>Loading tasks...</div>
+        <div style={{ padding: '60px', textAlign: 'center', color: '#4A6851', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid rgba(165, 214, 167, 0.55)' }}>Loading tasks...</div>
       ) : filtered.length === 0 ? (
         <EmptyState view={view} onNew={openNew} />
       ) : (
@@ -385,12 +385,12 @@ const ClientChat = () => {
 };
 
 const StatCard = ({ label, value, icon, color }) => (
-  <div style={{ padding: '18px 20px', backgroundColor: '#141720', borderRadius: '12px', border: '1px solid #1e2235' }}>
+  <div style={{ padding: '18px 20px', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px solid rgba(165, 214, 167, 0.55)' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-      <span style={{ color: '#9ca3af', fontSize: '13px' }}>{label}</span>
+      <span style={{ color: '#4A6851', fontSize: '13px' }}>{label}</span>
       <div style={{ color, display: 'flex' }}>{icon}</div>
     </div>
-    <div style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>{value}</div>
+    <div style={{ fontSize: '26px', fontWeight: 700, color: '#1B5E20' }}>{value}</div>
   </div>
 );
 
@@ -407,8 +407,8 @@ const TabBtn = ({ active, onClick, children, icon }) => (
       cursor: 'pointer',
       fontSize: '13px',
       fontWeight: 500,
-      backgroundColor: active ? 'rgba(37,99,235,0.16)' : 'transparent',
-      color: active ? '#60a5fa' : '#9ca3af',
+      backgroundColor: active ? 'rgba(21, 101, 192, 0.16)' : 'transparent',
+      color: active ? '#0D47A1' : '#4A6851',
     }}
   >
     {icon}
@@ -426,9 +426,9 @@ const FilterBtn = ({ active, onClick, children }) => (
       fontWeight: 500,
       cursor: 'pointer',
       border: '1px solid',
-      borderColor: active ? '#3b82f6' : '#1e2235',
-      backgroundColor: active ? 'rgba(59,130,246,0.14)' : '#141720',
-      color: active ? '#60a5fa' : '#9ca3af',
+      borderColor: active ? '#BBDEFB' : 'rgba(165, 214, 167, 0.55)',
+      backgroundColor: active ? 'rgba(30, 136, 229, 0.14)' : '#FFFFFF',
+      color: active ? '#0D47A1' : '#4A6851',
     }}
   >
     {children}
@@ -436,10 +436,10 @@ const FilterBtn = ({ active, onClick, children }) => (
 );
 
 const STATUS_OPTIONS = [
-  { value: STATUS.NEW, label: 'New', dot: '#60a5fa', icon: AlertCircle },
-  { value: STATUS.IN_PROGRESS, label: 'In Progress', dot: '#fbbf24', icon: Loader2 },
-  { value: STATUS.COMPLETED, label: 'Completed', dot: '#34d399', icon: CheckCircle2 },
-  { value: STATUS.NOT_COMPLETED, label: 'Not Completed', dot: '#f87171', icon: XCircle },
+  { value: STATUS.NEW, label: 'New', dot: '#0D47A1', icon: AlertCircle },
+  { value: STATUS.IN_PROGRESS, label: 'In Progress', dot: '#7A4400', icon: Loader2 },
+  { value: STATUS.COMPLETED, label: 'Completed', dot: '#2E7D32', icon: CheckCircle2 },
+  { value: STATUS.NOT_COMPLETED, label: 'Not Completed', dot: '#B71C1C', icon: XCircle },
 ];
 
 const StatusMenu = ({ value, onChange }) => {
@@ -488,10 +488,10 @@ const StatusMenu = ({ value, onChange }) => {
             top: 'calc(100% + 6px)',
             left: 0,
             minWidth: '160px',
-            background: 'linear-gradient(180deg, #1a1f2e 0%, #141720 100%)',
-            border: '1px solid #2d3348',
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 100%)',
+            border: '1px solid #A5D6A7',
             borderRadius: '10px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.06)',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(46, 125, 50, 0.06)',
             padding: '4px',
             zIndex: 50,
           }}
@@ -511,18 +511,18 @@ const StatusMenu = ({ value, onChange }) => {
                   cursor: 'pointer',
                   fontSize: '12px',
                   fontWeight: 500,
-                  color: active ? 'white' : '#d1d5db',
-                  background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: active ? 'white' : '#2F4A36',
+                  background: active ? 'rgba(46, 125, 50, 0.15)' : 'transparent',
                   transition: 'background 0.12s',
                 }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(27, 94, 32, 0.024)'; }}
                 onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: opt.dot, boxShadow: `0 0 6px ${opt.dot}` }} />
                   {opt.label}
                 </span>
-                {active && <Check size={13} style={{ color: '#a78bfa' }} />}
+                {active && <Check size={13} style={{ color: '#256B29' }} />}
               </div>
             );
           })}
@@ -538,8 +538,8 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
   const cellBase = {
     padding: '14px 12px',
     fontSize: '13px',
-    color: '#d1d5db',
-    borderBottom: '1px solid #1e2235',
+    color: '#2F4A36',
+    borderBottom: '1px solid rgba(165, 214, 167, 0.55)',
     verticalAlign: 'top',
   };
 
@@ -547,12 +547,12 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
     padding: '12px',
     fontSize: '11px',
     fontWeight: 700,
-    color: '#9ca3af',
+    color: '#4A6851',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     textAlign: 'left',
-    borderBottom: '1px solid #2d3348',
-    background: '#0f1117',
+    borderBottom: '1px solid #A5D6A7',
+    background: '#E8F5E9',
     position: 'sticky',
     top: 0,
     zIndex: 1,
@@ -561,9 +561,9 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
 
   return (
     <div style={{
-      backgroundColor: '#141720',
+      backgroundColor: '#FFFFFF',
       borderRadius: '12px',
-      border: '1px solid #1e2235',
+      border: '1px solid rgba(165, 214, 167, 0.55)',
       overflow: 'hidden',
     }}>
       <div style={{ overflowX: 'auto' }}>
@@ -588,7 +588,7 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
               const dl = deadlineBadge(task.deadline, task.status);
               const remarks = Array.isArray(task.responses) ? task.responses : [];
               const isOpen = expanded === task._id;
-              const rowBg = idx % 2 === 0 ? '#141720' : '#171b27';
+              const rowBg = idx % 2 === 0 ? '#1B5E20' : '#1B5E20';
               const role = getRole(task, currentUser);
               const canEdit = role === 'creator';
               const canDelete = role === 'creator';
@@ -598,25 +598,25 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
               return (
                 <React.Fragment key={task._id}>
                   <tr style={{ background: rowBg, transition: 'background 0.15s' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1f2e'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#1B5E20'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}
                   >
-                    <td style={{ ...cellBase, textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>{idx + 1}</td>
+                    <td style={{ ...cellBase, textAlign: 'center', color: '#5B7362', fontWeight: 600 }}>{idx + 1}</td>
 
                     <td style={cellBase}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div style={{
                           width: '32px', height: '32px', borderRadius: '50%',
                           background: task.taskType === 'spoc'
-                            ? 'linear-gradient(135deg, #10b981, #14b8a6)'
-                            : 'linear-gradient(135deg, #25D366, #128C7E)',
+                            ? 'linear-gradient(135deg, #2E7D32, #00695C)'
+                            : 'linear-gradient(135deg, #2E7D32, #00695C)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0,
                         }}>
                           {task.clientName?.[0]?.toUpperCase() || '?'}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>
+                          <span style={{ color: '#1B5E20', fontWeight: 600, fontSize: '13px' }}>
                             {task.clientName || '—'}
                           </span>
                           <span style={{
@@ -627,9 +627,9 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
                             letterSpacing: '0.5px',
                             textTransform: 'uppercase',
                             width: 'fit-content',
-                            background: task.taskType === 'spoc' ? 'rgba(16,185,129,0.15)' : 'rgba(96,165,250,0.15)',
-                            color: task.taskType === 'spoc' ? '#34d399' : '#60a5fa',
-                            border: `1px solid ${task.taskType === 'spoc' ? 'rgba(16,185,129,0.3)' : 'rgba(96,165,250,0.3)'}`,
+                            background: task.taskType === 'spoc' ? 'rgba(67, 160, 71, 0.15)' : 'rgba(30, 136, 229, 0.15)',
+                            color: task.taskType === 'spoc' ? '#2E7D32' : '#0D47A1',
+                            border: `1px solid ${task.taskType === 'spoc' ? 'rgba(67, 160, 71, 0.3)' : 'rgba(30, 136, 229, 0.3)'}`,
                           }}>
                             {task.taskType === 'spoc' ? 'SPOC' : 'Client'}
                           </span>
@@ -637,23 +637,23 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
                       </div>
                     </td>
 
-                    <td style={{ ...cellBase, color: '#e5e7eb', maxWidth: '320px' }}>
+                    <td style={{ ...cellBase, color: '#1B5E20', maxWidth: '320px' }}>
                       <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>
                         {task.message || '—'}
                       </div>
                     </td>
 
-                    <td style={{ ...cellBase, color: '#9ca3af' }}>
+                    <td style={{ ...cellBase, color: '#4A6851' }}>
                       {task.createdBy || task.assignedBy || '—'}
                     </td>
 
                     <td style={cellBase}>
                       {task.assignedTo ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#a78bfa', fontWeight: 500 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#256B29', fontWeight: 500 }}>
                           <UserCheck size={13} />
                           {task.assignedTo}
                         </span>
-                      ) : <span style={{ color: '#6b7280' }}>—</span>}
+                      ) : <span style={{ color: '#5B7362' }}>—</span>}
                     </td>
 
                     <td style={cellBase}>
@@ -664,9 +664,9 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: '6px',
                             padding: '5px 10px', borderRadius: '8px',
-                            background: 'rgba(59,130,246,0.12)',
-                            border: '1px solid rgba(59,130,246,0.25)',
-                            color: '#60a5fa', fontSize: '12px', fontWeight: 600,
+                            background: 'rgba(30, 136, 229, 0.12)',
+                            border: '1px solid rgba(30, 136, 229, 0.25)',
+                            color: '#0D47A1', fontSize: '12px', fontWeight: 600,
                             cursor: 'pointer',
                           }}
                         >
@@ -675,11 +675,11 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
                           <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
                         </button>
                       ) : (
-                        <span style={{ color: '#6b7280', fontSize: '12px' }}>No remarks</span>
+                        <span style={{ color: '#5B7362', fontSize: '12px' }}>No remarks</span>
                       )}
                     </td>
 
-                    <td style={{ ...cellBase, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                    <td style={{ ...cellBase, color: '#4A6851', whiteSpace: 'nowrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                         <Clock size={12} />
                         {fmt(task.receivedAt)}
@@ -688,7 +688,7 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
 
                     <td style={{ ...cellBase, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#d1d5db' }}>{fmt(task.deadline)}</span>
+                        <span style={{ color: '#2F4A36' }}>{fmt(task.deadline)}</span>
                         {dl && (
                           <span style={{
                             fontSize: '10px', padding: '2px 8px', borderRadius: '999px',
@@ -736,25 +736,25 @@ const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => 
                   </tr>
 
                   {isOpen && remarks.length > 0 && (
-                    <tr key={`${task._id}-remarks`} style={{ background: '#0f1117' }}>
-                      <td colSpan={10} style={{ padding: '0', borderBottom: '1px solid #1e2235' }}>
+                    <tr key={`${task._id}-remarks`} style={{ background: '#E8F5E9' }}>
+                      <td colSpan={10} style={{ padding: '0', borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
                         <div style={{ padding: '14px 20px 18px 60px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <MessageCircle size={12} style={{ color: '#60a5fa' }} />
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <MessageCircle size={12} style={{ color: '#0D47A1' }} />
                             All Remarks ({remarks.length})
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {remarks.map((r, i) => (
                               <div key={r._id || i} style={{
                                 padding: '10px 12px',
-                                background: '#141720',
-                                border: '1px solid #1e2540',
+                                background: '#FFFFFF',
+                                border: '1px solid rgba(165, 214, 167, 0.55)',
                                 borderRadius: '8px',
                               }}>
-                                <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
+                                <p style={{ fontSize: '13px', color: '#1B5E20', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
                                   {r.text}
                                 </p>
-                                <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                                <div style={{ fontSize: '10px', color: '#5B7362' }}>
                                   {r.createdBy ? `${r.createdBy} · ` : ''}
                                   {r.createdAt && new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </div>
@@ -785,9 +785,9 @@ const YourTaskBadge = () => (
       minHeight: '32px',
       padding: '0 9px',
       borderRadius: '8px',
-      border: '1px solid rgba(16,185,129,0.35)',
-      background: 'rgba(16,185,129,0.12)',
-      color: '#34d399',
+      border: '1px solid rgba(67, 160, 71, 0.35)',
+      background: 'rgba(67, 160, 71, 0.12)',
+      color: '#2E7D32',
       fontSize: '11px',
       fontWeight: 700,
       whiteSpace: 'nowrap',
@@ -806,9 +806,9 @@ const IconBtn = ({ children, onClick, title, danger, info }) => (
       width: '32px',
       height: '32px',
       borderRadius: '8px',
-      border: '1px solid #1e2235',
-      backgroundColor: '#0f1117',
-      color: danger ? '#f87171' : info ? '#60a5fa' : '#9ca3af',
+      border: '1px solid rgba(165, 214, 167, 0.55)',
+      backgroundColor: '#E8F5E9',
+      color: danger ? '#B71C1C' : info ? '#0D47A1' : '#4A6851',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -820,25 +820,25 @@ const IconBtn = ({ children, onClick, title, danger, info }) => (
 );
 
 const EmptyState = ({ view, onNew }) => (
-  <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#141720', borderRadius: '12px', border: '1px dashed #1e2235' }}>
+  <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#FFFFFF', borderRadius: '12px', border: '1px dashed rgba(165, 214, 167, 0.55)' }}>
     <div
       style={{
         width: '64px',
         height: '64px',
         borderRadius: '50%',
-        background: 'rgba(59,130,246,0.1)',
+        background: 'rgba(30, 136, 229, 0.1)',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: '16px',
       }}
     >
-      {view === 'archive' ? <Archive size={28} color="#60a5fa" /> : <MessageSquare size={28} color="#60a5fa" />}
+      {view === 'archive' ? <Archive size={28} color="#0D47A1" /> : <MessageSquare size={28} color="#0D47A1" />}
     </div>
-    <h3 style={{ color: 'white', fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
+    <h3 style={{ color: '#1B5E20', fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
       {view === 'archive' ? 'No archived tasks yet' : 'No tasks yet'}
     </h3>
-    <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '20px' }}>
+    <p style={{ color: '#4A6851', fontSize: '13px', marginBottom: '20px' }}>
       {view === 'archive'
         ? 'Completed tasks will appear here for reference.'
         : 'Log your first client task to get started.'}
@@ -850,7 +850,7 @@ const EmptyState = ({ view, onNew }) => (
           padding: '10px 18px',
           borderRadius: '10px',
           border: 'none',
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+          background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
           color: 'white',
           fontWeight: 600,
           fontSize: '13px',
@@ -1001,10 +1001,10 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
         style={{
           width: '600px',
           maxWidth: '100%',
-          background: 'linear-gradient(180deg, #161a26 0%, #12141d 100%)',
+          background: 'linear-gradient(180deg, #FFFFFF 0%, #E8F5E9 100%)',
           borderRadius: '18px',
-          border: '1px solid #262d45',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.06)',
+          border: '1px solid rgba(165, 214, 167, 0.55)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(46, 125, 50, 0.06)',
           margin: 'auto',
         }}
       >
@@ -1014,13 +1014,13 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
           justifyContent: 'space-between',
           alignItems: 'flex-start',
           padding: '24px 28px 18px',
-          borderBottom: '1px solid #1e2540',
+          borderBottom: '1px solid rgba(165, 214, 167, 0.55)',
         }}>
           <div>
-            <h2 style={{ color: 'white', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
+            <h2 style={{ color: '#1B5E20', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
               {initial ? 'Edit Task' : 'New Client Task'}
             </h2>
-            <p style={{ color: '#6b7280', fontSize: '12px' }}>
+            <p style={{ color: '#5B7362', fontSize: '12px' }}>
               {initial ? 'Update the task details below' : 'Log a new task from a client'}
             </p>
           </div>
@@ -1028,9 +1028,9 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
             type="button"
             onClick={onClose}
             style={{
-              background: '#0f1117',
-              border: '1px solid #2d3348',
-              color: '#9ca3af',
+              background: '#E8F5E9',
+              border: '1px solid #A5D6A7',
+              color: '#4A6851',
               cursor: 'pointer',
               width: '32px',
               height: '32px',
@@ -1066,12 +1066,12 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
           <ReadField label="Client Name" value={clientName || '—'} />
         )}
         {errors.clientName && (
-          <div style={{ color: '#f87171', fontSize: '12px', marginTop: '-10px' }}>{errors.clientName}</div>
+          <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '-10px' }}>{errors.clientName}</div>
         )}
 
         <div>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-            Task from Client <span style={{ color: '#ef4444' }}>*</span>
+          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+            Task from Client <span style={{ color: '#B71C1C' }}>*</span>
           </label>
           <textarea
             value={message}
@@ -1083,12 +1083,12 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
               ...inputStyle,
               resize: 'vertical',
               fontFamily: 'inherit',
-              borderColor: errors.message ? '#ef4444' : '#1e2540',
+              borderColor: errors.message ? '#FFCDD2' : 'rgba(165, 214, 167, 0.55)',
               opacity: !canEditAll ? 0.7 : 1,
               cursor: !canEditAll ? 'not-allowed' : 'text',
             }}
           />
-          {errors.message && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
+          {errors.message && <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -1119,22 +1119,22 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Status <span style={{ color: '#ef4444' }}>*</span>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+              Status <span style={{ color: '#B71C1C' }}>*</span>
             </label>
             <select
               value={status}
               disabled={readOnly || savingStatus}
               onChange={(e) => handleStatusChange(e.target.value)}
-              style={{ ...inputStyle, borderColor: errors.status ? '#ef4444' : '#1e2540', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
+              style={{ ...inputStyle, borderColor: errors.status ? '#FFCDD2' : 'rgba(165, 214, 167, 0.55)', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
             >
               <option value={STATUS.NEW}>New</option>
               <option value={STATUS.IN_PROGRESS}>In Progress</option>
               <option value={STATUS.COMPLETED}>Completed</option>
               <option value={STATUS.NOT_COMPLETED}>Not Completed</option>
             </select>
-            {savingStatus && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
-            {errors.status && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
+            {savingStatus && <div style={{ color: '#0D47A1', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
+            {errors.status && <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
           </div>
           <div>
             {canEditAll ? (
@@ -1150,23 +1150,23 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
             ) : (
               <ReadField label="Assigned To" value={assignedTo || '—'} />
             )}
-            {errors.assignedTo && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.assignedTo}</div>}
+            {errors.assignedTo && <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{errors.assignedTo}</div>}
           </div>
         </div>
 
         {initial?._id && (
           <div style={{
             padding: '16px',
-            background: 'linear-gradient(180deg, rgba(59,130,246,0.06), rgba(139,92,246,0.04))',
-            border: '1px solid #262d45',
+            background: 'linear-gradient(180deg, rgba(30, 136, 229, 0.06), rgba(27, 94, 32, 0.04))',
+            border: '1px solid rgba(165, 214, 167, 0.55)',
             borderRadius: '12px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <Send size={14} style={{ color: '#60a5fa' }} />
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+              <Send size={14} style={{ color: '#0D47A1' }} />
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#2F4A36', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                 Remarks by SPOC
               </span>
-              <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#6b7280' }}>
+              <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5B7362' }}>
                 {responses.length} {responses.length === 1 ? 'remark' : 'remarks'}
               </span>
             </div>
@@ -1178,8 +1178,8 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                     key={r._id}
                     style={{
                       padding: '10px 12px',
-                      background: '#0f1117',
-                      border: '1px solid #1e2540',
+                      background: '#E8F5E9',
+                      border: '1px solid rgba(165, 214, 167, 0.55)',
                       borderRadius: '8px',
                       display: 'flex',
                       gap: '10px',
@@ -1187,10 +1187,10 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
                         {r.text}
                       </p>
-                      <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                      <div style={{ fontSize: '10px', color: '#5B7362' }}>
                         {r.createdBy ? `${r.createdBy} · ` : ''}
                         {new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
@@ -1200,7 +1200,7 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                         type="button"
                         onClick={() => onRemoveResponse(initial._id, r._id)}
                         title="Delete remark"
-                        style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', display: 'flex' }}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -1220,10 +1220,10 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                   style={{
                     flex: 1,
                     padding: '9px 12px',
-                    backgroundColor: '#0f1117',
-                    border: '1px solid #1e2540',
+                    backgroundColor: '#E8F5E9',
+                    border: '1px solid rgba(165, 214, 167, 0.55)',
                     borderRadius: '8px',
-                    color: 'white',
+                    color: '#1B5E20',
                     fontSize: '13px',
                     outline: 'none',
                     fontFamily: 'inherit',
@@ -1244,8 +1244,8 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                     padding: '0 16px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: responseText.trim() ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : '#1e2540',
-                    color: responseText.trim() ? 'white' : '#6b7280',
+                    background: responseText.trim() ? 'linear-gradient(135deg, #1565C0, #1B5E20)' : '#F1F6F1',
+                    color: responseText.trim() ? 'white' : '#5B7362',
                     fontSize: '13px',
                     fontWeight: 600,
                     cursor: responseText.trim() ? 'pointer' : 'not-allowed',
@@ -1260,7 +1260,7 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                 </button>
               </div>
             ) : (
-              <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', padding: '8px 4px' }}>
+              <div style={{ fontSize: '12px', color: '#5B7362', fontStyle: 'italic', padding: '8px 4px' }}>
                 Read-only — only the assignee or task creator can add remarks.
               </div>
             )}
@@ -1275,7 +1275,7 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
           gap: '10px',
           justifyContent: 'flex-end',
           padding: '14px 28px',
-          borderTop: '1px solid #1e2540',
+          borderTop: '1px solid rgba(165, 214, 167, 0.55)',
           background: 'rgba(15,17,23,0.6)',
           flexShrink: 0,
         }}>
@@ -1285,9 +1285,9 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
             style={{
               padding: '10px 18px',
               borderRadius: '10px',
-              border: '1px solid #1e2540',
+              border: '1px solid rgba(165, 214, 167, 0.55)',
               backgroundColor: 'transparent',
-              color: '#9ca3af',
+              color: '#4A6851',
               fontSize: '14px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -1302,7 +1302,7 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
                 padding: '10px 22px',
                 borderRadius: '10px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                background: 'linear-gradient(135deg, #1565C0, #1B5E20)',
                 color: 'white',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -1320,8 +1320,8 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
 
 const RoleBanner = ({ role }) => {
   const cfg = role === 'assignee'
-    ? { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', color: '#34d399', text: 'Assignee view — you can update status and add remarks.' }
-    : { bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.25)', color: '#60a5fa', text: 'View only — only the task creator can edit task details.' };
+    ? { bg: 'rgba(67, 160, 71, 0.08)', border: 'rgba(67, 160, 71, 0.25)', color: '#2E7D32', text: 'Assignee view — you can update status and add remarks.' }
+    : { bg: 'rgba(30, 136, 229, 0.08)', border: 'rgba(30, 136, 229, 0.25)', color: '#0D47A1', text: 'View only — only the task creator can edit task details.' };
   return (
     <div style={{
       padding: '10px 14px',
@@ -1343,15 +1343,15 @@ const RoleBanner = ({ role }) => {
 
 const ReadField = ({ label, value }) => (
   <div>
-    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
       {label}
     </label>
     <div style={{
       padding: '10px 12px',
-      backgroundColor: '#0a0d14',
-      border: '1px dashed #1e2540',
+      backgroundColor: '#E8F5E9',
+      border: '1px dashed rgba(165, 214, 167, 0.55)',
       borderRadius: '8px',
-      color: '#d1d5db',
+      color: '#2F4A36',
       fontSize: '14px',
       minHeight: '40px',
       display: 'flex',
@@ -1363,10 +1363,10 @@ const ReadField = ({ label, value }) => (
 );
 
 const PRIORITY_OPTIONS = [
-  { value: 'Low', color: '#34d399', bg: 'rgba(16,185,129,0.14)', border: 'rgba(16,185,129,0.3)' },
-  { value: 'Medium', color: '#60a5fa', bg: 'rgba(59,130,246,0.14)', border: 'rgba(59,130,246,0.3)' },
-  { value: 'High', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)', border: 'rgba(245,158,11,0.3)' },
-  { value: 'Urgent', color: '#f87171', bg: 'rgba(239,68,68,0.14)', border: 'rgba(239,68,68,0.3)' },
+  { value: 'Low', color: '#2E7D32', bg: 'rgba(67, 160, 71, 0.14)', border: 'rgba(67, 160, 71, 0.3)' },
+  { value: 'Medium', color: '#0D47A1', bg: 'rgba(30, 136, 229, 0.14)', border: 'rgba(30, 136, 229, 0.3)' },
+  { value: 'High', color: '#7A4400', bg: 'rgba(249, 168, 37, 0.14)', border: 'rgba(249, 168, 37, 0.3)' },
+  { value: 'Urgent', color: '#B71C1C', bg: 'rgba(229, 57, 53, 0.14)', border: 'rgba(229, 57, 53, 0.3)' },
 ];
 
 const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, onClose, onSave, onAddResponse, onRemoveResponse, onStatusChange }) => {
@@ -1497,10 +1497,10 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
         style={{
           width: '600px',
           maxWidth: '100%',
-          background: 'linear-gradient(180deg, #161a26 0%, #12141d 100%)',
+          background: 'linear-gradient(180deg, #FFFFFF 0%, #E8F5E9 100%)',
           borderRadius: '18px',
-          border: '1px solid #1f3a32',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(16,185,129,0.08)',
+          border: '1px solid #66BB6A',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(67, 160, 71, 0.08)',
           margin: 'auto',
         }}
       >
@@ -1509,21 +1509,21 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
           justifyContent: 'space-between',
           alignItems: 'flex-start',
           padding: '24px 28px 18px',
-          borderBottom: '1px solid #1e3a32',
+          borderBottom: '1px solid #66BB6A',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '40px', height: '40px', borderRadius: '10px',
-              background: 'linear-gradient(135deg, #10b981, #14b8a6)',
+              background: 'linear-gradient(135deg, #2E7D32, #00695C)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <Users size={20} color="white" />
             </div>
             <div>
-              <h2 style={{ color: 'white', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
+              <h2 style={{ color: '#1B5E20', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
                 {initial ? 'Edit SPOC Task' : 'New Task for SPOC'}
               </h2>
-              <p style={{ color: '#6b7280', fontSize: '12px' }}>
+              <p style={{ color: '#5B7362', fontSize: '12px' }}>
                 {initial ? 'Update internal task assigned to a SPOC' : 'Assign an internal task to a team SPOC'}
               </p>
             </div>
@@ -1532,8 +1532,8 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
             type="button"
             onClick={onClose}
             style={{
-              background: '#0f1117', border: '1px solid #2d3348',
-              color: '#9ca3af', cursor: 'pointer',
+              background: '#E8F5E9', border: '1px solid #A5D6A7',
+              color: '#4A6851', cursor: 'pointer',
               width: '32px', height: '32px', borderRadius: '8px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}
@@ -1560,11 +1560,11 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
             <ReadField label="SPOC Name" value={spocName || '—'} />
           )}
           {errors.spocName && (
-            <div style={{ color: '#f87171', fontSize: '12px', marginTop: '-10px' }}>{errors.spocName}</div>
+            <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '-10px' }}>{errors.spocName}</div>
           )}
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
               Task Title
             </label>
             <input
@@ -1577,8 +1577,8 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Task Description <span style={{ color: '#ef4444' }}>*</span>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+              Task Description <span style={{ color: '#B71C1C' }}>*</span>
             </label>
             <textarea
               value={message}
@@ -1590,12 +1590,12 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                 ...inputStyle,
                 resize: 'vertical',
                 fontFamily: 'inherit',
-                borderColor: errors.message ? '#ef4444' : '#1e2540',
+                borderColor: errors.message ? '#FFCDD2' : 'rgba(165, 214, 167, 0.55)',
                 opacity: !canEditAll ? 0.7 : 1,
                 cursor: !canEditAll ? 'not-allowed' : 'text',
               }}
             />
-            {errors.message && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
+            {errors.message && <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
@@ -1625,9 +1625,9 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '8px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '8px' }}>
               <Flag size={11} style={{ display: 'inline', marginRight: '4px' }} />
-              Priority <span style={{ color: '#ef4444' }}>*</span>
+              Priority <span style={{ color: '#B71C1C' }}>*</span>
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {PRIORITY_OPTIONS.map((p) => {
@@ -1641,9 +1641,9 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                     style={{
                       padding: '7px 14px',
                       borderRadius: '8px',
-                      border: `1px solid ${selected ? p.border : '#1e2540'}`,
+                      border: `1px solid ${selected ? p.border : 'rgba(165, 214, 167, 0.55)'}`,
                       background: selected ? p.bg : 'transparent',
-                      color: selected ? p.color : '#6b7280',
+                      color: selected ? p.color : '#5B7362',
                       fontSize: '12px',
                       fontWeight: 600,
                       cursor: canEditAll ? 'pointer' : 'not-allowed',
@@ -1659,37 +1659,37 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Status <span style={{ color: '#ef4444' }}>*</span>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+              Status <span style={{ color: '#B71C1C' }}>*</span>
             </label>
             <select
               value={status}
               disabled={readOnly || savingStatus}
               onChange={(e) => handleStatusChange(e.target.value)}
-              style={{ ...inputStyle, borderColor: errors.status ? '#ef4444' : '#1e2540', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
+              style={{ ...inputStyle, borderColor: errors.status ? '#FFCDD2' : 'rgba(165, 214, 167, 0.55)', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
             >
               <option value={STATUS.NEW}>New</option>
               <option value={STATUS.IN_PROGRESS}>In Progress</option>
               <option value={STATUS.COMPLETED}>Completed</option>
               <option value={STATUS.NOT_COMPLETED}>Not Completed</option>
             </select>
-            {savingStatus && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
-            {errors.status && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
+            {savingStatus && <div style={{ color: '#0D47A1', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
+            {errors.status && <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
           </div>
 
           {initial?._id && (
             <div style={{
               padding: '16px',
-              background: 'linear-gradient(180deg, rgba(16,185,129,0.06), rgba(20,184,166,0.04))',
-              border: '1px solid #1f3a32',
+              background: 'linear-gradient(180deg, rgba(67, 160, 71, 0.06), rgba(0, 137, 123, 0.04))',
+              border: '1px solid #66BB6A',
               borderRadius: '12px',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <Send size={14} style={{ color: '#34d399' }} />
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                <Send size={14} style={{ color: '#2E7D32' }} />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#2F4A36', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
                   Remarks / Updates
                 </span>
-                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#6b7280' }}>
+                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#5B7362' }}>
                   {responses.length} {responses.length === 1 ? 'remark' : 'remarks'}
                 </span>
               </div>
@@ -1701,8 +1701,8 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                       key={r._id}
                       style={{
                         padding: '10px 12px',
-                        background: '#0f1117',
-                        border: '1px solid #1e2540',
+                        background: '#E8F5E9',
+                        border: '1px solid rgba(165, 214, 167, 0.55)',
                         borderRadius: '8px',
                         display: 'flex',
                         gap: '10px',
@@ -1710,10 +1710,10 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
+                        <p style={{ fontSize: '13px', color: '#1B5E20', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
                           {r.text}
                         </p>
-                        <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                        <div style={{ fontSize: '10px', color: '#5B7362' }}>
                           {r.createdBy ? `${r.createdBy} · ` : ''}
                           {new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -1723,7 +1723,7 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                           type="button"
                           onClick={() => onRemoveResponse(initial._id, r._id)}
                           title="Delete remark"
-                          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                          style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', display: 'flex' }}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1743,10 +1743,10 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                     style={{
                       flex: 1,
                       padding: '9px 12px',
-                      backgroundColor: '#0f1117',
-                      border: '1px solid #1e2540',
+                      backgroundColor: '#E8F5E9',
+                      border: '1px solid rgba(165, 214, 167, 0.55)',
                       borderRadius: '8px',
-                      color: 'white',
+                      color: '#1B5E20',
                       fontSize: '13px',
                       outline: 'none',
                       fontFamily: 'inherit',
@@ -1767,8 +1767,8 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                       padding: '0 16px',
                       borderRadius: '8px',
                       border: 'none',
-                      background: responseText.trim() ? 'linear-gradient(135deg, #10b981, #14b8a6)' : '#1e2540',
-                      color: responseText.trim() ? 'white' : '#6b7280',
+                      background: responseText.trim() ? 'linear-gradient(135deg, #2E7D32, #00695C)' : '#F1F6F1',
+                      color: responseText.trim() ? 'white' : '#5B7362',
                       fontSize: '13px',
                       fontWeight: 600,
                       cursor: responseText.trim() ? 'pointer' : 'not-allowed',
@@ -1783,7 +1783,7 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                   </button>
                 </div>
               ) : (
-                <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', padding: '8px 4px' }}>
+                <div style={{ fontSize: '12px', color: '#5B7362', fontStyle: 'italic', padding: '8px 4px' }}>
                   Read-only — only the assigned SPOC or task creator can add remarks.
                 </div>
               )}
@@ -1797,7 +1797,7 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
           gap: '10px',
           justifyContent: 'flex-end',
           padding: '14px 28px',
-          borderTop: '1px solid #1e3a32',
+          borderTop: '1px solid #66BB6A',
           background: 'rgba(15,17,23,0.6)',
           flexShrink: 0,
         }}>
@@ -1807,9 +1807,9 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
             style={{
               padding: '10px 18px',
               borderRadius: '10px',
-              border: '1px solid #1e2540',
+              border: '1px solid rgba(165, 214, 167, 0.55)',
               backgroundColor: 'transparent',
-              color: '#9ca3af',
+              color: '#4A6851',
               fontSize: '14px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -1824,7 +1824,7 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
                 padding: '10px 22px',
                 borderRadius: '10px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #10b981, #14b8a6)',
+                background: 'linear-gradient(135deg, #2E7D32, #00695C)',
                 color: 'white',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -1842,7 +1842,7 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
 
 const Field = ({ label, children }) => (
   <div style={{ marginBottom: '14px' }}>
-    <label style={{ display: 'block', color: '#9ca3af', fontSize: '12px', fontWeight: 500, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+    <label style={{ display: 'block', color: '#4A6851', fontSize: '12px', fontWeight: 500, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
       {label}
     </label>
     {children}
@@ -1852,10 +1852,10 @@ const Field = ({ label, children }) => (
 const inputStyle = {
   width: '100%',
   padding: '10px 12px',
-  backgroundColor: '#0f1117',
-  border: '1px solid #1e2540',
+  backgroundColor: '#E8F5E9',
+  border: '1px solid rgba(165, 214, 167, 0.55)',
   borderRadius: '8px',
-  color: 'white',
+  color: '#1B5E20',
   fontSize: '14px',
   outline: 'none',
   boxSizing: 'border-box',
