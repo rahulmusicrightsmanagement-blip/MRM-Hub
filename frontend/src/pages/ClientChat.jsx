@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, Plus, Archive, Inbox, Filter, Trash2, Edit3, X, Clock, CheckCircle2, Loader2, AlertCircle, ChevronDown, Check, Send, UserCheck, XCircle, MessageCircle, Users, Flag, Eye, Lock } from 'lucide-react';
+import {
+  Plus, Trash2, Edit3, X, Clock, CheckCircle2, Loader2, AlertCircle, ChevronDown, ChevronRight, Check,
+  Send, UserCheck, XCircle, MessageCircle, MessageSquare, Users, Flag, Eye, Lock, Search, CalendarClock,
+  ListTodo, Filter,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from '../components/SearchableSelect';
 import DateTimePicker from '../components/DateTimePicker';
 import { useNotificationDeeplink } from '../hooks/useNotificationDeeplink';
+import { useUrlState } from '../hooks/useUrlState';
+import {
+  PageHeader, Button, IconButton, StatGrid, StatCard, Segmented, Card, Panel, Pill,
+  SearchInput, TH, EmptyState, TableSkeleton, Avatar, PersonChip,
+} from '../components/studio';
+import { T, TONES, TD, LABEL, SP, toneOf } from '../theme';
 
 const STATUS = {
   NEW: 'New',
@@ -13,30 +23,48 @@ const STATUS = {
   NOT_COMPLETED: 'Not Completed',
 };
 
-const statusColors = {
-  [STATUS.NEW]: { bg: 'rgba(59,130,246,0.14)', fg: '#60a5fa', border: 'rgba(59,130,246,0.3)' },
-  [STATUS.IN_PROGRESS]: { bg: 'rgba(245,158,11,0.14)', fg: '#fbbf24', border: 'rgba(245,158,11,0.3)' },
-  [STATUS.COMPLETED]: { bg: 'rgba(16,185,129,0.14)', fg: '#34d399', border: 'rgba(16,185,129,0.3)' },
-  [STATUS.NOT_COMPLETED]: { bg: 'rgba(239,68,68,0.14)', fg: '#f87171', border: 'rgba(239,68,68,0.3)' },
+const STATUS_OPTIONS = [
+  { value: STATUS.NEW, label: 'New', tone: 'blue', icon: AlertCircle },
+  { value: STATUS.IN_PROGRESS, label: 'In Progress', tone: 'amber', icon: Loader2 },
+  { value: STATUS.COMPLETED, label: 'Completed', tone: 'green', icon: CheckCircle2 },
+  { value: STATUS.NOT_COMPLETED, label: 'Not Completed', tone: 'red', icon: XCircle },
+];
+const statusTone = (status) => (STATUS_OPTIONS.find((o) => o.value === status) || STATUS_OPTIONS[0]).tone;
+
+const isClosed = (t) => t.status === STATUS.COMPLETED || t.status === STATUS.NOT_COMPLETED;
+
+/* One status filter, driven by the stat cards. "open" is the default and is
+   what the old Active tab showed: anything not yet closed either way. */
+const STATUS_FILTERS = {
+  open: (t) => !isClosed(t),
+  new: (t) => t.status === STATUS.NEW,
+  progress: (t) => t.status === STATUS.IN_PROGRESS,
+  completed: (t) => t.status === STATUS.COMPLETED,
+  not_completed: (t) => t.status === STATUS.NOT_COMPLETED,
+  all: () => true,
 };
+
+// module level, because useUrlState needs a stable reference
+const VIEW_DEFAULTS = { scope: 'all', status: 'open' };
 
 const fmt = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const deadlineBadge = (iso, status) => {
-  if (!iso) return null;
-  if (status === STATUS.COMPLETED) return null;
+  if (!iso || isClosed({ status })) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
   d.setHours(0, 0, 0, 0);
   const diffDays = Math.round((d.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-  if (diffDays < 0) return { text: 'Overdue', color: '#f87171', bg: 'rgba(239,68,68,0.14)' };
-  if (diffDays === 0) return { text: 'Due today', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)' };
-  if (diffDays === 1) return { text: 'Due tomorrow', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)' };
+  if (diffDays < 0) return { text: 'Overdue', tone: 'red' };
+  if (diffDays === 0) return { text: 'Due today', tone: 'amber' };
+  if (diffDays === 1) return { text: 'Due tomorrow', tone: 'amber' };
   return null;
 };
 
@@ -51,6 +79,15 @@ const isAssignedToCurrentUser = (task, user) => {
   return !!task.assignedTo && normalizeName(task.assignedTo) === normalizeName(user.name);
 };
 
+const isCreatedByCurrentUser = (task, user) => {
+  if (!task || !user) return false;
+  const userId = toId(user._id || user.id);
+  const creatorId = toId(task.createdById);
+  if (userId && creatorId) return userId === creatorId;
+  const by = task.createdBy || task.assignedBy;
+  return !!by && normalizeName(by) === normalizeName(user.name);
+};
+
 const getRole = (task, user) => {
   if (!user) return 'viewer';
   const uid = toId(user._id || user.id);
@@ -62,6 +99,17 @@ const getRole = (task, user) => {
   return 'viewer';
 };
 
+const SCOPES = {
+  all: () => true,
+  mine: isAssignedToCurrentUser,
+  byme: isCreatedByCurrentUser,
+};
+
+const LINK = {
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  color: T.accent, fontWeight: 600, fontSize: 'inherit', fontFamily: 'inherit', textDecoration: 'underline',
+};
+
 const ClientChat = () => {
   const { authFetch, user: currentUser, isGuest } = useAuth();
   const { addToast } = useToast();
@@ -69,8 +117,8 @@ const ClientChat = () => {
   const [members, setMembers] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [view, setView] = useState('active');
+  const [view, setView] = useUrlState(VIEW_DEFAULTS);
+  const [query, setQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [modalType, setModalType] = useState('client');
@@ -223,17 +271,36 @@ const ClientChat = () => {
     }
   };
 
+  const scope = SCOPES[view.scope] ? view.scope : 'all';
+  const status = STATUS_FILTERS[view.status] ? view.status : 'open';
+
+  // the scope narrows everything below it, so the stat cards count "my" tasks when "mine" is on
+  const scoped = useMemo(
+    () => messages.filter((t) => SCOPES[scope](t, currentUser)),
+    [messages, scope, currentUser],
+  );
+
+  const counts = useMemo(() => {
+    const out = {};
+    for (const [key, test] of Object.entries(STATUS_FILTERS)) out[key] = scoped.filter(test).length;
+    out.overdue = scoped.filter((t) => deadlineBadge(t.deadline, t.status)?.text === 'Overdue').length;
+    return out;
+  }, [scoped]);
+
+  const scopeCounts = useMemo(() => {
+    const open = messages.filter(STATUS_FILTERS.open);
+    return {
+      all: open.length,
+      mine: open.filter((t) => isAssignedToCurrentUser(t, currentUser)).length,
+      byme: open.filter((t) => isCreatedByCurrentUser(t, currentUser)).length,
+    };
+  }, [messages, currentUser]);
+
   const filtered = useMemo(() => {
-    let list = [...messages];
-    if (view === 'archive') {
-      list = list.filter((t) => t.status === STATUS.COMPLETED || t.status === STATUS.NOT_COMPLETED);
-    } else {
-      if (filter === 'all') list = list.filter((t) => t.status !== STATUS.COMPLETED && t.status !== STATUS.NOT_COMPLETED);
-      else if (filter === 'new') list = list.filter((t) => t.status === STATUS.NEW);
-      else if (filter === 'progress') list = list.filter((t) => t.status === STATUS.IN_PROGRESS);
-      else if (filter === 'completed') list = list.filter((t) => t.status === STATUS.COMPLETED);
-      else if (filter === 'not_completed') list = list.filter((t) => t.status === STATUS.NOT_COMPLETED);
-    }
+    const q = query.trim().toLowerCase();
+    const list = scoped.filter(STATUS_FILTERS[status]).filter((t) => !q || [
+      t.clientName, t.message, t.assignedTo, t.createdBy, t.assignedBy,
+    ].some((v) => (v || '').toLowerCase().includes(q)));
     list.sort((a, b) => {
       const ad = a.deadline ? new Date(a.deadline).getTime() : Infinity;
       const bd = b.deadline ? new Date(b.deadline).getTime() : Infinity;
@@ -241,114 +308,145 @@ const ClientChat = () => {
       return new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime();
     });
     return list;
-  }, [messages, filter, view]);
+  }, [scoped, status, query]);
 
-  const counts = useMemo(() => ({
-    all: messages.filter((t) => t.status !== STATUS.COMPLETED && t.status !== STATUS.NOT_COMPLETED).length,
-    new: messages.filter((t) => t.status === STATUS.NEW).length,
-    progress: messages.filter((t) => t.status === STATUS.IN_PROGRESS).length,
-    completed: messages.filter((t) => t.status === STATUS.COMPLETED).length,
-    not_completed: messages.filter((t) => t.status === STATUS.NOT_COMPLETED).length,
-  }), [messages]);
+  const pickStatus = (key) => setView({ status: status === key && key !== 'open' ? 'open' : key });
+  const filtersOn = scope !== 'all' || status !== 'open' || !!query;
+  const resetAll = () => { setView({ scope: 'all', status: 'open' }); setQuery(''); };
+
+  const statCards = [
+    { key: 'open', label: 'Open tasks', icon: ListTodo, tone: 'indigo', caption: counts.overdue ? `${counts.overdue} past deadline` : 'Nothing overdue' },
+    { key: 'new', label: 'New', icon: AlertCircle, tone: 'blue', caption: 'Not picked up yet' },
+    { key: 'progress', label: 'In progress', icon: Loader2, tone: 'amber', caption: 'Being worked on' },
+    { key: 'completed', label: 'Completed', icon: CheckCircle2, tone: 'green', caption: 'Done and closed' },
+    { key: 'not_completed', label: 'Not completed', icon: XCircle, tone: 'red', caption: 'Closed unfinished' },
+  ];
+
+  // the counts live on the stat cards above, so the chips do not repeat them
+  const statusOptions = [
+    { value: 'open', label: 'Open', icon: ListTodo },
+    { value: 'new', label: 'New', icon: AlertCircle },
+    { value: 'progress', label: 'In Progress', icon: Loader2 },
+    { value: 'completed', label: 'Completed', icon: CheckCircle2 },
+    { value: 'not_completed', label: 'Not Completed', icon: XCircle },
+    { value: 'all', label: 'All', icon: Filter },
+  ];
+
+  const scopeOptions = [
+    { value: 'all', label: 'All tasks', icon: Users, count: scopeCounts.all },
+    { value: 'mine', label: 'My work', icon: UserCheck, count: scopeCounts.mine },
+    { value: 'byme', label: 'Assigned by me', icon: Send, count: scopeCounts.byme },
+  ];
+
+  const emptyTitle = messages.length === 0
+    ? 'No tasks yet'
+    : scope === 'mine' && !query && status === 'open'
+      ? 'Nothing open is assigned to you'
+      : 'Nothing matches these filters';
 
   return (
-    <div style={{ padding: '32px 36px', color: 'white' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <MessageSquare style={{ width: '26px', height: '26px', color: '#60a5fa' }} />
-            Client Task
-          </h1>
-          <p style={{ color: '#9ca3af', fontSize: '14px' }}>
-            Track client tasks, deadlines, and progress with SPOC remarks
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button
-            onClick={() => openNew('client')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
-          >
-            <Plus style={{ width: '16px', height: '16px' }} />
-            New Task
-          </button>
-          <button
-            onClick={() => openNew('spoc')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 18px',
-              borderRadius: '10px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #10b981, #14b8a6)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-            }}
-          >
-            <Users style={{ width: '16px', height: '16px' }} />
-            Task for SPOC
-          </button>
-        </div>
-      </div>
+    // capped, like the other list pages: a table stretched across 1900px puts
+    // the status an arm's length from the task it belongs to
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
+      <PageHeader
+        breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Client Task' }]}
+        title="Client Task"
+        subtitle="Tasks from clients and for SPOCs: who owns each one, when it is due, and where it stands."
+        actions={(
+          <>
+            <Button variant="ghost" icon={Users} onClick={() => openNew('spoc')}>Task for SPOC</Button>
+            <Button icon={Plus} onClick={() => openNew('client')}>New client task</Button>
+          </>
+        )}
+      />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <StatCard label="Active Tasks" value={counts.all} icon={<Inbox size={18} />} color="#60a5fa" />
-        <StatCard label="New" value={counts.new} icon={<AlertCircle size={18} />} color="#60a5fa" />
-        <StatCard label="In Progress" value={counts.progress} icon={<Loader2 size={18} />} color="#fbbf24" />
-        <StatCard label="Completed" value={counts.completed} icon={<CheckCircle2 size={18} />} color="#34d399" />
-        <StatCard label="Not Completed" value={counts.not_completed} icon={<XCircle size={18} />} color="#f87171" />
-      </div>
+      {/* The cards ARE the status filter: click one to narrow the table to it,
+          click it again to go back to everything still open. */}
+      <StatGrid columns={5}>
+        {statCards.map((c) => (
+          <StatCard
+            key={c.key}
+            label={c.label}
+            value={loading ? '–' : counts[c.key]}
+            caption={c.caption}
+            icon={c.icon}
+            tone={c.tone}
+            active={status === c.key}
+            onClick={() => pickStatus(c.key)}
+          />
+        ))}
+      </StatGrid>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '6px', backgroundColor: '#141720', padding: '4px', borderRadius: '10px', border: '1px solid #1e2235' }}>
-          <TabBtn active={view === 'active'} onClick={() => { setView('active'); setFilter('all'); }} icon={<Inbox size={14} />}>
-            Active
-          </TabBtn>
-          <TabBtn active={view === 'archive'} onClick={() => { setView('archive'); setFilter('all'); }} icon={<Archive size={14} />}>
-            Archive
-          </TabBtn>
+      <Panel style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <Segmented options={scopeOptions} value={scope} onChange={(v) => setView({ scope: v })} tone="purple" />
+          <SearchInput
+            icon={Search}
+            placeholder="Search client, task or person"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ flex: '1 1 240px', maxWidth: '380px', marginLeft: 'auto' }}
+          />
+          {filtersOn && (
+            <Button variant="ghost" icon={X} onClick={resetAll} title="Back to all open tasks" style={{ padding: '9px 14px', fontSize: '13px' }}>
+              Reset
+            </Button>
+          )}
         </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: SP.snug, flexWrap: 'wrap',
+          marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${T.border}`,
+        }}>
+          <span style={{ ...LABEL, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Filter size={13} />
+            Status
+          </span>
+          <Segmented options={statusOptions} value={status} onChange={(v) => setView({ status: v })} tone="indigo" />
+        </div>
+      </Panel>
 
-        {view === 'active' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Filter size={14} style={{ color: '#6b7280' }} />
-            <FilterBtn active={filter === 'all'} onClick={() => setFilter('all')}>All</FilterBtn>
-            <FilterBtn active={filter === 'new'} onClick={() => setFilter('new')}>New</FilterBtn>
-            <FilterBtn active={filter === 'progress'} onClick={() => setFilter('progress')}>In Progress</FilterBtn>
-            <FilterBtn active={filter === 'completed'} onClick={() => setFilter('completed')}>Completed</FilterBtn>
-            <FilterBtn active={filter === 'not_completed'} onClick={() => setFilter('not_completed')}>Not Completed</FilterBtn>
+      <Card bodyStyle={{ padding: 0 }}>
+        {!loading && filtered.length === 0 ? (
+          <EmptyState icon={messages.length === 0 ? MessageSquare : Search} title={emptyTitle}>
+            {messages.length === 0
+              ? <button type="button" onClick={() => openNew('client')} style={LINK}>Add the first task</button>
+              : <button type="button" onClick={resetAll} style={LINK}>Show all open tasks</button>}
+          </EmptyState>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <TH width="48px" align="center">#</TH>
+                  <TH>Task</TH>
+                  <TH width="230px">People</TH>
+                  <TH width="170px">Timeline</TH>
+                  <TH width="130px">Remarks</TH>
+                  <TH width="170px">Status</TH>
+                  <TH width="96px" align="right" />
+                </tr>
+              </thead>
+              {loading ? (
+                <TableSkeleton columns={['18px', '75%', '70%', '60%', '50%', '60%', '40px']} rows={8} />
+              ) : (
+                <tbody>
+                  {filtered.map((task, idx) => (
+                    <TaskRow
+                      key={task._id}
+                      index={idx + 1}
+                      task={task}
+                      currentUser={currentUser}
+                      onOpen={openEdit}
+                      onDelete={deleteMessage}
+                      onStatusChange={setStatus}
+                    />
+                  ))}
+                </tbody>
+              )}
+            </table>
           </div>
         )}
-      </div>
-
-      {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0', backgroundColor: '#141720', borderRadius: '12px', border: '1px solid #1e2235' }}>Loading tasks...</div>
-      ) : filtered.length === 0 ? (
-        <EmptyState view={view} onNew={openNew} />
-      ) : (
-        <TaskTable
-          tasks={filtered}
-          onEdit={openEdit}
-          onDelete={deleteMessage}
-          onStatusChange={setStatus}
-          currentUser={currentUser}
-        />
-      )}
+      </Card>
 
       {modalOpen && (() => {
         const initial = editing ? messages.find((m) => m._id === editing._id) || editing : null;
@@ -384,486 +482,550 @@ const ClientChat = () => {
   );
 };
 
-const StatCard = ({ label, value, icon, color }) => (
-  <div style={{ padding: '18px 20px', backgroundColor: '#141720', borderRadius: '12px', border: '1px solid #1e2235' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-      <span style={{ color: '#9ca3af', fontSize: '13px' }}>{label}</span>
-      <div style={{ color, display: 'flex' }}>{icon}</div>
-    </div>
-    <div style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>{value}</div>
-  </div>
-);
-
-const TabBtn = ({ active, onClick, children, icon }) => (
-  <button
-    onClick={onClick}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '8px 14px',
-      borderRadius: '8px',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '13px',
-      fontWeight: 500,
-      backgroundColor: active ? 'rgba(37,99,235,0.16)' : 'transparent',
-      color: active ? '#60a5fa' : '#9ca3af',
-    }}
-  >
-    {icon}
-    {children}
-  </button>
-);
-
-const FilterBtn = ({ active, onClick, children }) => (
-  <button
-    onClick={onClick}
-    style={{
-      padding: '6px 12px',
-      borderRadius: '8px',
-      fontSize: '12px',
-      fontWeight: 500,
-      cursor: 'pointer',
-      border: '1px solid',
-      borderColor: active ? '#3b82f6' : '#1e2235',
-      backgroundColor: active ? 'rgba(59,130,246,0.14)' : '#141720',
-      color: active ? '#60a5fa' : '#9ca3af',
-    }}
-  >
-    {children}
-  </button>
-);
-
-const STATUS_OPTIONS = [
-  { value: STATUS.NEW, label: 'New', dot: '#60a5fa', icon: AlertCircle },
-  { value: STATUS.IN_PROGRESS, label: 'In Progress', dot: '#fbbf24', icon: Loader2 },
-  { value: STATUS.COMPLETED, label: 'Completed', dot: '#34d399', icon: CheckCircle2 },
-  { value: STATUS.NOT_COMPLETED, label: 'Not Completed', dot: '#f87171', icon: XCircle },
-];
-
+/* The menu is position:fixed, measured off the button, so it is never clipped
+   by the table's horizontal scroller (which also clips vertically). */
 const StatusMenu = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
   const current = STATUS_OPTIONS.find((o) => o.value === value) || STATUS_OPTIONS[0];
-  const sc = statusColors[value] || statusColors[STATUS.NEW];
+  const c = toneOf(current.tone);
 
   useEffect(() => {
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    if (!pos) return undefined;
+    const onDown = (e) => {
+      if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setPos(null);
     };
-    if (open) document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
+    const close = () => setPos(null);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [pos]);
+
+  const toggle = () => {
+    if (pos) { setPos(null); return; }
+    const r = btnRef.current.getBoundingClientRect();
+    const menuH = 176;
+    const up = r.bottom + menuH + 8 > window.innerHeight;
+    setPos({ left: r.left, top: up ? r.top - menuH - 6 : r.bottom + 6 });
+  };
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
+        title="Change status"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 10px 6px 12px',
-          backgroundColor: sc.bg,
-          border: `1px solid ${sc.border}`,
-          color: sc.fg,
-          fontSize: '12px',
-          fontWeight: 600,
-          borderRadius: '8px',
-          cursor: 'pointer',
-          transition: 'all 0.15s',
+          display: 'inline-flex', alignItems: 'center', gap: '7px',
+          padding: '6px 9px 6px 11px', borderRadius: '8px', cursor: 'pointer',
+          background: c.bg, border: `1px solid ${c.bd}`, color: c.fg,
+          fontSize: '12.5px', fontWeight: 600, whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: current.dot, boxShadow: `0 0 8px ${current.dot}` }} />
+        <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
         {current.label}
-        <ChevronDown size={13} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', opacity: 0.8 }} />
+        <ChevronDown size={13} style={{ transform: pos ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
       </button>
 
-      {open && (
+      {pos && (
         <div
+          ref={menuRef}
+          role="menu"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            minWidth: '160px',
-            background: 'linear-gradient(180deg, #1a1f2e 0%, #141720 100%)',
-            border: '1px solid #2d3348',
-            borderRadius: '10px',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.06)',
-            padding: '4px',
-            zIndex: 50,
+            position: 'fixed', top: pos.top, left: pos.left, zIndex: 60, minWidth: '180px',
+            background: T.surface, border: `1px solid ${T.border}`, borderRadius: '11px',
+            boxShadow: '0 16px 36px -12px rgba(27, 94, 32, 0.30)', padding: '5px',
           }}
         >
           {STATUS_OPTIONS.map((opt) => {
             const active = opt.value === value;
+            const oc = toneOf(opt.tone);
+            const Icon = opt.icon;
             return (
-              <div
+              <button
                 key={opt.value}
-                onClick={() => { onChange(opt.value); setOpen(false); }}
+                type="button"
+                role="menuitem"
+                className="mrm-nav"
+                onClick={() => { setPos(null); if (!active) onChange(opt.value); }}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 10px',
-                  borderRadius: '7px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  color: active ? 'white' : '#d1d5db',
-                  background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-                  transition: 'background 0.12s',
+                  justifyContent: 'space-between', fontSize: '13px', padding: '8px 10px',
+                  ...(active ? { background: oc.bg, color: oc.fg, fontWeight: 600 } : null),
                 }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-                onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: opt.dot, boxShadow: `0 0 6px ${opt.dot}` }} />
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '9px' }}>
+                  <Icon size={14} style={{ color: oc.fg }} />
                   {opt.label}
                 </span>
-                {active && <Check size={13} style={{ color: '#a78bfa' }} />}
-              </div>
+                {active && <Check size={14} />}
+              </button>
             );
           })}
         </div>
       )}
+    </>
+  );
+};
+
+const stop = (e) => e.stopPropagation();
+
+const TaskRow = ({ index, task, currentUser, onOpen, onDelete, onStatusChange }) => {
+  const [showRemarks, setShowRemarks] = useState(false);
+  const dl = deadlineBadge(task.deadline, task.status);
+  const remarks = Array.isArray(task.responses) ? task.responses : [];
+  const role = getRole(task, currentUser);
+  const canEdit = role === 'creator';
+  const canChangeStatus = role !== 'viewer';
+  const isMine = isAssignedToCurrentUser(task, currentUser);
+  const isSpoc = task.taskType === 'spoc';
+  const name = task.clientName || 'Unnamed';
+  const by = task.createdBy || task.assignedBy;
+  const closed = isClosed(task);
+
+  /* Tasks assigned to you carry a green edge, so "mine" reads down the table
+     even with the scope filter off. Hover is a faint wash, as on the other lists. */
+  const edge = isMine ? TONES.green.bd : 'transparent';
+
+  return (
+    <>
+      <tr
+        onClick={() => onOpen(task)}
+        title={canEdit ? 'Open to edit' : 'Open to view'}
+        style={{
+          cursor: 'pointer', boxShadow: `inset 3px 0 0 ${edge}`,
+          transition: 'background 0.14s ease, box-shadow 0.14s ease',
+          opacity: closed ? 0.82 : 1,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = TONES.grey.bg;
+          if (!isMine) e.currentTarget.style.boxShadow = `inset 3px 0 0 ${T.borderHi}`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.boxShadow = `inset 3px 0 0 ${edge}`;
+        }}
+      >
+        <td style={{ ...TD, textAlign: 'center', color: T.faint, fontSize: '12.5px', fontWeight: 600 }}>{index}</td>
+
+        <td style={TD}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0 }}>
+            <Avatar name={name} size={36} tone="auto" />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>{name}</span>
+                <Pill tone={isSpoc ? 'teal' : 'blue'}>{isSpoc ? 'SPOC' : 'Client'}</Pill>
+                {isSpoc && task.priority && ['High', 'Urgent'].includes(task.priority) && (
+                  <Pill tone={task.priority === 'Urgent' ? 'red' : 'amber'} icon={Flag}>{task.priority}</Pill>
+                )}
+              </div>
+              <div
+                title={task.message || ''}
+                style={{
+                  marginTop: '4px', fontSize: '13px', color: T.body, lineHeight: 1.45,
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden', wordBreak: 'break-word', maxWidth: '560px',
+                }}
+              >
+                {task.message || <span style={{ color: T.faint }}>No description</span>}
+              </div>
+            </div>
+          </div>
+        </td>
+
+        <td style={TD}>
+          <div style={{ display: 'grid', gap: '7px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <span style={{ ...LABEL, fontSize: '10px', width: '20px', flexShrink: 0 }}>By</span>
+              <PersonChip name={by} size={22} empty="Unknown" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <span style={{ ...LABEL, fontSize: '10px', width: '20px', flexShrink: 0 }}>To</span>
+              <PersonChip name={task.assignedTo} size={22} empty="Unassigned" />
+              {isMine && <Pill tone="green">You</Pill>}
+            </div>
+          </div>
+        </td>
+
+        <td style={TD}>
+          {task.deadline ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: T.body, whiteSpace: 'nowrap' }}>
+              <CalendarClock size={13} style={{ color: T.faint }} />
+              {fmt(task.deadline)}
+            </div>
+          ) : (
+            <span style={{ fontSize: '13.5px', color: T.faint }}>No deadline</span>
+          )}
+          <div style={{ marginTop: '6px' }}>
+            {dl
+              ? <Pill tone={dl.tone} icon={Clock}>{dl.text}</Pill>
+              : <span style={{ fontSize: '11.5px', color: T.faint, whiteSpace: 'nowrap' }}>Assigned {fmt(task.receivedAt)}</span>}
+          </div>
+        </td>
+
+        <td style={TD} onClick={stop}>
+          {remarks.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowRemarks((v) => !v)}
+              aria-expanded={showRemarks}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '5px 10px', borderRadius: '8px', cursor: 'pointer',
+                background: showRemarks ? TONES.indigo.bg : T.surface,
+                border: `1px solid ${showRemarks ? TONES.indigo.bd : T.border}`,
+                color: TONES.indigo.fg, fontSize: '12.5px', fontWeight: 600, whiteSpace: 'nowrap',
+              }}
+            >
+              <MessageCircle size={13} />
+              {remarks.length} {remarks.length === 1 ? 'remark' : 'remarks'}
+              <ChevronDown size={13} style={{ transform: showRemarks ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            </button>
+          ) : (
+            <span style={{ color: T.faint, fontSize: '12.5px' }}>None yet</span>
+          )}
+        </td>
+
+        <td style={TD} onClick={stop}>
+          {canChangeStatus ? (
+            <StatusMenu value={task.status} onChange={(s) => onStatusChange(task._id, s)} />
+          ) : (
+            <span title="Only the creator or the assignee can change this">
+              <Pill tone={statusTone(task.status)} icon={Lock}>{task.status}</Pill>
+            </span>
+          )}
+        </td>
+
+        <td style={{ ...TD, textAlign: 'right' }} onClick={stop}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <IconButton
+              icon={canEdit ? Edit3 : Eye}
+              title={canEdit ? 'Edit task' : role === 'assignee' ? 'View and add remarks' : 'View only'}
+              tone={canEdit ? 'indigo' : 'blue'}
+              onClick={() => onOpen(task)}
+            />
+            {canEdit && <IconButton icon={Trash2} title="Delete task" tone="red" onClick={() => onDelete(task._id)} />}
+          </div>
+        </td>
+      </tr>
+
+      {showRemarks && remarks.length > 0 && (
+        <tr style={{ background: T.page }}>
+          <td colSpan={7} style={{ padding: 0, borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ padding: '14px 20px 18px 108px', display: 'grid', gap: SP.tight }}>
+              {remarks.map((r, i) => (
+                <div key={r._id || i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <Avatar name={r.createdBy || '?'} size={26} tone="auto" />
+                  <div style={{
+                    flex: 1, minWidth: 0, maxWidth: '820px', padding: '9px 12px',
+                    background: T.surface, border: `1px solid ${T.border}`, borderRadius: '10px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: T.heading }}>{r.createdBy || 'Someone'}</span>
+                      <span style={{ fontSize: '11.5px', color: T.faint }}>
+                        {r.createdAt && new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '13px', color: T.body, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{r.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+/* Both task modals close on Escape as well as on the backdrop. */
+const useEscape = (onClose) => {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+};
+
+const fmtLong = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+/* Two equal columns that are allowed to shrink. A plain `1fr 1fr` cannot go
+   below its content's natural width, which is what pushed the End Date picker
+   out past the right edge of the dialog. */
+const TWO_COL = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: SP.base };
+
+const ErrorText = ({ children }) => (children
+  ? <div style={{ color: TONES.red.fg, fontSize: '12px', marginTop: '6px' }}>{children}</div>
+  : null);
+
+const FieldLabel = ({ children, required }) => (
+  <label style={{ ...LABEL, display: 'block', marginBottom: '6px' }}>
+    {children}{required && <span style={{ color: TONES.red.fg }}> *</span>}
+  </label>
+);
+
+/* Read-only values are text, not boxes: a border means you can type in it. */
+const ReadField = ({ label, value }) => (
+  <div style={{ minWidth: 0 }}>
+    <FieldLabel>{label}</FieldLabel>
+    <div style={{ fontSize: '14px', color: T.body, fontWeight: 500, padding: '2px 0', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+      {value}
+    </div>
+  </div>
+);
+
+const TEXTAREA = {
+  width: '100%', boxSizing: 'border-box', padding: '10px 13px', minHeight: '96px',
+  background: T.bg, border: `1px solid ${T.border}`, borderRadius: '9px',
+  color: T.heading, fontSize: '14px', lineHeight: 1.5, outline: 'none',
+  fontFamily: 'inherit', resize: 'vertical',
+};
+
+/* A short fixed option set picked in one click, each in its own tone — so
+   "Not Completed" never looks the same as "New". */
+const TonePicker = ({ options, value, onChange, disabled, columns }) => (
+  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns || options.length}, minmax(0, 1fr))`, gap: SP.tight }}>
+    {options.map((opt) => {
+      const on = opt.value === value;
+      const c = toneOf(opt.tone);
+      const Icon = opt.icon;
+      return (
+        <button
+          key={opt.value}
+          type="button"
+          disabled={disabled}
+          aria-pressed={on}
+          onClick={() => { if (!on) onChange(opt.value); }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '9px 8px', borderRadius: '9px', whiteSpace: 'nowrap',
+            fontSize: '13px', fontWeight: 600, fontFamily: 'inherit',
+            background: on ? c.bg : T.surface,
+            border: `1px solid ${on ? c.fg : T.border}`,
+            boxShadow: on ? `0 0 0 1px ${c.fg}` : 'none',
+            color: on ? c.fg : T.muted,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled && !on ? 0.55 : 1,
+            transition: 'border-color 0.15s, background 0.15s',
+          }}
+        >
+          {Icon && <Icon size={14} />}
+          {opt.label || opt.value}
+        </button>
+      );
+    })}
+  </div>
+);
+
+const RoleBanner = ({ role }) => {
+  const c = toneOf(role === 'assignee' ? 'green' : 'blue');
+  const text = role === 'assignee'
+    ? 'You are the assignee: you can update the status and add remarks.'
+    : 'View only: only the person who created this task can edit it.';
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '9px',
+      background: c.bg, border: `1px solid ${c.bd}`, color: c.fg, fontSize: '13px', fontWeight: 500,
+    }}>
+      <Lock size={13} style={{ flexShrink: 0 }} />
+      {text}
     </div>
   );
 };
 
-const TaskTable = ({ tasks, onEdit, onDelete, onStatusChange, currentUser }) => {
-  const [expanded, setExpanded] = useState(null);
+/* The dialog shell both task modals share. */
+const ModalFrame = ({ icon: Icon, tone: t, title, subtitle, onClose, onSubmit, footer, children }) => {
+  const c = toneOf(t);
+  return (
+    <div
+      onClick={onClose}
+      role="presentation"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(27, 94, 32, 0.28)', backdropFilter: 'blur(2px)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        zIndex: 9999, overflowY: 'auto', padding: '40px 20px',
+      }}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={onSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          width: '640px', maxWidth: '100%', margin: 'auto', background: T.surface,
+          borderRadius: '16px', border: `1px solid ${T.border}`, boxShadow: '0 24px 60px rgba(27, 94, 32, 0.18)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: SP.snug,
+          padding: '20px 24px', borderBottom: `1px solid ${T.border}`,
+        }}>
+          <span style={{
+            width: '40px', height: '40px', borderRadius: '11px', flexShrink: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: c.bg, border: `1px solid ${c.bd}`, color: c.fg,
+          }}>
+            {Icon && <Icon size={19} />}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: T.heading }}>{title}</h2>
+            <p style={{ fontSize: '13px', color: T.muted, marginTop: '3px' }}>{subtitle}</p>
+          </div>
+          <IconButton icon={X} title="Close (Esc)" onClick={onClose} />
+        </div>
 
-  const cellBase = {
-    padding: '14px 12px',
-    fontSize: '13px',
-    color: '#d1d5db',
-    borderBottom: '1px solid #1e2235',
-    verticalAlign: 'top',
-  };
+        <div style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: SP.block }}>
+          {children}
+        </div>
 
-  const headBase = {
-    padding: '12px',
-    fontSize: '11px',
-    fontWeight: 700,
-    color: '#9ca3af',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    textAlign: 'left',
-    borderBottom: '1px solid #2d3348',
-    background: '#0f1117',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1,
-    whiteSpace: 'nowrap',
+        <div style={{
+          display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center',
+          padding: '14px 24px', borderTop: `1px solid ${T.border}`, background: T.page,
+          borderRadius: '0 0 16px 16px',
+        }}>
+          {footer}
+        </div>
+      </form>
+    </div>
+  );
+};
+
+/* The remarks thread at the foot of both modals. It writes the instant you
+   press Add — separate from the form's Save, as before. */
+const RemarksPanel = ({ taskId, responses, role, currentUser, canAdd, onAdd, onRemove, title, placeholder, readOnlyText }) => {
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const add = async () => {
+    const value = text.trim();
+    if (!value || !taskId) return;
+    setSaving(true);
+    const updated = await onAdd(taskId, value);
+    setSaving(false);
+    if (updated) setText('');
   };
 
   return (
-    <div style={{
-      backgroundColor: '#141720',
-      borderRadius: '12px',
-      border: '1px solid #1e2235',
-      overflow: 'hidden',
-    }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1400px' }}>
-          <thead>
-            <tr>
-              <th style={{ ...headBase, width: '50px', textAlign: 'center' }}>Sr.</th>
-              <th style={{ ...headBase, minWidth: '180px' }}>Task Person</th>
-              <th style={{ ...headBase, minWidth: '260px' }}>Task Name</th>
-              <th style={{ ...headBase, minWidth: '140px' }}>Assigned By</th>
-              <th style={{ ...headBase, minWidth: '160px' }}>Assigned To</th>
-              <th style={{ ...headBase, minWidth: '180px' }}>Remarks</th>
-              <th style={{ ...headBase, minWidth: '120px' }}>Date Assigned</th>
-              <th style={{ ...headBase, minWidth: '120px' }}>Deadline</th>
-              <th style={{ ...headBase, minWidth: '160px' }}>Status</th>
-              <th style={{ ...headBase, width: '90px', textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.map((task, idx) => {
-              const sc = statusColors[task.status] || statusColors[STATUS.NEW];
-              const dl = deadlineBadge(task.deadline, task.status);
-              const remarks = Array.isArray(task.responses) ? task.responses : [];
-              const isOpen = expanded === task._id;
-              const rowBg = idx % 2 === 0 ? '#141720' : '#171b27';
-              const role = getRole(task, currentUser);
-              const canEdit = role === 'creator';
-              const canDelete = role === 'creator';
-              const canChangeStatus = role !== 'viewer';
-              const isMine = isAssignedToCurrentUser(task, currentUser);
+    <div style={{ border: `1px solid ${T.border}`, borderRadius: '12px', background: T.page, overflow: 'hidden' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px',
+        borderBottom: `1px solid ${T.border}`, background: T.surface,
+      }}>
+        <MessageCircle size={15} style={{ color: TONES.indigo.fg }} />
+        <span style={{ fontSize: '14px', fontWeight: 600, color: T.heading }}>{title}</span>
+        <span style={{
+          marginLeft: 'auto', fontSize: '11.5px', fontWeight: 700, padding: '1px 8px', borderRadius: '999px',
+          background: T.raised, color: T.body,
+        }}>
+          {responses.length}
+        </span>
+      </div>
 
+      <div style={{ padding: '14px 16px', display: 'grid', gap: SP.snug }}>
+        {responses.length === 0 ? (
+          <p style={{ fontSize: '13px', color: T.faint }}>No remarks yet.</p>
+        ) : (
+          <div style={{ display: 'grid', gap: '10px', maxHeight: '220px', overflowY: 'auto', paddingRight: '2px' }}>
+            {responses.map((r) => {
+              const canDelete = role === 'creator' || (currentUser && r.createdById && r.createdById === currentUser._id);
               return (
-                <React.Fragment key={task._id}>
-                  <tr style={{ background: rowBg, transition: 'background 0.15s' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1f2e'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}
-                  >
-                    <td style={{ ...cellBase, textAlign: 'center', color: '#6b7280', fontWeight: 600 }}>{idx + 1}</td>
-
-                    <td style={cellBase}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '32px', height: '32px', borderRadius: '50%',
-                          background: task.taskType === 'spoc'
-                            ? 'linear-gradient(135deg, #10b981, #14b8a6)'
-                            : 'linear-gradient(135deg, #25D366, #128C7E)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'white', fontWeight: 700, fontSize: '12px', flexShrink: 0,
-                        }}>
-                          {task.clientName?.[0]?.toUpperCase() || '?'}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ color: 'white', fontWeight: 600, fontSize: '13px' }}>
-                            {task.clientName || '—'}
-                          </span>
-                          <span style={{
-                            fontSize: '9px',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                            width: 'fit-content',
-                            background: task.taskType === 'spoc' ? 'rgba(16,185,129,0.15)' : 'rgba(96,165,250,0.15)',
-                            color: task.taskType === 'spoc' ? '#34d399' : '#60a5fa',
-                            border: `1px solid ${task.taskType === 'spoc' ? 'rgba(16,185,129,0.3)' : 'rgba(96,165,250,0.3)'}`,
-                          }}>
-                            {task.taskType === 'spoc' ? 'SPOC' : 'Client'}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td style={{ ...cellBase, color: '#e5e7eb', maxWidth: '320px' }}>
-                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>
-                        {task.message || '—'}
-                      </div>
-                    </td>
-
-                    <td style={{ ...cellBase, color: '#9ca3af' }}>
-                      {task.createdBy || task.assignedBy || '—'}
-                    </td>
-
-                    <td style={cellBase}>
-                      {task.assignedTo ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#a78bfa', fontWeight: 500 }}>
-                          <UserCheck size={13} />
-                          {task.assignedTo}
-                        </span>
-                      ) : <span style={{ color: '#6b7280' }}>—</span>}
-                    </td>
-
-                    <td style={cellBase}>
-                      {remarks.length > 0 ? (
+                <div key={r._id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <Avatar name={r.createdBy || '?'} size={28} tone="auto" />
+                  <div style={{
+                    flex: 1, minWidth: 0, padding: '9px 12px',
+                    background: T.surface, border: `1px solid ${T.border}`, borderRadius: '10px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: T.heading }}>{r.createdBy || 'Someone'}</span>
+                      <span style={{ fontSize: '11.5px', color: T.faint }}>
+                        {r.createdAt && new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {canDelete && (
                         <button
                           type="button"
-                          onClick={() => setExpanded(isOpen ? null : task._id)}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '6px',
-                            padding: '5px 10px', borderRadius: '8px',
-                            background: 'rgba(59,130,246,0.12)',
-                            border: '1px solid rgba(59,130,246,0.25)',
-                            color: '#60a5fa', fontSize: '12px', fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
+                          className="mrm-icon-btn"
+                          onClick={() => onRemove(taskId, r._id)}
+                          title="Delete remark"
+                          aria-label="Delete remark"
+                          style={{ marginLeft: 'auto', padding: '3px' }}
                         >
-                          <MessageCircle size={12} />
-                          {remarks.length} {remarks.length === 1 ? 'remark' : 'remarks'}
-                          <ChevronDown size={12} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+                          <Trash2 size={13} />
                         </button>
-                      ) : (
-                        <span style={{ color: '#6b7280', fontSize: '12px' }}>No remarks</span>
                       )}
-                    </td>
-
-                    <td style={{ ...cellBase, color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Clock size={12} />
-                        {fmt(task.receivedAt)}
-                      </span>
-                    </td>
-
-                    <td style={{ ...cellBase, whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ color: '#d1d5db' }}>{fmt(task.deadline)}</span>
-                        {dl && (
-                          <span style={{
-                            fontSize: '10px', padding: '2px 8px', borderRadius: '999px',
-                            backgroundColor: dl.bg, color: dl.color, fontWeight: 600,
-                            width: 'fit-content',
-                          }}>
-                            {dl.text}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td style={cellBase}>
-                      {canChangeStatus ? (
-                        <StatusMenu value={task.status} onChange={(s) => onStatusChange(task._id, s)} />
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '6px',
-                          padding: '6px 10px',
-                          backgroundColor: sc.bg,
-                          border: `1px solid ${sc.border}`,
-                          color: sc.fg,
-                          fontSize: '12px', fontWeight: 600,
-                          borderRadius: '8px',
-                        }}>
-                          <Lock size={11} />
-                          {task.status}
-                        </span>
-                      )}
-                    </td>
-
-                    <td style={{ ...cellBase, textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        {isMine && <YourTaskBadge />}
-                        {canEdit ? (
-                          <IconBtn title="Edit task" onClick={() => onEdit(task)}><Edit3 size={14} /></IconBtn>
-                        ) : (
-                          <IconBtn title={role === 'assignee' ? 'View / add remarks' : 'View only'} onClick={() => onEdit(task)} info><Eye size={14} /></IconBtn>
-                        )}
-                        {canDelete && (
-                          <IconBtn title="Delete" onClick={() => onDelete(task._id)} danger><Trash2 size={14} /></IconBtn>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-
-                  {isOpen && remarks.length > 0 && (
-                    <tr key={`${task._id}-remarks`} style={{ background: '#0f1117' }}>
-                      <td colSpan={10} style={{ padding: '0', borderBottom: '1px solid #1e2235' }}>
-                        <div style={{ padding: '14px 20px 18px 60px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <MessageCircle size={12} style={{ color: '#60a5fa' }} />
-                            All Remarks ({remarks.length})
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {remarks.map((r, i) => (
-                              <div key={r._id || i} style={{
-                                padding: '10px 12px',
-                                background: '#141720',
-                                border: '1px solid #1e2540',
-                                borderRadius: '8px',
-                              }}>
-                                <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
-                                  {r.text}
-                                </p>
-                                <div style={{ fontSize: '10px', color: '#6b7280' }}>
-                                  {r.createdBy ? `${r.createdBy} · ` : ''}
-                                  {r.createdAt && new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
+                    </div>
+                    <p style={{ fontSize: '13px', color: T.body, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{r.text}</p>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+        )}
+
+        {canAdd ? (
+          <div>
+            <div style={{ display: 'flex', gap: SP.tight, alignItems: 'flex-end' }}>
+              <textarea
+                className="sc-control"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder={placeholder}
+                rows={2}
+                style={{ ...TEXTAREA, minHeight: '64px', background: T.surface, flex: 1 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
+              />
+              <Button icon={Send} disabled={!text.trim() || saving} onClick={add} style={{ padding: '10px 16px' }}>
+                {saving ? 'Adding…' : 'Add'}
+              </Button>
+            </div>
+            <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '6px' }}>Ctrl + Enter to add. Remarks save straight away.</div>
+          </div>
+        ) : (
+          <p style={{ fontSize: '12.5px', color: T.faint, fontStyle: 'italic' }}>{readOnlyText}</p>
+        )}
       </div>
     </div>
   );
 };
 
-const YourTaskBadge = () => (
-  <span
-    title="Assigned to your profile"
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '5px',
-      minHeight: '32px',
-      padding: '0 9px',
-      borderRadius: '8px',
-      border: '1px solid rgba(16,185,129,0.35)',
-      background: 'rgba(16,185,129,0.12)',
-      color: '#34d399',
-      fontSize: '11px',
-      fontWeight: 700,
-      whiteSpace: 'nowrap',
-    }}
-  >
-    <UserCheck size={13} />
-    Yours
-  </span>
-);
+const STATUS_PICKS = STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label, tone: o.tone, icon: o.icon }));
 
-const IconBtn = ({ children, onClick, title, danger, info }) => (
-  <button
-    onClick={onClick}
-    title={title}
-    style={{
-      width: '32px',
-      height: '32px',
-      borderRadius: '8px',
-      border: '1px solid #1e2235',
-      backgroundColor: '#0f1117',
-      color: danger ? '#f87171' : info ? '#60a5fa' : '#9ca3af',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    {children}
-  </button>
-);
-
-const EmptyState = ({ view, onNew }) => (
-  <div style={{ padding: '60px 20px', textAlign: 'center', backgroundColor: '#141720', borderRadius: '12px', border: '1px dashed #1e2235' }}>
-    <div
-      style={{
-        width: '64px',
-        height: '64px',
-        borderRadius: '50%',
-        background: 'rgba(59,130,246,0.1)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '16px',
-      }}
-    >
-      {view === 'archive' ? <Archive size={28} color="#60a5fa" /> : <MessageSquare size={28} color="#60a5fa" />}
-    </div>
-    <h3 style={{ color: 'white', fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
-      {view === 'archive' ? 'No archived tasks yet' : 'No tasks yet'}
-    </h3>
-    <p style={{ color: '#9ca3af', fontSize: '13px', marginBottom: '20px' }}>
-      {view === 'archive'
-        ? 'Completed tasks will appear here for reference.'
-        : 'Log your first client task to get started.'}
-    </p>
-    {view === 'active' && (
-      <button
-        onClick={onNew}
-        style={{
-          padding: '10px 18px',
-          borderRadius: '10px',
-          border: 'none',
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-          color: 'white',
-          fontWeight: 600,
-          fontSize: '13px',
-          cursor: 'pointer',
-        }}
-      >
-        + Add First Entry
-      </button>
-    )}
+const StatusField = ({ status, onChange, disabled, saving, error }) => (
+  <div>
+    <FieldLabel required>Status</FieldLabel>
+    <TonePicker options={STATUS_PICKS} value={status} onChange={onChange} disabled={disabled} />
+    {saving && <div style={{ color: TONES.blue.fg, fontSize: '12px', marginTop: '6px' }}>Saving status…</div>}
+    <ErrorText>{error}</ErrorText>
   </div>
 );
 
+const ModalFooter = ({ canEditAll, onClose, submitLabel }) => (canEditAll ? (
+  <>
+    <Button variant="ghost" onClick={onClose}>Cancel</Button>
+    <Button type="submit" icon={Check}>{submitLabel}</Button>
+  </>
+) : (
+  <Button variant="ghost" onClick={onClose}>Close</Button>
+));
+
 const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUser, onClose, onSave, onAddResponse, onRemoveResponse, onStatusChange }) => {
+  useEscape(onClose);
   const isNew = !initial;
   const canEditAll = isNew || role === 'creator';
   const canAddRemark = role !== 'viewer';
@@ -877,8 +1039,6 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
   const [status, setStatus] = useState(initial?.status || STATUS.NEW);
   const [assignedTo, setAssignedTo] = useState(initial?.assignedTo || '');
   const [errors, setErrors] = useState({});
-  const [responseText, setResponseText] = useState('');
-  const [savingResponse, setSavingResponse] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
 
   const responses = initial?.responses || [];
@@ -903,6 +1063,8 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
     })),
     [members]
   );
+
+  const clearError = (key) => { if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined })); };
 
   const validate = () => {
     const errs = {};
@@ -957,19 +1119,10 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
     });
   };
 
-  const handleAddResponse = async () => {
-    const text = responseText.trim();
-    if (!text || !initial?._id) return;
-    setSavingResponse(true);
-    const updated = await onAddResponse(initial._id, text);
-    setSavingResponse(false);
-    if (updated) setResponseText('');
-  };
-
   const handleStatusChange = async (nextStatus) => {
     const previousStatus = status;
     setStatus(nextStatus);
-    if (errors.status) setErrors((p) => ({ ...p, status: undefined }));
+    clearError('status');
     if (!canEditAll && role === 'assignee' && initial?._id && onStatusChange) {
       setSavingStatus(true);
       const updated = await onStatusChange(initial._id, nextStatus);
@@ -980,396 +1133,124 @@ const TaskModal = ({ initial, members, teamMembers, role = 'creator', currentUse
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        zIndex: 9999,
-        backdropFilter: 'blur(4px)',
-        overflowY: 'auto',
-        padding: '40px 20px',
-      }}
+    <ModalFrame
+      icon={isNew ? Plus : canEditAll ? Edit3 : Eye}
+      tone="purple"
+      title={isNew ? 'New client task' : canEditAll ? 'Edit task' : 'Task details'}
+      subtitle={isNew ? 'Log a task that came in from a client.' : canEditAll ? 'Update the task details below.' : `Created by ${initial.createdBy || initial.assignedBy || 'someone else'}.`}
+      onClose={onClose}
+      onSubmit={submit}
+      footer={<ModalFooter canEditAll={canEditAll} onClose={onClose} submitLabel={isNew ? 'Add task' : 'Save changes'} />}
     >
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
-        style={{
-          width: '600px',
-          maxWidth: '100%',
-          background: 'linear-gradient(180deg, #161a26 0%, #12141d 100%)',
-          borderRadius: '18px',
-          border: '1px solid #262d45',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(99,102,241,0.06)',
-          margin: 'auto',
-        }}
-      >
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          padding: '24px 28px 18px',
-          borderBottom: '1px solid #1e2540',
-        }}>
-          <div>
-            <h2 style={{ color: 'white', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
-              {initial ? 'Edit Task' : 'New Client Task'}
-            </h2>
-            <p style={{ color: '#6b7280', fontSize: '12px' }}>
-              {initial ? 'Update the task details below' : 'Log a new task from a client'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#0f1117',
-              border: '1px solid #2d3348',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              width: '32px',
-              height: '32px',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <X size={15} />
-          </button>
+      {!isNew && !canEditAll && <RoleBanner role={role} />}
+
+      <div style={TWO_COL}>
+        <div style={{ minWidth: 0 }}>
+          {canEditAll ? (
+            <SearchableSelect
+              label="Client Name"
+              required
+              options={memberOptions}
+              value={clientName}
+              onChange={(v) => { setClientName(v); clearError('clientName'); }}
+              placeholder="Select a client..."
+              emptyMessage="No matching clients"
+            />
+          ) : (
+            <ReadField label="Client" value={clientName || '—'} />
+          )}
+          <ErrorText>{errors.clientName}</ErrorText>
         </div>
+        <div style={{ minWidth: 0 }}>
+          {canEditAll ? (
+            <SearchableSelect
+              label="Assign Task To"
+              required
+              options={teamOptions}
+              value={assignedTo}
+              onChange={(v) => { setAssignedTo(v); clearError('assignedTo'); }}
+              placeholder="Select team member..."
+              emptyMessage="No team members"
+            />
+          ) : (
+            <ReadField label="Assigned to" value={assignedTo || '—'} />
+          )}
+          <ErrorText>{errors.assignedTo}</ErrorText>
+        </div>
+      </div>
 
-        {/* Body */}
-        <div style={{ padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      {canEditAll ? (
+        <div>
+          <FieldLabel required>Task from client</FieldLabel>
+          <textarea
+            className="sc-control"
+            value={message}
+            onChange={(e) => { setMessage(e.target.value); clearError('message'); }}
+            rows={4}
+            placeholder="Describe the task received from the client..."
+            style={{ ...TEXTAREA, borderColor: errors.message ? TONES.red.bd : T.border }}
+          />
+          <ErrorText>{errors.message}</ErrorText>
+        </div>
+      ) : (
+        <ReadField label="Task from client" value={message || '—'} />
+      )}
 
-        {!isNew && !canEditAll && (
-          <RoleBanner role={role} />
-        )}
-
+      <div style={TWO_COL}>
         {canEditAll ? (
-          <SearchableSelect
-            label="Client Name"
+          <DateTimePicker
+            label="Start Date"
             required
-            options={memberOptions}
-            value={clientName}
-            onChange={(v) => { setClientName(v); if (errors.clientName) setErrors((p) => ({ ...p, clientName: undefined })); }}
-            placeholder="Select a client..."
-            emptyMessage="No matching clients"
+            value={receivedAt}
+            onChange={(v) => { setReceivedAt(v); clearError('receivedAt'); }}
+            error={errors.receivedAt}
           />
         ) : (
-          <ReadField label="Client Name" value={clientName || '—'} />
+          <ReadField label="Start date" value={fmtLong(receivedAt)} />
         )}
-        {errors.clientName && (
-          <div style={{ color: '#f87171', fontSize: '12px', marginTop: '-10px' }}>{errors.clientName}</div>
-        )}
-
-        <div>
-          <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-            Task from Client <span style={{ color: '#ef4444' }}>*</span>
-          </label>
-          <textarea
-            value={message}
-            onChange={(e) => { setMessage(e.target.value); if (errors.message) setErrors((p) => ({ ...p, message: undefined })); }}
-            rows={4}
-            readOnly={!canEditAll}
-            placeholder="Describe the task received from the client..."
-            style={{
-              ...inputStyle,
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              borderColor: errors.message ? '#ef4444' : '#1e2540',
-              opacity: !canEditAll ? 0.7 : 1,
-              cursor: !canEditAll ? 'not-allowed' : 'text',
-            }}
+        {canEditAll ? (
+          <DateTimePicker
+            label="End Date"
+            required
+            value={deadline}
+            onChange={(v) => { setDeadline(v); clearError('deadline'); }}
+            minDate={receivedAt}
+            error={errors.deadline}
           />
-          {errors.message && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          {canEditAll ? (
-            <DateTimePicker
-              label="Start Date"
-              required
-              value={receivedAt}
-              onChange={(v) => { setReceivedAt(v); if (errors.receivedAt) setErrors((p) => ({ ...p, receivedAt: undefined })); }}
-              error={errors.receivedAt}
-            />
-          ) : (
-            <ReadField label="Start Date" value={receivedAt ? new Date(receivedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} />
-          )}
-          {canEditAll ? (
-            <DateTimePicker
-              label="End Date"
-              required
-              value={deadline}
-              onChange={(v) => { setDeadline(v); if (errors.deadline) setErrors((p) => ({ ...p, deadline: undefined })); }}
-              minDate={receivedAt}
-              error={errors.deadline}
-            />
-          ) : (
-            <ReadField label="End Date" value={deadline ? new Date(deadline).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} />
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Status <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <select
-              value={status}
-              disabled={readOnly || savingStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              style={{ ...inputStyle, borderColor: errors.status ? '#ef4444' : '#1e2540', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
-            >
-              <option value={STATUS.NEW}>New</option>
-              <option value={STATUS.IN_PROGRESS}>In Progress</option>
-              <option value={STATUS.COMPLETED}>Completed</option>
-              <option value={STATUS.NOT_COMPLETED}>Not Completed</option>
-            </select>
-            {savingStatus && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
-            {errors.status && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
-          </div>
-          <div>
-            {canEditAll ? (
-              <SearchableSelect
-                label="Assign Task To"
-                required
-                options={teamOptions}
-                value={assignedTo}
-                onChange={(v) => { setAssignedTo(v); if (errors.assignedTo) setErrors((p) => ({ ...p, assignedTo: undefined })); }}
-                placeholder="Select team member..."
-                emptyMessage="No team members"
-              />
-            ) : (
-              <ReadField label="Assigned To" value={assignedTo || '—'} />
-            )}
-            {errors.assignedTo && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.assignedTo}</div>}
-          </div>
-        </div>
-
-        {initial?._id && (
-          <div style={{
-            padding: '16px',
-            background: 'linear-gradient(180deg, rgba(59,130,246,0.06), rgba(139,92,246,0.04))',
-            border: '1px solid #262d45',
-            borderRadius: '12px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <Send size={14} style={{ color: '#60a5fa' }} />
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                Remarks by SPOC
-              </span>
-              <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#6b7280' }}>
-                {responses.length} {responses.length === 1 ? 'remark' : 'remarks'}
-              </span>
-            </div>
-
-            {responses.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', maxHeight: '180px', overflowY: 'auto' }}>
-                {responses.map((r) => (
-                  <div
-                    key={r._id}
-                    style={{
-                      padding: '10px 12px',
-                      background: '#0f1117',
-                      border: '1px solid #1e2540',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      gap: '10px',
-                      alignItems: 'flex-start',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
-                        {r.text}
-                      </p>
-                      <div style={{ fontSize: '10px', color: '#6b7280' }}>
-                        {r.createdBy ? `${r.createdBy} · ` : ''}
-                        {new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                    {(role === 'creator' || (currentUser && r.createdById && r.createdById === currentUser._id)) && (
-                      <button
-                        type="button"
-                        onClick={() => onRemoveResponse(initial._id, r._id)}
-                        title="Delete remark"
-                        style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {canAddRemark ? (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
-                <textarea
-                  value={responseText}
-                  onChange={(e) => setResponseText(e.target.value)}
-                  placeholder="Add a remark about this task..."
-                  rows={2}
-                  style={{
-                    flex: 1,
-                    padding: '9px 12px',
-                    backgroundColor: '#0f1117',
-                    border: '1px solid #1e2540',
-                    borderRadius: '8px',
-                    color: 'white',
-                    fontSize: '13px',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      e.preventDefault();
-                      handleAddResponse();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={!responseText.trim() || savingResponse}
-                  onClick={handleAddResponse}
-                  style={{
-                    padding: '0 16px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: responseText.trim() ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : '#1e2540',
-                    color: responseText.trim() ? 'white' : '#6b7280',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: responseText.trim() ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    opacity: savingResponse ? 0.6 : 1,
-                  }}
-                >
-                  <Plus size={14} />
-                  Add
-                </button>
-              </div>
-            ) : (
-              <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', padding: '8px 4px' }}>
-                Read-only — only the assignee or task creator can add remarks.
-              </div>
-            )}
-          </div>
+        ) : (
+          <ReadField label="End date" value={fmtLong(deadline)} />
         )}
+      </div>
 
-        </div>
+      <StatusField status={status} onChange={handleStatusChange} disabled={readOnly || savingStatus} saving={savingStatus} error={errors.status} />
 
-        {/* Sticky footer */}
-        <div style={{
-          display: 'flex',
-          gap: '10px',
-          justifyContent: 'flex-end',
-          padding: '14px 28px',
-          borderTop: '1px solid #1e2540',
-          background: 'rgba(15,17,23,0.6)',
-          flexShrink: 0,
-        }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '10px 18px',
-              borderRadius: '10px',
-              border: '1px solid #1e2540',
-              backgroundColor: 'transparent',
-              color: '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          {(canEditAll) && (
-            <button
-              type="submit"
-              style={{
-                padding: '10px 22px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {initial ? 'Save Changes' : 'Add Entry'}
-            </button>
-          )}
-        </div>
-      </form>
-    </div>
+      {initial?._id && (
+        <RemarksPanel
+          taskId={initial._id}
+          responses={responses}
+          role={role}
+          currentUser={currentUser}
+          canAdd={canAddRemark}
+          onAdd={onAddResponse}
+          onRemove={onRemoveResponse}
+          title="Remarks by SPOC"
+          placeholder="Add a remark about this task..."
+          readOnlyText="Read-only: only the assignee or the task creator can add remarks."
+        />
+      )}
+    </ModalFrame>
   );
 };
-
-const RoleBanner = ({ role }) => {
-  const cfg = role === 'assignee'
-    ? { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)', color: '#34d399', text: 'Assignee view — you can update status and add remarks.' }
-    : { bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.25)', color: '#60a5fa', text: 'View only — only the task creator can edit task details.' };
-  return (
-    <div style={{
-      padding: '10px 14px',
-      background: cfg.bg,
-      border: `1px solid ${cfg.border}`,
-      borderRadius: '8px',
-      color: cfg.color,
-      fontSize: '12px',
-      fontWeight: 500,
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-    }}>
-      <Lock size={12} />
-      {cfg.text}
-    </div>
-  );
-};
-
-const ReadField = ({ label, value }) => (
-  <div>
-    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-      {label}
-    </label>
-    <div style={{
-      padding: '10px 12px',
-      backgroundColor: '#0a0d14',
-      border: '1px dashed #1e2540',
-      borderRadius: '8px',
-      color: '#d1d5db',
-      fontSize: '14px',
-      minHeight: '40px',
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-      {value}
-    </div>
-  </div>
-);
 
 const PRIORITY_OPTIONS = [
-  { value: 'Low', color: '#34d399', bg: 'rgba(16,185,129,0.14)', border: 'rgba(16,185,129,0.3)' },
-  { value: 'Medium', color: '#60a5fa', bg: 'rgba(59,130,246,0.14)', border: 'rgba(59,130,246,0.3)' },
-  { value: 'High', color: '#fbbf24', bg: 'rgba(245,158,11,0.14)', border: 'rgba(245,158,11,0.3)' },
-  { value: 'Urgent', color: '#f87171', bg: 'rgba(239,68,68,0.14)', border: 'rgba(239,68,68,0.3)' },
+  { value: 'Low', tone: 'green' },
+  { value: 'Medium', tone: 'blue' },
+  { value: 'High', tone: 'amber' },
+  { value: 'Urgent', tone: 'red' },
 ];
 
 const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, onClose, onSave, onAddResponse, onRemoveResponse, onStatusChange }) => {
+  useEscape(onClose);
   const isNew = !initial;
   const canEditAll = isNew || role === 'creator';
   const canAddRemark = role !== 'viewer';
@@ -1384,8 +1265,6 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
   const [status, setStatus] = useState(initial?.status || STATUS.NEW);
   const [priority, setPriority] = useState(initial?.priority || 'Medium');
   const [errors, setErrors] = useState({});
-  const [responseText, setResponseText] = useState('');
-  const [savingResponse, setSavingResponse] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
 
   const responses = initial?.responses || [];
@@ -1398,6 +1277,8 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
     })),
     [teamMembers]
   );
+
+  const clearError = (key) => { if (errors[key]) setErrors((p) => ({ ...p, [key]: undefined })); };
 
   const validate = () => {
     const errs = {};
@@ -1453,19 +1334,10 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
     });
   };
 
-  const handleAddResponse = async () => {
-    const text = responseText.trim();
-    if (!text || !initial?._id) return;
-    setSavingResponse(true);
-    const updated = await onAddResponse(initial._id, text);
-    setSavingResponse(false);
-    if (updated) setResponseText('');
-  };
-
   const handleStatusChange = async (nextStatus) => {
     const previousStatus = status;
     setStatus(nextStatus);
-    if (errors.status) setErrors((p) => ({ ...p, status: undefined }));
+    clearError('status');
     if (!canEditAll && role === 'assignee' && initial?._id && onStatusChange) {
       setSavingStatus(true);
       const updated = await onStatusChange(initial._id, nextStatus);
@@ -1476,389 +1348,122 @@ const SpocTaskModal = ({ initial, teamMembers, role = 'creator', currentUser, on
   };
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        zIndex: 9999,
-        backdropFilter: 'blur(4px)',
-        overflowY: 'auto',
-        padding: '40px 20px',
-      }}
+    <ModalFrame
+      icon={Users}
+      tone="teal"
+      title={isNew ? 'New task for a SPOC' : canEditAll ? 'Edit SPOC task' : 'SPOC task details'}
+      subtitle={isNew ? 'Assign an internal task to a team SPOC.' : canEditAll ? 'Update this internal task.' : `Created by ${initial.createdBy || initial.assignedBy || 'someone else'}.`}
+      onClose={onClose}
+      onSubmit={submit}
+      footer={<ModalFooter canEditAll={canEditAll} onClose={onClose} submitLabel={isNew ? 'Create SPOC task' : 'Save changes'} />}
     >
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={submit}
-        style={{
-          width: '600px',
-          maxWidth: '100%',
-          background: 'linear-gradient(180deg, #161a26 0%, #12141d 100%)',
-          borderRadius: '18px',
-          border: '1px solid #1f3a32',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(16,185,129,0.08)',
-          margin: 'auto',
-        }}
-      >
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          padding: '24px 28px 18px',
-          borderBottom: '1px solid #1e3a32',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '10px',
-              background: 'linear-gradient(135deg, #10b981, #14b8a6)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Users size={20} color="white" />
-            </div>
-            <div>
-              <h2 style={{ color: 'white', fontSize: '19px', fontWeight: 700, marginBottom: '4px' }}>
-                {initial ? 'Edit SPOC Task' : 'New Task for SPOC'}
-              </h2>
-              <p style={{ color: '#6b7280', fontSize: '12px' }}>
-                {initial ? 'Update internal task assigned to a SPOC' : 'Assign an internal task to a team SPOC'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: '#0f1117', border: '1px solid #2d3348',
-              color: '#9ca3af', cursor: 'pointer',
-              width: '32px', height: '32px', borderRadius: '8px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}
-          >
-            <X size={15} />
-          </button>
-        </div>
+      {!isNew && !canEditAll && <RoleBanner role={role} />}
 
-        <div style={{ padding: '22px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-
-          {!isNew && !canEditAll && <RoleBanner role={role} />}
-
+      <div style={TWO_COL}>
+        <div style={{ minWidth: 0 }}>
           {canEditAll ? (
             <SearchableSelect
               label="SPOC Name"
               required
               options={teamOptions}
               value={spocName}
-              onChange={(v) => { setSpocName(v); if (errors.spocName) setErrors((p) => ({ ...p, spocName: undefined })); }}
+              onChange={(v) => { setSpocName(v); clearError('spocName'); }}
               placeholder="Select a SPOC..."
               emptyMessage="No team members"
             />
           ) : (
-            <ReadField label="SPOC Name" value={spocName || '—'} />
+            <ReadField label="SPOC" value={spocName || '—'} />
           )}
-          {errors.spocName && (
-            <div style={{ color: '#f87171', fontSize: '12px', marginTop: '-10px' }}>{errors.spocName}</div>
-          )}
-
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Task Title
-            </label>
+          <ErrorText>{errors.spocName}</ErrorText>
+        </div>
+        {canEditAll ? (
+          <div style={{ minWidth: 0 }}>
+            <FieldLabel>Task title</FieldLabel>
             <input
+              className="sc-control"
               value={taskTitle}
               onChange={(e) => setTaskTitle(e.target.value)}
-              readOnly={!canEditAll}
-              placeholder="Short title for this task (optional)"
-              style={{ ...inputStyle, opacity: !canEditAll ? 0.7 : 1, cursor: !canEditAll ? 'not-allowed' : 'text' }}
+              placeholder="Short title (optional)"
+              style={{ ...TEXTAREA, minHeight: 0, resize: 'none', padding: '11px 13px' }}
             />
           </div>
+        ) : (
+          <ReadField label="Task title" value={taskTitle || '—'} />
+        )}
+      </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Task Description <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <textarea
-              value={message}
-              onChange={(e) => { setMessage(e.target.value); if (errors.message) setErrors((p) => ({ ...p, message: undefined })); }}
-              rows={4}
-              readOnly={!canEditAll}
-              placeholder="Describe what the SPOC needs to do..."
-              style={{
-                ...inputStyle,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                borderColor: errors.message ? '#ef4444' : '#1e2540',
-                opacity: !canEditAll ? 0.7 : 1,
-                cursor: !canEditAll ? 'not-allowed' : 'text',
-              }}
-            />
-            {errors.message && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.message}</div>}
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            {canEditAll ? (
-              <DateTimePicker
-                label="Start Date"
-                required
-                value={receivedAt}
-                onChange={(v) => { setReceivedAt(v); if (errors.receivedAt) setErrors((p) => ({ ...p, receivedAt: undefined })); }}
-                error={errors.receivedAt}
-              />
-            ) : (
-              <ReadField label="Start Date" value={receivedAt ? new Date(receivedAt).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} />
-            )}
-            {canEditAll ? (
-              <DateTimePicker
-                label="Deadline"
-                required
-                value={deadline}
-                onChange={(v) => { setDeadline(v); if (errors.deadline) setErrors((p) => ({ ...p, deadline: undefined })); }}
-                minDate={receivedAt}
-                error={errors.deadline}
-              />
-            ) : (
-              <ReadField label="Deadline" value={deadline ? new Date(deadline).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} />
-            )}
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '8px' }}>
-              <Flag size={11} style={{ display: 'inline', marginRight: '4px' }} />
-              Priority <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {PRIORITY_OPTIONS.map((p) => {
-                const selected = priority === p.value;
-                return (
-                  <button
-                    key={p.value}
-                    type="button"
-                    disabled={!canEditAll}
-                    onClick={() => canEditAll && setPriority(p.value)}
-                    style={{
-                      padding: '7px 14px',
-                      borderRadius: '8px',
-                      border: `1px solid ${selected ? p.border : '#1e2540'}`,
-                      background: selected ? p.bg : 'transparent',
-                      color: selected ? p.color : '#6b7280',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: canEditAll ? 'pointer' : 'not-allowed',
-                      opacity: canEditAll ? 1 : 0.6,
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {p.value}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-              Status <span style={{ color: '#ef4444' }}>*</span>
-            </label>
-            <select
-              value={status}
-              disabled={readOnly || savingStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              style={{ ...inputStyle, borderColor: errors.status ? '#ef4444' : '#1e2540', opacity: readOnly || savingStatus ? 0.7 : 1, cursor: readOnly || savingStatus ? 'not-allowed' : 'pointer' }}
-            >
-              <option value={STATUS.NEW}>New</option>
-              <option value={STATUS.IN_PROGRESS}>In Progress</option>
-              <option value={STATUS.COMPLETED}>Completed</option>
-              <option value={STATUS.NOT_COMPLETED}>Not Completed</option>
-            </select>
-            {savingStatus && <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '4px' }}>Saving status...</div>}
-            {errors.status && <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{errors.status}</div>}
-          </div>
-
-          {initial?._id && (
-            <div style={{
-              padding: '16px',
-              background: 'linear-gradient(180deg, rgba(16,185,129,0.06), rgba(20,184,166,0.04))',
-              border: '1px solid #1f3a32',
-              borderRadius: '12px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <Send size={14} style={{ color: '#34d399' }} />
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#d1d5db', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                  Remarks / Updates
-                </span>
-                <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#6b7280' }}>
-                  {responses.length} {responses.length === 1 ? 'remark' : 'remarks'}
-                </span>
-              </div>
-
-              {responses.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', maxHeight: '180px', overflowY: 'auto' }}>
-                  {responses.map((r) => (
-                    <div
-                      key={r._id}
-                      style={{
-                        padding: '10px 12px',
-                        background: '#0f1117',
-                        border: '1px solid #1e2540',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        gap: '10px',
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: '4px' }}>
-                          {r.text}
-                        </p>
-                        <div style={{ fontSize: '10px', color: '#6b7280' }}>
-                          {r.createdBy ? `${r.createdBy} · ` : ''}
-                          {new Date(r.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-                      {(role === 'creator' || (currentUser && r.createdById && r.createdById === currentUser._id)) && (
-                        <button
-                          type="button"
-                          onClick={() => onRemoveResponse(initial._id, r._id)}
-                          title="Delete remark"
-                          style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', display: 'flex' }}
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {canAddRemark ? (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
-                  <textarea
-                    value={responseText}
-                    onChange={(e) => setResponseText(e.target.value)}
-                    placeholder="Add an update / remark..."
-                    rows={2}
-                    style={{
-                      flex: 1,
-                      padding: '9px 12px',
-                      backgroundColor: '#0f1117',
-                      border: '1px solid #1e2540',
-                      borderRadius: '8px',
-                      color: 'white',
-                      fontSize: '13px',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      resize: 'vertical',
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                        e.preventDefault();
-                        handleAddResponse();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!responseText.trim() || savingResponse}
-                    onClick={handleAddResponse}
-                    style={{
-                      padding: '0 16px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: responseText.trim() ? 'linear-gradient(135deg, #10b981, #14b8a6)' : '#1e2540',
-                      color: responseText.trim() ? 'white' : '#6b7280',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: responseText.trim() ? 'pointer' : 'not-allowed',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      opacity: savingResponse ? 0.6 : 1,
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add
-                  </button>
-                </div>
-              ) : (
-                <div style={{ fontSize: '12px', color: '#6b7280', fontStyle: 'italic', padding: '8px 4px' }}>
-                  Read-only — only the assigned SPOC or task creator can add remarks.
-                </div>
-              )}
-            </div>
-          )}
-
+      {canEditAll ? (
+        <div>
+          <FieldLabel required>Task description</FieldLabel>
+          <textarea
+            className="sc-control"
+            value={message}
+            onChange={(e) => { setMessage(e.target.value); clearError('message'); }}
+            rows={4}
+            placeholder="Describe what the SPOC needs to do..."
+            style={{ ...TEXTAREA, borderColor: errors.message ? TONES.red.bd : T.border }}
+          />
+          <ErrorText>{errors.message}</ErrorText>
         </div>
+      ) : (
+        <ReadField label="Task description" value={message || '—'} />
+      )}
 
-        <div style={{
-          display: 'flex',
-          gap: '10px',
-          justifyContent: 'flex-end',
-          padding: '14px 28px',
-          borderTop: '1px solid #1e3a32',
-          background: 'rgba(15,17,23,0.6)',
-          flexShrink: 0,
-        }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '10px 18px',
-              borderRadius: '10px',
-              border: '1px solid #1e2540',
-              backgroundColor: 'transparent',
-              color: '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          {(canEditAll) && (
-            <button
-              type="submit"
-              style={{
-                padding: '10px 22px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #10b981, #14b8a6)',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {initial ? 'Save Changes' : 'Create SPOC Task'}
-            </button>
-          )}
-        </div>
-      </form>
-    </div>
+      <div style={TWO_COL}>
+        {canEditAll ? (
+          <DateTimePicker
+            label="Start Date"
+            required
+            value={receivedAt}
+            onChange={(v) => { setReceivedAt(v); clearError('receivedAt'); }}
+            error={errors.receivedAt}
+          />
+        ) : (
+          <ReadField label="Start date" value={fmtLong(receivedAt)} />
+        )}
+        {canEditAll ? (
+          <DateTimePicker
+            label="Deadline"
+            required
+            value={deadline}
+            onChange={(v) => { setDeadline(v); clearError('deadline'); }}
+            minDate={receivedAt}
+            error={errors.deadline}
+          />
+        ) : (
+          <ReadField label="Deadline" value={fmtLong(deadline)} />
+        )}
+      </div>
+
+      <div>
+        <FieldLabel required>Priority</FieldLabel>
+        <TonePicker
+          options={PRIORITY_OPTIONS.map((p) => ({ ...p, icon: p.value === 'Urgent' || p.value === 'High' ? Flag : undefined }))}
+          value={priority}
+          onChange={setPriority}
+          disabled={!canEditAll}
+        />
+        <ErrorText>{errors.priority}</ErrorText>
+      </div>
+
+      <StatusField status={status} onChange={handleStatusChange} disabled={readOnly || savingStatus} saving={savingStatus} error={errors.status} />
+
+      {initial?._id && (
+        <RemarksPanel
+          taskId={initial._id}
+          responses={responses}
+          role={role}
+          currentUser={currentUser}
+          canAdd={canAddRemark}
+          onAdd={onAddResponse}
+          onRemove={onRemoveResponse}
+          title="Remarks and updates"
+          placeholder="Add an update or remark..."
+          readOnlyText="Read-only: only the assigned SPOC or the task creator can add remarks."
+        />
+      )}
+    </ModalFrame>
   );
-};
-
-const Field = ({ label, children }) => (
-  <div style={{ marginBottom: '14px' }}>
-    <label style={{ display: 'block', color: '#9ca3af', fontSize: '12px', fontWeight: 500, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-      {label}
-    </label>
-    {children}
-  </div>
-);
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px 12px',
-  backgroundColor: '#0f1117',
-  border: '1px solid #1e2540',
-  borderRadius: '8px',
-  color: 'white',
-  fontSize: '14px',
-  outline: 'none',
-  boxSizing: 'border-box',
 };
 
 export default ClientChat;

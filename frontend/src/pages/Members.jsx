@@ -1,136 +1,147 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X, Check, Copy, Trash2, Edit3 } from 'lucide-react';
+import {
+  Search, Plus, X, Download, Edit3, Trash2, ChevronRight, Mail, Flame,
+  AlertTriangle, CheckCircle2, ArrowRight, Users, IdCard, Sparkles, Handshake,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePicklist } from '../context/PicklistContext';
 import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useGuestGuard } from '../hooks/useGuestGuard';
+import { useUrlState } from '../hooks/useUrlState';
 import Pagination from '../components/Pagination';
+import { T, TONES, TD } from '../theme';
+import {
+  PageHeader, Button, Segmented, Card, Pill, DistributionBar, SearchInput, TH,
+  EmptyState, Checkbox, SelectionBar, TableSkeleton, Banner, Panel,
+  Avatar, PersonChip, SubHead, FormGrid, Input, Select, Textarea, MultiSelect, Choice,
+} from '../components/studio';
 
-const fmtDateISO = (d) => {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-};
-const getDeadlineStatus = (deadline) => {
-  if (!deadline) return null;
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  const dl = new Date(deadline); dl.setHours(0, 0, 0, 0);
-  const diffDays = (dl - now) / (1000 * 60 * 60 * 24);
-  if (diffDays < 0) return 'red';
-  if (diffDays <= 2) return 'yellow';
-  return 'green';
-};
-const DEADLINE_COLORS = {
-  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track' },
-  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline' },
-  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue' },
+const fmtDate = (d) => {
+  if (!d) return '';
+  const t = new Date(d);
+  return Number.isNaN(t.getTime())
+    ? ''
+    : t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const statusColors = {
-  Active: { bg: '#065f46', text: '#34d399' },
-  Onboarding: { bg: '#713f12', text: '#fbbf24' },
-  Inactive: { bg: '#374151', text: '#9ca3af' },
+const toDateInput = (d) => {
+  if (!d) return '';
+  const t = new Date(d);
+  if (Number.isNaN(t.getTime())) return '';
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 };
 
-const kycColors = {
-  Verified: { bg: '#065f46', text: '#34d399' },
-  Pending: { bg: '#7f1d1d', text: '#f87171' },
+/* Contract type is the roster's main axis, so it keeps its colour coding — but
+   as tones rather than four raw hexes, and the standalone "Contract Type:"
+   legend strip is gone: the filter chips below it carried the same four labels
+   in the same four colours, so it was a key to a key. */
+const CONTRACT_TYPES = ['Royalty', 'Retainer', 'Work-Based', 'Inhouse'];
+const CONTRACT_TONES = {
+  Royalty: 'green', Retainer: 'blue', 'Work-Based': 'amber', Inhouse: 'purple',
 };
+const NO_CONTRACT = 'No contract';
 
-const StatusBadge = ({ status, colors: colorMap }) => {
-  const c = (colorMap || statusColors)[status] || { bg: '#374151', text: '#9ca3af' };
-  return (
-    <span style={{ background: c.bg, color: c.text, padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {status}
-    </span>
-  );
-};
+const STATUS_TONES = { Active: 'green', Onboarding: 'amber', Inactive: 'grey' };
 
-/* ────────── Add Member Modal ────────── */
-const MultiRoleSelect = ({ selected, onChange, inputStyle, labelStyle }) => {
-  const { getOptions } = usePicklist();
-  const roleOptions = getOptions('member_roles');
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const toggle = (role) => {
-    onChange(selected.includes(role) ? selected.filter((r) => r !== role) : [...selected, role]);
-  };
+/* Pending is amber, not red. Work not yet done is not a failure — the same rule
+   that took red off the "No" button. `Rejected` is the real error state, and it
+   used to render in the same grey as an unknown value because the old colour
+   map only knew Verified and Pending. */
+const KYC_TONES = { Verified: 'green', Pending: 'amber', Rejected: 'red' };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
+const roleList = (m) => (Array.isArray(m.role) ? m.role : (m.role ? [m.role] : []));
 
-  return (
-    <div style={{ position: 'relative' }} ref={ref}>
-      <label style={labelStyle}>Role</label>
-      <div onClick={() => setOpen(!open)} style={{ ...inputStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '42px', flexWrap: 'wrap', gap: '4px' }}>
-        {selected.length === 0 ? <span style={{ color: '#6b7280' }}>Select roles...</span> : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {selected.map((r) => (
-              <span key={r} style={{ background: '#6366f1', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                {r}
-                <span onClick={(e) => { e.stopPropagation(); toggle(r); }} style={{ cursor: 'pointer', fontSize: '14px', lineHeight: 1 }}>&times;</span>
-              </span>
-            ))}
-          </div>
-        )}
-        <span style={{ color: '#6b7280', fontSize: '12px', flexShrink: 0 }}>{open ? '▲' : '▼'}</span>
-      </div>
-      {open && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '8px', marginTop: '4px', zIndex: 10, maxHeight: '200px', overflowY: 'auto' }}>
-          {roleOptions.map((role) => (
-            <div key={role} onClick={() => toggle(role)} style={{ padding: '8px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: '#fff', fontSize: '13px', background: selected.includes(role) ? '#2a3050' : 'transparent' }}
-              onMouseEnter={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = '#1e2540'; }}
-              onMouseLeave={(e) => { if (!selected.includes(role)) e.currentTarget.style.background = 'transparent'; }}>
-              <span style={{ width: '16px', height: '16px', borderRadius: '4px', border: selected.includes(role) ? 'none' : '2px solid #3a4060', background: selected.includes(role) ? '#6366f1' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#fff', flexShrink: 0 }}>
-                {selected.includes(role) && '✓'}
-              </span>
-              {role}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+const text = (v) => (v || '').toString().toLowerCase();
+const blanksLast = (v) => (text(v) === '' ? 1 : 0);
 
-const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
+const COLUMNS = [
+  { key: 'name', label: 'Member', width: 'auto' },
+  { key: 'roles', label: 'Roles', width: '190px' },
+  { key: 'status', label: 'Status', width: '150px' },
+  { key: 'contract', label: 'Contract', width: '165px' },
+  { key: 'spoc', label: 'Owner', width: '160px' },
+];
+
+const VIEW_DEFAULTS = { q: '', contract: 'all', status: 'all', sort: 'createdAt', dir: 'desc', page: 1, size: 25 };
+
+const toExportRow = (m, contract) => ({
+  'Name': m.name || '',
+  'MRM ID': m.clientNumber || '',
+  'Email': m.email || '',
+  'Phone': m.phone || '',
+  'Roles': roleList(m).join(', '),
+  'Genre': m.genre || '',
+  'Status': m.status || '',
+  'KYC': m.kycStatus || '',
+  'Contract': contract || '',
+  'Owner': m.spoc || '',
+  'Priority': m.priority || '',
+  'Registrations': m.registrations ?? 0,
+  'PAN': m.panCard || '',
+  'Aadhaar': m.aadhaar || '',
+  'IPI': m.ipiNumber || '',
+  'ISNI': m.isni || '',
+  'Lead source': m.leadSource || '',
+  'Referred by': m.isReferred ? (m.referredBy || 'Yes') : '',
+  'Added on': fmtDate(m.createdAt) || '',
+});
+
+const PRIORITY_CHOICES = [
+  { value: 'high', label: 'High', tone: 'red', hint: 'Chase this one first' },
+  { value: 'medium', label: 'Medium', tone: 'amber', hint: 'Normal pace' },
+  { value: 'low', label: 'Low', tone: 'teal', hint: 'No rush' },
+];
+
+/* ═══════════════════════════════════════════
+   ADD / EDIT MEMBER
+   ═══════════════════════════════════════════ */
+const MemberFormModal = ({ onClose, onSubmit, initialData }) => {
   const { getOptions } = usePicklist();
   const sourceList = getOptions('lead_source');
+  const roleOptions = getOptions('member_roles');
   const isEdit = !!initialData;
-  const [form, setForm] = useState(
-    initialData
-      ? { ...initialData }
-      : { name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '', panCard: '', aadhaar: '', dateOfFirstContact: '', leadSource: '', priority: 'medium', isReferred: false, referredBy: '', referralCommission: '' },
-  );
-  const [conflicts, setConflicts] = useState([]); // ['name' | 'email' | 'clientNumber']
+
+  const [form, setForm] = useState(() => initialData || {
+    name: '', role: [], email: '', phone: '', genre: '', languages: '', bio: '',
+    clientNumber: '', panCard: '', aadhaar: '', dateOfFirstContact: '',
+    leadSource: '', priority: 'medium', isReferred: false, referredBy: '', referralCommission: '',
+  });
+  const [conflicts, setConflicts] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const h = (f, v) => {
-    setForm((p) => ({ ...p, [f]: v }));
-    if (conflicts.includes(f)) {
-      // Clear the red highlight on the field the user is fixing
-      setConflicts((prev) => prev.filter((c) => c !== f));
-    }
+  /* Escape closes, and so does the backdrop. This dialog had neither — the
+     only way out was a 20px × glyph in the corner. */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const set = (field, value) => {
+    setForm((p) => ({ ...p, [field]: value }));
+    // clear the red highlight on the very field being fixed
+    if (conflicts.includes(field)) setConflicts((prev) => prev.filter((c) => c !== field));
   };
 
+  const FIELD_LABELS = { name: 'Name', email: 'Email', clientNumber: 'MRM Membership ID' };
+  const bad = (field) => (conflicts.includes(field)
+    ? { borderColor: TONES.red.bd, boxShadow: `0 0 0 1px ${TONES.red.bd}` }
+    : undefined);
+
+  const canSubmit = !!form.name.trim() && !!form.email.trim();
+
   const handleSubmit = async () => {
-    if (!form.name.trim() || !form.email.trim()) return;
+    if (!canSubmit || submitting) return;
     setSubmitting(true);
     try {
-      const result = await onAdd(form);
-      if (result && result.ok) {
-        setConflicts([]);
-        setErrorMsg('');
-        onClose();
-      } else if (result && result.status === 409) {
+      const result = await onSubmit(form);
+      if (result && result.ok) { setConflicts([]); setErrorMsg(''); onClose(); }
+      else if (result && result.status === 409) {
         setConflicts(Array.isArray(result.conflicts) ? result.conflicts : []);
         setErrorMsg(result.message || 'Duplicate name, email or MRM ID already exists.');
       } else {
@@ -141,453 +152,389 @@ const AddMemberModal = ({ onClose, onAdd, teamMembers, initialData }) => {
     }
   };
 
-  const inputStyle = { width: '100%', padding: '10px 14px', background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' };
-  const conflictStyle = { borderColor: '#ef4444', boxShadow: '0 0 0 1px #ef4444' };
-  const styleFor = (field) => (conflicts.includes(field) ? { ...inputStyle, ...conflictStyle } : inputStyle);
-  const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', display: 'block' };
-  const sectionStyle = { fontSize: '13px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '14px', marginTop: '8px' };
-  const FIELD_LABELS = { name: 'Name', email: 'Email', clientNumber: 'MRM Membership ID' };
-
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '560px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>{isEdit ? 'Edit Member' : 'Add New Member'}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
-        </div>
-
-        {errorMsg && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', border: '1px solid #7f1d1d', marginBottom: '18px' }}>
-            <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#ef4444', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, flexShrink: 0 }}>!</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#fca5a5', fontSize: '13px', fontWeight: 600 }}>Duplicate already exists</div>
-              <div style={{ color: '#fca5a5', fontSize: '12px', marginTop: '2px' }}>{errorMsg}</div>
-              {conflicts.length > 0 && (
-                <div style={{ color: '#fda4af', fontSize: '11px', marginTop: '4px' }}>
-                  Conflicting field{conflicts.length > 1 ? 's' : ''}: {conflicts.map((c) => FIELD_LABELS[c] || c).join(', ')}
-                </div>
-              )}
-            </div>
-            <button onClick={() => { setErrorMsg(''); setConflicts([]); }} style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', padding: '2px' }}><X size={14} /></button>
+    <div
+      onClick={onClose}
+      role="presentation"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(27, 94, 32, 0.28)',
+        backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 50, padding: '24px',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? `Edit ${form.name}` : 'Add a new member'}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: T.surface, borderRadius: '16px', width: '100%', maxWidth: '620px',
+          maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+          border: `1px solid ${T.border}`, boxShadow: '0 24px 60px rgba(27, 94, 32, 0.18)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: '12px',
+          padding: '20px 22px', borderBottom: `1px solid ${T.border}`,
+        }}>
+          {isEdit
+            ? <Avatar name={form.name} size={38} tone="auto" />
+            : (
+              <span style={{
+                width: '38px', height: '38px', borderRadius: '11px', flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                background: TONES.purple.bg, border: `1px solid ${TONES.purple.bd}`, color: TONES.purple.fg,
+              }}>
+                <Plus style={{ width: '18px', height: '18px' }} />
+              </span>
+            )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: T.heading }}>
+              {isEdit ? form.name || 'Edit member' : 'Add a new member'}
+            </h2>
+            <p style={{ fontSize: '13px', color: T.muted, marginTop: '3px' }}>
+              {isEdit
+                ? 'Name and email are the source of truth for leads, onboarding and royalty.'
+                : 'A member is an artist on the roster. Leads and onboarding entries both hang off one.'}
+            </p>
           </div>
-        )}
-
-        {/* Personal Details */}
-        <div style={sectionStyle}>Personal Details</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={labelStyle}>Full Name <span style={{ color: '#ef4444' }}>*</span></label>
-            <input style={styleFor('name')} placeholder="e.g. Prateek Kuhad" value={form.name} onChange={(e) => h('name', e.target.value)} />
-            {conflicts.includes('name') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This name is already used by another member.</div>}
-          </div>
-          <MultiRoleSelect selected={form.role} onChange={(v) => h('role', v)} inputStyle={inputStyle} labelStyle={labelStyle} />
-          <div>
-            <label style={labelStyle}>Email <span style={{ color: '#ef4444' }}>*</span></label>
-            <input style={styleFor('email')} placeholder="email@example.com" value={form.email} onChange={(e) => h('email', e.target.value)} />
-            {conflicts.includes('email') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This email is already used by another member.</div>}
-          </div>
-          <div>
-            <label style={labelStyle}>Phone</label>
-            <input style={inputStyle} placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => h('phone', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Genre</label>
-            <input style={inputStyle} placeholder="e.g. Indie Folk / Pop" value={form.genre} onChange={(e) => h('genre', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Languages (comma-separated)</label>
-            <input style={inputStyle} placeholder="e.g. Hindi, English" value={form.languages} onChange={(e) => h('languages', e.target.value)} />
-          </div>
-        </div>
-        <div style={{ marginTop: '16px' }}>
-          <label style={labelStyle}>Bio</label>
-          <textarea style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }} placeholder="Brief description of the artist..." value={form.bio} onChange={(e) => h('bio', e.target.value)} />
-        </div>
-
-        {/* KYC */}
-        <div style={{ ...sectionStyle, marginTop: '24px' }}>KYC Information</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={labelStyle}>MRM Membership ID</label>
-            <input style={styleFor('clientNumber')} placeholder="e.g. MRM-176" value={form.clientNumber || ''} onChange={(e) => h('clientNumber', e.target.value)} />
-            {conflicts.includes('clientNumber') && <div style={{ color: '#fca5a5', fontSize: '11px', marginTop: '4px' }}>This MRM ID is already used by another member.</div>}
-          </div>
-          <div />
-          <div>
-            <label style={labelStyle}>PAN Card Number</label>
-            <input style={inputStyle} placeholder="e.g. ABCPK1234A" value={form.panCard} onChange={(e) => h('panCard', e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Aadhaar Number</label>
-            <input style={inputStyle} placeholder="e.g. XXXX-XXXX-1234" value={form.aadhaar} onChange={(e) => h('aadhaar', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Date of First Contact */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
-          <div>
-            <label style={labelStyle}>Date of First Contact</label>
-            <input type="date" style={{ ...inputStyle, colorScheme: 'dark' }} value={form.dateOfFirstContact} onChange={(e) => h('dateOfFirstContact', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Lead Info */}
-        <div style={{ ...sectionStyle, marginTop: '24px' }}>Lead Information</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={labelStyle}>Lead Source</label>
-            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.leadSource} onChange={(e) => h('leadSource', e.target.value)}>
-              <option value="">Select source...</option>
-              {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Priority</label>
-            <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto' }} value={form.priority} onChange={(e) => h('priority', e.target.value)}>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Referral Info */}
-        <div style={{ ...sectionStyle, marginTop: '24px' }}>Referral Information</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>Is Referred?</label>
           <button
             type="button"
-            onClick={() => h('isReferred', !form.isReferred)}
+            onClick={onClose}
+            title="Close"
+            aria-label="Close"
             style={{
-              width: '42px', height: '24px', borderRadius: '12px', border: 'none',
-              backgroundColor: form.isReferred ? '#22c55e' : '#374151',
-              position: 'relative', cursor: 'pointer', transition: 'background-color 0.2s',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
+              background: 'transparent', border: `1px solid ${T.border}`,
+              color: T.muted, cursor: 'pointer',
             }}
           >
-            <span style={{
-              position: 'absolute', top: '3px', left: form.isReferred ? '21px' : '3px',
-              width: '18px', height: '18px', borderRadius: '50%', backgroundColor: 'white', transition: 'left 0.2s',
-            }} />
+            <X style={{ width: '15px', height: '15px' }} />
           </button>
-          <span style={{ fontSize: '12px', color: form.isReferred ? '#34d399' : '#9ca3af' }}>
-            {form.isReferred ? 'Yes' : 'No'}
-          </span>
         </div>
-        {form.isReferred && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={labelStyle}>Referred By</label>
-              <input style={inputStyle} placeholder="e.g. John Doe" value={form.referredBy} onChange={(e) => h('referredBy', e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>Referral Commission</label>
-              <input style={inputStyle} placeholder="e.g. 10% or ₹5000" value={form.referralCommission} onChange={(e) => h('referralCommission', e.target.value)} />
-            </div>
-          </div>
-        )}
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '28px' }}>
-          <button onClick={onClose} disabled={submitting} style={{ padding: '10px 20px', background: 'transparent', border: '1px solid #2a3050', borderRadius: '8px', color: '#ccc', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: submitting ? 0.6 : 1 }}>Cancel</button>
-          <button onClick={handleSubmit} disabled={submitting} style={{ padding: '10px 20px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? 'Saving...' : (isEdit ? <><Edit3 size={16} /> Save Changes</> : <><Plus size={16} /> Add Member</>)}
-          </button>
+        <div style={{ padding: '20px 22px', overflowY: 'auto', flex: 1 }}>
+          {errorMsg && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '16px',
+              padding: '12px 14px', borderRadius: '10px',
+              background: TONES.red.bg, border: `1px solid ${TONES.red.bd}`,
+            }}>
+              <AlertTriangle style={{ width: '16px', height: '16px', flexShrink: 0, color: TONES.red.fg, marginTop: '1px' }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: TONES.red.fg, fontSize: '13px', fontWeight: 700 }}>That would be a duplicate</div>
+                <div style={{ color: TONES.red.fg, fontSize: '12.5px', marginTop: '2px', lineHeight: 1.45 }}>{errorMsg}</div>
+                {conflicts.length > 0 && (
+                  <div style={{ color: TONES.red.fg, fontSize: '11.5px', marginTop: '5px' }}>
+                    Already taken: {conflicts.map((c) => FIELD_LABELS[c] || c).join(', ')}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { setErrorMsg(''); setConflicts([]); }}
+                title="Dismiss"
+                aria-label="Dismiss"
+                style={{ background: 'none', border: 'none', color: TONES.red.fg, cursor: 'pointer', padding: '2px', display: 'inline-flex' }}
+              >
+                <X style={{ width: '14px', height: '14px' }} />
+              </button>
+            </div>
+          )}
+
+          <SubHead icon={Users}>Who they are</SubHead>
+          <FormGrid min="240px">
+            <Input
+              label="Full name" required
+              placeholder="e.g. Prateek Kuhad"
+              value={form.name}
+              onChange={(e) => set('name', e.target.value)}
+              style={bad('name')}
+              hint={conflicts.includes('name') ? 'Another member already has this name.' : undefined}
+            />
+            <Input
+              label="Email" required
+              placeholder="email@example.com"
+              value={form.email}
+              onChange={(e) => set('email', e.target.value)}
+              style={bad('email')}
+              hint={conflicts.includes('email') ? 'Another member already has this email.' : undefined}
+            />
+            <Input label="Phone" placeholder="+91 98xxx xxxxx" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+            <Input label="Genre" placeholder="e.g. Indie Folk / Pop" value={form.genre} onChange={(e) => set('genre', e.target.value)} />
+            <MultiSelect
+              label="Roles"
+              options={roleOptions}
+              selected={Array.isArray(form.role) ? form.role : []}
+              onChange={(v) => set('role', v)}
+              placeholder="What do they do?"
+            />
+            <Input label="Languages" placeholder="e.g. Hindi, English" hint="Comma separated." value={form.languages} onChange={(e) => set('languages', e.target.value)} />
+          </FormGrid>
+          <div style={{ marginTop: '12px' }}>
+            <Textarea
+              span label="Bio" placeholder="A line or two about the artist..."
+              value={form.bio} onChange={(e) => set('bio', e.target.value)}
+            />
+          </div>
+
+          <SubHead icon={IdCard} style={{ marginTop: '24px' }}>Identity &amp; KYC</SubHead>
+          <FormGrid min="240px">
+            <Input
+              label="MRM membership ID"
+              placeholder="e.g. MRM-176"
+              value={form.clientNumber || ''}
+              onChange={(e) => set('clientNumber', e.target.value)}
+              style={bad('clientNumber')}
+              hint={conflicts.includes('clientNumber') ? 'Another member already holds this ID.' : undefined}
+            />
+            <Input label="PAN number" placeholder="ABCPK1234A" value={form.panCard} onChange={(e) => set('panCard', e.target.value)} />
+            <Input label="Aadhaar number" placeholder="1234 5678 9012" value={form.aadhaar} onChange={(e) => set('aadhaar', e.target.value)} />
+            <Input
+              label="First contacted" type="date" style={{ colorScheme: 'light' }}
+              value={toDateInput(form.dateOfFirstContact) || form.dateOfFirstContact || ''}
+              onChange={(e) => set('dateOfFirstContact', e.target.value)}
+            />
+          </FormGrid>
+
+          <SubHead icon={Sparkles} style={{ marginTop: '24px' }}>Where they came from</SubHead>
+          <FormGrid min="240px">
+            <Select label="Lead source" value={form.leadSource} onChange={(e) => set('leadSource', e.target.value)}>
+              <option value="">Not set</option>
+              {sourceList.map((s) => <option key={s} value={s}>{s}</option>)}
+            </Select>
+            <Choice label="Priority" options={PRIORITY_CHOICES} value={form.priority} onChange={(v) => set('priority', v)} />
+          </FormGrid>
+
+          <SubHead icon={Handshake} style={{ marginTop: '24px' }}>Referral</SubHead>
+          <Choice
+            label="Did somebody refer them?"
+            options={[
+              { value: 'yes', label: 'Yes', tone: 'green' },
+              { value: 'no', label: 'No', tone: 'grey' },
+            ]}
+            value={form.isReferred ? 'yes' : 'no'}
+            onChange={(v) => set('isReferred', v === 'yes')}
+            compact
+          />
+          {form.isReferred && (
+            <FormGrid min="240px" style={{ marginTop: '12px' }}>
+              <Input label="Referred by" placeholder="e.g. John Doe" value={form.referredBy} onChange={(e) => set('referredBy', e.target.value)} />
+              <Input label="Referral commission" placeholder="e.g. 10% or ₹5000" value={form.referralCommission} onChange={(e) => set('referralCommission', e.target.value)} />
+            </FormGrid>
+          )}
+        </div>
+
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px',
+          padding: '16px 22px', borderTop: `1px solid ${T.border}`, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '12px', color: T.faint }}>
+            {canSubmit ? 'Press Esc to cancel.' : 'A name and an email are required.'}
+          </span>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button
+              icon={isEdit ? Edit3 : Plus}
+              onClick={handleSubmit}
+              disabled={!canSubmit || submitting}
+              title={canSubmit ? undefined : 'Fill in a name and an email first'}
+            >
+              {submitting ? 'Saving...' : isEdit ? 'Save changes' : 'Add member'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-/* ────────── Member Profile Modal ────────── */
-const MemberProfileModal = ({ member, onClose, onUpdate, onDelete, onEdit, onAddTask, onToggleTask, teamMembers }) => {
-  const { guardAction, blockGuestAction } = useGuestGuard();
-  const [activeTab, setActiveTab] = useState('General Info');
-  const [showAddTask, setShowAddTask] = useState(false);
-  const [newTaskText, setNewTaskText] = useState('');
-  const [newTaskAssignee, setNewTaskAssignee] = useState('');
-  const [copiedField, setCopiedField] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+/* ═══════════════════════════════════════════
+   ONE ROW OF THE TABLE
+   ═══════════════════════════════════════════ */
+const MemberRow = ({ member, contract, onOpen, onEdit, onDelete, selected, onToggleSelect, confirming, onCancelDelete }) => {
+  const name = member.name || 'Unnamed member';
+  const roles = roleList(member);
+  const urgent = member.priority === 'high' && member.status !== 'Inactive';
 
-  const spocMember = teamMembers.find((m) => m.name === member.spoc);
-  const completedTasks = member.subTasks.filter((t) => t.done).length;
-  const totalTasks = member.subTasks.length;
-  const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+  const rest = selected ? TONES.indigo.bg : 'transparent';
+  const edge = selected ? T.accent : 'transparent';
 
-  const tabs = ['General Info', 'Additional Info', 'KYC', 'Unique IDs'];
-
-  const toggleTask = (taskId) => {
-    if (blockGuestAction()) return;
-    const task = member.subTasks.find((t) => t._id === taskId);
-    if (task) onToggleTask(member._id, taskId, !task.done);
-  };
-  const addTask = () => {
-    if (blockGuestAction()) return;
-    if (!newTaskText.trim()) return;
-    onAddTask(member._id, newTaskText.trim(), newTaskAssignee);
-    setNewTaskText('');
-    setNewTaskAssignee('');
-    setShowAddTask(false);
-  };
-
-  const copyToClipboard = (text, field) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(''), 1500);
-  };
-
-  const infoBox = { background: '#161b2e', borderRadius: '10px', padding: '14px 16px' };
-  const infoLabel = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' };
-  const infoVal = { color: '#fff', fontSize: '14px', fontWeight: 500 };
-
-  /* ─── Shared: SPOC + Sub-Tasks ─── */
-  const renderSpocAndTasks = () => (
+  return (
     <>
-      {/* Assigned SPOC */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: '1px solid #1e2540', borderBottom: '1px solid #1e2540', marginBottom: '16px' }}>
-        <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Assigned SPOC</span>
-        {spocMember ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#161b2e', padding: '6px 14px', borderRadius: '9999px', fontSize: '13px' }}>
-            <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#fff' }}>{spocMember.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}</span>
-            <span style={{ color: '#fff', fontWeight: 500 }}>{spocMember.name}</span>
-          </span>
-        ) : <span style={{ color: '#555', fontSize: '13px' }}>Not assigned</span>}
-        {member.assignedDate && (
-          <span style={{ color: '#6b7280', fontSize: '11px', marginLeft: '8px' }}>
-            on {new Date(member.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </span>
-        )}
-      </div>
+      <tr
+        onClick={() => onOpen(member)}
+        title={`Open ${name}`}
+        style={{
+          cursor: 'pointer', background: rest,
+          boxShadow: `inset 3px 0 0 ${edge}`,
+          transition: 'background 0.14s ease, box-shadow 0.14s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = TONES.grey.bg;
+          e.currentTarget.style.boxShadow = `inset 3px 0 0 ${T.borderHi}`;
+          e.currentTarget.querySelectorAll('[data-hover]').forEach((el) => { el.style.opacity = '1'; });
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = rest;
+          e.currentTarget.style.boxShadow = `inset 3px 0 0 ${edge}`;
+          e.currentTarget.querySelectorAll('[data-hover]').forEach((el) => { el.style.opacity = '0'; });
+        }}
+      >
+        <td style={TD} onClick={(e) => e.stopPropagation()}>
+          <Checkbox checked={!!selected} onChange={onToggleSelect} label={`Select ${name}`} />
+        </td>
 
-      {/* Deadline */}
-      {member.deadline && (() => {
-        const dlStatus = getDeadlineStatus(member.deadline);
-        const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #1e2540', marginBottom: '16px' }}>
-            <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Deadline</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#fff', fontSize: '13px' }}>{new Date(member.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-              {dlColor && <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', backgroundColor: dlColor.bg, color: dlColor.color }}>{dlColor.label}</span>}
+        <td style={TD}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <Avatar name={name} size={36} tone="auto" />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{
+                  fontSize: '14px', fontWeight: 600, color: T.heading,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {name}
+                </span>
+                {urgent && (
+                  <span title="High priority" style={{ display: 'inline-flex', flexShrink: 0, color: TONES.red.fg }}>
+                    <Flame style={{ width: '13px', height: '13px' }} />
+                  </span>
+                )}
+              </div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px',
+                fontSize: '12px', color: T.muted, minWidth: 0,
+              }}>
+                {member.email && <Mail style={{ width: '11px', height: '11px', flexShrink: 0, color: T.faint }} />}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {member.email || 'No email'}
+                </span>
+                {member.clientNumber && (
+                  <>
+                    <span style={{ color: T.faint, flexShrink: 0 }}>·</span>
+                    <span style={{ flexShrink: 0, color: T.faint }}>MRM {member.clientNumber}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        );
-      })()}
+        </td>
 
-      {/* Sub-Tasks header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ color: '#fff', fontSize: '14px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sub-Tasks</span>
-          <span style={{ color: '#8892b0', fontSize: '13px' }}>{completedTasks}/{totalTasks}</span>
-        </div>
-        <button onClick={() => guardAction(() => setShowAddTask(true))} style={{ background: 'none', border: 'none', color: '#22c55e', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <Plus size={14} /> Add
-        </button>
-      </div>
+        <td style={TD}>
+          {roles.length === 0
+            ? <span style={{ fontSize: '13px', color: T.faint }}>No role set</span>
+            : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {roles.slice(0, 2).map((r) => <Pill key={r} tone="indigo">{r}</Pill>)}
+                {roles.length > 2 && (
+                  <span title={roles.join(', ')} style={{ fontSize: '11.5px', color: T.faint, alignSelf: 'center' }}>
+                    +{roles.length - 2}
+                  </span>
+                )}
+              </div>
+            )}
+        </td>
 
-      {/* Progress */}
-      {totalTasks > 0 && (
-        <div style={{ height: '4px', background: '#1e2540', borderRadius: '4px', marginBottom: '12px' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: '#22c55e', borderRadius: '4px', transition: 'width 0.3s' }} />
-        </div>
-      )}
-
-      {/* Task List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {member.subTasks.map((task) => {
-          const a = teamMembers.find((m) => m.name === task.assignee);
-          const initials = a ? a.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : '';
-          return (
-            <div key={task._id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0' }}>
-              <button onClick={() => toggleTask(task._id)} style={{ width: '22px', height: '22px', borderRadius: '6px', border: task.done ? 'none' : '2px solid #3a4060', background: task.done ? '#22c55e' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {task.done && <Check size={14} color="#fff" />}
-              </button>
-              <span style={{ flex: 1, color: task.done ? '#6b7280' : '#fff', fontSize: '13px', textDecoration: task.done ? 'line-through' : 'none' }}>{task.text}</span>
-              {a && (
-                <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials}</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Inline Add Task */}
-      {showAddTask && (
-        <div style={{ marginTop: '12px', padding: '14px', background: '#161b2e', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input autoFocus placeholder="Task description..." value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addTask()}
-            style={{ width: '100%', padding: '8px 12px', background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '6px', color: '#fff', fontSize: '13px', outline: 'none' }} />
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <select value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}
-              style={{ flex: 1, padding: '8px 12px', background: '#1a1f2e', border: '1px solid #2a3050', borderRadius: '6px', color: '#fff', fontSize: '13px', outline: 'none', cursor: 'pointer', appearance: 'auto' }}>
-              <option value="">Assign to...</option>
-              {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
-            </select>
-            <button onClick={addTask} style={{ padding: '8px 16px', background: '#22c55e', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Add Task</button>
-            <button onClick={() => { setShowAddTask(false); setNewTaskText(''); setNewTaskAssignee(''); }}
-              style={{ padding: '8px 14px', background: 'transparent', border: '1px solid #2a3050', borderRadius: '6px', color: '#aaa', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+        <td style={TD}>
+          <Pill tone={STATUS_TONES[member.status] || 'grey'} dot>{member.status || 'Unknown'}</Pill>
+          <div style={{ marginTop: '5px' }}>
+            <span style={{ fontSize: '11.5px', color: (KYC_TONES[member.kycStatus] ? TONES[KYC_TONES[member.kycStatus]].fg : T.faint) }}>
+              KYC {(member.kycStatus || 'unknown').toLowerCase()}
+            </span>
           </div>
-        </div>
+        </td>
+
+        <td style={TD}>
+          {contract
+            ? <Pill tone={CONTRACT_TONES[contract] || 'grey'}>{contract}</Pill>
+            : <span style={{ fontSize: '13.5px', color: T.faint }}>{NO_CONTRACT}</span>}
+          <div style={{ fontSize: '11.5px', color: T.faint, marginTop: '5px' }}>
+            {member.registrations ?? 0} registration{(member.registrations ?? 0) === 1 ? '' : 's'}
+          </div>
+        </td>
+
+        <td style={TD}>
+          <PersonChip name={member.spoc} size={24} empty="Nobody yet" />
+        </td>
+
+        {/* Row actions fade in on hover; the chevron says the row itself opens. */}
+        <td style={{ ...TD, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+          <span data-hover style={{ opacity: 0, transition: 'opacity 0.14s ease', display: 'inline-flex', gap: '2px', verticalAlign: 'middle' }}>
+            <button
+              type="button"
+              className="mrm-icon-ghost"
+              onClick={() => onEdit(member)}
+              title={`Edit ${name}`}
+              aria-label={`Edit ${name}`}
+            >
+              <Edit3 style={{ width: '15px', height: '15px' }} />
+            </button>
+            <button
+              type="button"
+              className="mrm-icon-btn"
+              onClick={() => onDelete(member._id)}
+              title={`Delete ${name}`}
+              aria-label={`Delete ${name}`}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'inline-flex' }}
+            >
+              <Trash2 style={{ width: '15px', height: '15px' }} />
+            </button>
+          </span>
+          <span
+            aria-hidden
+            style={{ display: 'inline-flex', color: T.accent, marginLeft: '4px', verticalAlign: 'middle' }}
+          >
+            <ChevronRight style={{ width: '17px', height: '17px' }} />
+          </span>
+        </td>
+      </tr>
+
+      {confirming && (
+        <tr>
+          <td colSpan={COLUMNS.length + 2} style={{ ...TD, background: TONES.red.bg, padding: '12px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <AlertTriangle style={{ width: '16px', height: '16px', color: TONES.red.fg, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: '220px', fontSize: '13px', color: TONES.red.fg }}>
+                Delete <strong>{name}</strong> permanently? Their leads, onboarding and royalty records stay,
+                but stop pointing at anybody.
+              </span>
+              <Button variant="ghost" onClick={onCancelDelete} style={{ padding: '7px 13px', fontSize: '12.5px' }}>Cancel</Button>
+              <Button variant="danger" icon={Trash2} onClick={() => onDelete(member._id, true)} style={{ padding: '7px 13px', fontSize: '12.5px' }}>
+                Yes, delete
+              </Button>
+            </div>
+          </td>
+        </tr>
       )}
     </>
   );
-
-  const renderCopyRow = (label, value, fieldKey) => (
-    <div style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <div>
-        <div style={infoLabel}>{label}</div>
-        <div style={{ ...infoVal, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{value || '—'}</div>
-      </div>
-      {value && (
-        <button onClick={() => copyToClipboard(value, fieldKey)}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === fieldKey ? '#22c55e' : '#8892b0', fontSize: '12px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {copiedField === fieldKey ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
-        </button>
-      )}
-    </div>
-  );
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '600px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>Member Profile</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button onClick={() => guardAction(() => onEdit(member))} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px' }}><Edit3 size={18} /></button>
-            <button onClick={() => guardAction(() => setConfirmDelete(true))} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }}><Trash2 size={18} /></button>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
-          </div>
-        </div>
-
-        {confirmDelete && (
-          <div style={{ background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: '10px', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <span style={{ fontSize: '13px', color: '#fca5a5' }}>Delete this member permanently?</span>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setConfirmDelete(false)} style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-            </div>
-          </div>
-        )}
-
-        {/* Avatar + Name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: member.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 700, color: '#fff' }}>
-            {member.initials}
-          </div>
-          <div style={{ flex: 1 }}>
-            <h3 style={{ color: '#fff', fontSize: '18px', fontWeight: 600, margin: 0 }}>{member.name}</h3>
-            <p style={{ color: '#8892b0', fontSize: '13px', margin: '2px 0 0' }}>{Array.isArray(member.role) ? member.role.join(', ') : member.role} · {member.genre || 'N/A'}</p>
-          </div>
-          <StatusBadge status={member.status} />
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '4px', background: '#141720', borderRadius: '8px', padding: '3px', marginBottom: '20px' }}>
-          {tabs.map((t) => (
-            <button key={t} onClick={() => setActiveTab(t)}
-              style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: activeTab === t ? '#1e2540' : 'transparent', color: activeTab === t ? '#fff' : '#8892b0', fontSize: '13px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.15s' }}>
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === 'General Info' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div style={infoBox}><div style={infoLabel}>MRM Membership ID</div><div style={infoVal}>{member.clientNumber || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Email</div><div style={infoVal}>{member.email || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Phone</div><div style={infoVal}>{member.phone || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(member.role) ? member.role.join(', ') : member.role}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Join Date</div><div style={infoVal}>{member.joinDate || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Status</div><div style={infoVal}>{member.status}</div></div>
-            </div>
-            <div style={{ ...infoBox, marginBottom: '16px' }}><div style={infoLabel}>Bio</div><div style={infoVal}>{member.bio || '—'}</div></div>
-            {renderSpocAndTasks()}
-          </>
-        )}
-
-        {activeTab === 'Additional Info' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-              <div style={infoBox}><div style={infoLabel}>Genre</div><div style={infoVal}>{member.genre || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Languages</div><div style={infoVal}>{member.languages || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Territories</div><div style={infoVal}>{member.territories || '—'}</div></div>
-              <div style={infoBox}><div style={infoLabel}>Society Registrations</div><div style={infoVal}>{member.registrations}</div></div>
-            </div>
-            {renderSpocAndTasks()}
-          </>
-        )}
-
-        {activeTab === 'KYC' && (
-          <>
-            {/* KYC Status row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', marginBottom: '12px' }}>
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 500 }}>KYC Status</span>
-              <StatusBadge status={member.kycStatus} colors={kycColors} />
-            </div>
-            {/* PAN */}
-            <div style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div>
-                <div style={infoLabel}>PAN Card</div>
-                <div style={infoVal}>{member.panCard || '—'}</div>
-              </div>
-              {member.panCard && <StatusBadge status={member.panVerified ? 'Verified' : 'Pending'} colors={kycColors} />}
-            </div>
-            {/* Aadhaar */}
-            <div style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div>
-                <div style={infoLabel}>Aadhaar</div>
-                <div style={infoVal}>{member.aadhaar || '—'}</div>
-              </div>
-              {member.aadhaar && <StatusBadge status={member.aadhaarVerified ? 'Verified' : 'Pending'} colors={kycColors} />}
-            </div>
-            {renderSpocAndTasks()}
-          </>
-        )}
-
-        {activeTab === 'Unique IDs' && (
-          <>
-            {renderCopyRow('Member ID', member._id, 'memberId')}
-            {renderCopyRow('IPI Number', member.ipiNumber, 'ipi')}
-            {renderCopyRow('ISNI', member.isni, 'isni')}
-            <div style={{ marginTop: '4px' }} />
-            {renderSpocAndTasks()}
-          </>
-        )}
-      </div>
-    </div>
-  );
 };
 
-/* ────────── Main Page ────────── */
+/* ═══════════════════════════════════════════
+   MAIN MEMBERS PAGE
+   ═══════════════════════════════════════════ */
 const Members = () => {
   const navigate = useNavigate();
   const { authFetch } = useAuth();
   const { addToast } = useToast();
   const { setCached, invalidate } = useDataCache();
-  const { guardAction } = useGuestGuard();
-  const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
-  const getContractColor = (t) => CONTRACT_COLORS[t] || '';
-  const [searchQuery, setSearchQuery] = useState('');
+  const { guardAction, blockGuestAction } = useGuestGuard();
+
+  const [view, setView] = useUrlState(VIEW_DEFAULTS);
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
   const debouncedQuery = useDebouncedValue(searchQuery, 250);
-  const [contractFilter, setContractFilter] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingMember, setEditingMember] = useState(null);
-  const [selectedMember, setSelectedMember] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [selected, setSelected] = useState(() => new Set());
+  const searchRef = useRef(null);
 
   const membersQ = useCachedFetch('members:list', async () => {
     const r = await authFetch('/api/members');
     const d = await r.json();
     return d.members || [];
-  });
-  const teamQ = useCachedFetch('users:team', async () => {
-    const r = await authFetch('/api/users/team');
-    const d = await r.json();
-    return d.users || [];
   });
   const onboardingQ = useCachedFetch('onboarding:list', async () => {
     const r = await authFetch('/api/onboarding');
@@ -595,11 +542,32 @@ const Members = () => {
     return d.entries || [];
   });
 
-  const members = membersQ.data || [];
-  const teamMembers = teamQ.data || [];
-  const onboardingEntries = onboardingQ.data || [];
-  const loading = (membersQ.loading && !membersQ.data) || (teamQ.loading && !teamQ.data) || (onboardingQ.loading && !onboardingQ.data);
+  const members = useMemo(() => membersQ.data || [], [membersQ.data]);
+  const onboardingEntries = useMemo(() => onboardingQ.data || [], [onboardingQ.data]);
+  const loading = (membersQ.loading && !membersQ.data) || (onboardingQ.loading && !onboardingQ.data);
 
+  const openMember = useCallback((m) => navigate(`/members/${m._id}`), [navigate]);
+
+  useEffect(() => {
+    if (debouncedQuery !== view.q) setView({ q: debouncedQuery, page: 1 });
+  }, [debouncedQuery, view.q, setView]);
+
+  // "/" jumps to the search box
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      const tag = el && el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el && el.isContentEditable)) return;
+      e.preventDefault();
+      if (searchRef.current) searchRef.current.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /* Contract type lives on the onboarding entry, matched by MRM ID first and by
+     name only as a fallback — an id is unique, a name is not. */
   const contractMap = useMemo(() => {
     const map = {};
     onboardingEntries.forEach((e) => {
@@ -609,65 +577,108 @@ const Members = () => {
     return map;
   }, [onboardingEntries]);
 
+  const contractOf = useCallback(
+    (m) => contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`] || '',
+    [contractMap],
+  );
+
   const setMembers = (updater) => {
     const current = membersQ.data || [];
-    const next = typeof updater === 'function' ? updater(current) : updater;
-    setCached('members:list', next);
+    setCached('members:list', typeof updater === 'function' ? updater(current) : updater);
   };
 
-  const getMemberContract = (m) =>
-    contractMap[m.clientNumber] || contractMap[`name:${(m.name || '').toLowerCase()}`] || '';
+  const STATUS_FILTERS = useMemo(() => [
+    { id: 'all', label: 'All', test: () => true },
+    { id: 'active', label: 'Active', test: (m) => m.status === 'Active' },
+    { id: 'onboarding', label: 'Onboarding', test: (m) => m.status === 'Onboarding' },
+    { id: 'inactive', label: 'Inactive', test: (m) => m.status === 'Inactive' },
+    { id: 'kyc', label: 'KYC not done', test: (m) => m.kycStatus !== 'Verified' },
+    { id: 'unassigned', label: 'No owner', test: (m) => !m.spoc },
+  ], []);
 
-  const contractCounts = useMemo(() => {
-    const counts = { All: members.length, Royalty: 0, Retainer: 0, 'Work-Based': 0, Inhouse: 0 };
-    members.forEach((m) => {
-      const c = getMemberContract(m);
-      if (counts[c] !== undefined) counts[c] += 1;
-    });
-    return counts;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members, contractMap]);
-
-  const filteredMembers = useMemo(() => {
+  const rows = useMemo(() => {
+    let list = members;
     const q = debouncedQuery.trim().toLowerCase();
-    return members.filter((m) => {
-      if (contractFilter !== 'All' && getMemberContract(m) !== contractFilter) return false;
-      if (!q) return true;
-      return (
-        m.name.toLowerCase().includes(q) ||
+    if (q) {
+      list = list.filter((m) =>
+        (m.name || '').toLowerCase().includes(q) ||
         (m._id && m._id.toLowerCase().includes(q)) ||
         (m.clientNumber && m.clientNumber.toLowerCase().includes(q)) ||
         (m.email && m.email.toLowerCase().includes(q)) ||
-        (Array.isArray(m.role) ? m.role.some((r) => r.toLowerCase().includes(q)) : (m.role || '').toLowerCase().includes(q)) ||
+        (m.phone && m.phone.includes(q)) ||
         (m.genre && m.genre.toLowerCase().includes(q)) ||
-        (m.status && m.status.toLowerCase().includes(q)) ||
-        (m.spoc && m.spoc.toLowerCase().includes(q))
+        (m.spoc && m.spoc.toLowerCase().includes(q)) ||
+        roleList(m).some((r) => r.toLowerCase().includes(q))
       );
-    });
-  }, [members, debouncedQuery, contractFilter, contractMap]);
+    }
+    if (view.contract !== 'all') {
+      list = list.filter((m) => (view.contract === NO_CONTRACT ? !contractOf(m) : contractOf(m) === view.contract));
+    }
+    const sf = STATUS_FILTERS.find((s) => s.id === view.status);
+    if (sf && sf.id !== 'all') list = list.filter(sf.test);
 
-  useEffect(() => { setPage(1); }, [debouncedQuery, contractFilter, pageSize]);
+    const cmp = {
+      name: (a, b) => text(a.name).localeCompare(text(b.name)),
+      roles: (a, b) => blanksLast(roleList(a)[0]) - blanksLast(roleList(b)[0]) || text(roleList(a)[0]).localeCompare(text(roleList(b)[0])),
+      status: (a, b) => text(a.status).localeCompare(text(b.status)),
+      contract: (a, b) => blanksLast(contractOf(a)) - blanksLast(contractOf(b)) || text(contractOf(a)).localeCompare(text(contractOf(b))),
+      spoc: (a, b) => blanksLast(a.spoc) - blanksLast(b.spoc) || text(a.spoc).localeCompare(text(b.spoc)),
+      createdAt: (a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0),
+    }[view.sort] || ((a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0));
 
-  const totalFiltered = filteredMembers.length;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const pagedMembers = useMemo(
-    () => filteredMembers.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredMembers, safePage, pageSize]
+    return [...list].sort((a, b) => (view.dir === 'asc' ? cmp(a, b) : -cmp(a, b)));
+  }, [members, debouncedQuery, view.contract, view.status, view.sort, view.dir, contractOf, STATUS_FILTERS]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / view.size));
+  const safePage = Math.min(Math.max(1, view.page), totalPages);
+  const pageRows = rows.slice((safePage - 1) * view.size, safePage * view.size);
+
+  const contractSegments = useMemo(() => {
+    const buckets = [...CONTRACT_TYPES, NO_CONTRACT];
+    return buckets.map((label) => ({
+      id: label,
+      label,
+      tone: CONTRACT_TONES[label] || 'grey',
+      value: members.filter((m) => (label === NO_CONTRACT ? !contractOf(m) : contractOf(m) === label)).length,
+    }));
+  }, [members, contractOf]);
+
+  const statusOptions = STATUS_FILTERS.map((f) => ({
+    value: f.id, label: f.label, count: members.filter(f.test).length,
+  }));
+
+  const unassignedCount = members.filter((m) => !m.spoc).length;
+  const filtersOn = !!searchQuery || view.contract !== 'all' || view.status !== 'all';
+  const resetAll = () => { setSearchQuery(''); setView({ q: '', contract: 'all', status: 'all', page: 1 }); };
+  const pickContract = (v) => setView({ contract: v, page: 1 });
+  const pickStatus = (v) => setView({ status: v, page: 1 });
+  const toggleSort = (key) => setView(
+    view.sort === key
+      ? { sort: key, dir: view.dir === 'asc' ? 'desc' : 'asc', page: 1 }
+      : { sort: key, dir: key === 'createdAt' ? 'desc' : 'asc', page: 1 },
   );
 
-  const handleAddMember = async (form) => {
+  const pageIds = pageRows.map((m) => m._id);
+  const selectedOnPage = pageIds.filter((id) => selected.has(id)).length;
+  const allPageSelected = pageIds.length > 0 && selectedOnPage === pageIds.length;
+  const toggleRow = (id) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const togglePage = () => setSelected((prev) => {
+    const next = new Set(prev);
+    if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+    else pageIds.forEach((id) => next.add(id));
+    return next;
+  });
+
+  const handleAdd = async (form) => {
+    if (blockGuestAction()) return { ok: false, message: 'Guest users have view-only access' };
     try {
-      const res = await authFetch('/api/members', {
-        method: 'POST',
-        body: JSON.stringify(form),
-      });
+      const res = await authFetch('/api/members', { method: 'POST', body: JSON.stringify(form) });
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMembers((p) => [data.member, ...p]);
-        addToast('Member added');
-        return { ok: true };
-      }
+      if (res.ok) { setMembers((p) => [data.member, ...p]); addToast('Member added'); return { ok: true }; }
       if (res.status === 409) {
         return { ok: false, status: 409, conflicts: data.conflicts || [], message: data.message || 'Duplicate name, email or MRM ID already exists.' };
       }
@@ -678,25 +689,29 @@ const Members = () => {
     }
   };
 
-  const handleEditMember = (member) => {
-    setSelectedMember(null);
-    setEditingMember({
-      _id: member._id, name: member.name, role: Array.isArray(member.role) ? member.role : [], email: member.email,
-      phone: member.phone || '', genre: member.genre || '', languages: member.languages || '', bio: member.bio || '',
-      panCard: member.panCard || '', aadhaar: member.aadhaar || '', dateOfFirstContact: member.dateOfFirstContact || '', spoc: member.spoc || '',
-      leadSource: member.leadSource || '', priority: member.priority || 'medium',
-      isReferred: member.isReferred || false, referredBy: member.referredBy || '', referralCommission: member.referralCommission || '',
-    });
-  };
+  /* The edit form is built from the member rather than spread wholesale, so the
+     PUT carries exactly the editable fields. `clientNumber` belongs in here —
+     it is on the form, and leaving it out showed an empty MRM ID box for a
+     member who already had one. */
+  const startEdit = (m) => setEditing({
+    _id: m._id,
+    name: m.name || '', role: roleList(m), email: m.email || '', phone: m.phone || '',
+    genre: m.genre || '', languages: m.languages || '', bio: m.bio || '',
+    clientNumber: m.clientNumber || '', panCard: m.panCard || '', aadhaar: m.aadhaar || '',
+    dateOfFirstContact: m.dateOfFirstContact || '', leadSource: m.leadSource || '',
+    priority: m.priority || 'medium', isReferred: !!m.isReferred,
+    referredBy: m.referredBy || '', referralCommission: m.referralCommission || '',
+  });
 
-  const handleEditSubmit = async (form) => {
-    if (!editingMember) return { ok: false, message: 'No member selected' };
+  const handleEdit = async (form) => {
+    if (!editing) return { ok: false, message: 'No member selected' };
+    if (blockGuestAction()) return { ok: false, message: 'Guest users have view-only access' };
     try {
-      const res = await authFetch(`/api/members/${editingMember._id}`, { method: 'PUT', body: JSON.stringify(form) });
+      const res = await authFetch(`/api/members/${editing._id}`, { method: 'PUT', body: JSON.stringify(form) });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setMembers((p) => p.map((m) => (m._id === editingMember._id ? data.member : m)));
-        // Backend propagates name/email/phone to leads / onboarding / society / royalty — drop those caches.
+        setMembers((p) => p.map((m) => (m._id === editing._id ? data.member : m)));
+        // the backend propagates name/email/phone out to every record that names them
         invalidate('leads:list');
         invalidate('onboarding:list');
         invalidate('societyregs:list');
@@ -714,201 +729,233 @@ const Members = () => {
     }
   };
 
-  const handleDeleteMember = async (memberId) => {
+  const handleDelete = async (memberId, confirmed) => {
+    if (!confirmed) { guardAction(() => setConfirmDeleteId(memberId)); return; }
+    if (blockGuestAction()) return;
+    setConfirmDeleteId(null);
     try {
       const res = await authFetch(`/api/members/${memberId}`, { method: 'DELETE' });
-      if (res.ok) { setMembers((p) => p.filter((m) => m._id !== memberId)); addToast('Member deleted'); }
-      else addToast('Failed to delete member', 'error');
-    } catch (err) { console.error('Failed to delete member:', err); addToast('Failed to delete member', 'error'); }
-  };
-
-  const handleAddTask = async (memberId, text, assignee) => {
-    try {
-      const res = await authFetch(`/api/members/${memberId}/subtasks`, {
-        method: 'POST',
-        body: JSON.stringify({ text, assignee }),
-      });
-      const data = await res.json();
       if (res.ok) {
-        setMembers((p) => p.map((m) => (m._id === memberId ? data.member : m)));
-        setSelectedMember(data.member);
-        addToast('Task added');
-      } else addToast('Failed to add task', 'error');
+        setMembers((p) => p.filter((m) => m._id !== memberId));
+        setSelected((prev) => { const next = new Set(prev); next.delete(memberId); return next; });
+        addToast('Member deleted');
+      } else addToast('Failed to delete member', 'error');
     } catch (err) {
-      console.error('Failed to add task:', err);
-      addToast('Failed to add task', 'error');
+      console.error('Failed to delete member:', err);
+      addToast('Failed to delete member', 'error');
     }
   };
 
-  const handleToggleTask = async (memberId, taskId, done) => {
+  const exportRows = (list, scope) => {
     try {
-      const res = await authFetch(`/api/members/${memberId}/subtasks/${taskId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ done }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMembers((p) => p.map((m) => (m._id === memberId ? data.member : m)));
-        setSelectedMember(data.member);
-      }
+      if (!list.length) { addToast('Nothing to export', 'error'); return; }
+      const data = list.map((m) => toExportRow(m, contractOf(m)));
+      const sheet = XLSX.utils.json_to_sheet(data);
+      sheet['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 26 }, { wch: 18 },
+        { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 13 },
+        { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 14 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Members');
+      XLSX.writeFile(wb, `Members_${scope}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      addToast(`Exported ${data.length} member${data.length === 1 ? '' : 's'}`);
     } catch (err) {
-      console.error('Failed to toggle task:', err);
+      console.error('Export error:', err);
+      addToast('Failed to export Excel', 'error');
     }
   };
-
-  if (loading) {
-    return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading members...</div>;
-  }
 
   return (
-    <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div>
-          <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>Member Management</h1>
-          <p style={{ color: '#8892b0', fontSize: '14px', margin: '4px 0 0' }}>Manage member profiles, KYC, and unique identifiers</p>
-        </div>
-        <button onClick={() => guardAction(() => setShowAddModal(true))}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', background: '#22c55e', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>
-          <Plus size={16} /> Add Member
-        </button>
-      </div>
+    // capped, because a table stretched across 1600px puts the owner column an
+    // inch from the name it belongs to
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
+      <PageHeader
+        breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Members' }]}
+        title="Members"
+        subtitle="Every artist on the roster. Leads, onboarding and royalty records all hang off one of these."
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              icon={Download}
+              disabled={loading || rows.length === 0}
+              title={rows.length ? `Download these ${rows.length} member${rows.length === 1 ? '' : 's'} as Excel` : 'Nothing to export'}
+              onClick={() => exportRows(rows, 'view')}
+            >
+              Export
+            </Button>
+            <Button
+              icon={Plus}
+              title="Add an artist to the roster"
+              onClick={() => guardAction(() => setShowAddModal(true))}
+            >
+              New Member
+            </Button>
+          </>
+        }
+      />
 
-      {/* Contract color legend */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '16px', padding: '10px 14px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px' }}>
-        <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600 }}>Contract Type:</span>
-        {Object.entries(CONTRACT_COLORS).map(([label, col]) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col }} />
-            <span style={{ color: '#e5e7eb', fontSize: '12px' }}>{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Search + Contract Filter */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-        <div style={{ position: 'relative', flex: '0 1 360px', minWidth: '240px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-          <input placeholder="Search by name, role, ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }} />
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {['All', ...Object.keys(CONTRACT_COLORS)].map((label) => {
-            const active = contractFilter === label;
-            const accent = label === 'All' ? '#6366f1' : CONTRACT_COLORS[label];
-            const count = contractCounts[label] ?? 0;
-            return (
-              <button key={label} onClick={() => setContractFilter(label)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 14px', borderRadius: '9999px',
-                  background: active ? accent : '#141720',
-                  border: `1px solid ${active ? accent : '#1e2540'}`,
-                  color: active ? '#fff' : '#e5e7eb',
-                  fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}>
-                {label !== 'All' && (
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: active ? '#fff' : accent }} />
-                )}
-                {label}
-                <span style={{
-                  fontSize: '11px', fontWeight: 700,
-                  padding: '1px 7px', borderRadius: '9999px',
-                  background: active ? 'rgba(255,255,255,0.22)' : '#1e2540',
-                  color: active ? '#fff' : '#9ca3af',
-                }}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Members Grid */}
-      {filteredMembers.length === 0 ? (
-        <div style={{ textAlign: 'center', color: '#6b7280', fontSize: '14px', padding: '60px 0' }}>
-          {searchQuery ? 'No members match your search.' : 'No members yet. Click "+ Add Member" to get started.'}
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-          {pagedMembers.map((m) => (
-            <div key={m._id} onClick={() => navigate(`/members/${m._id}`)}
-              style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', padding: '20px', cursor: 'pointer', transition: 'border-color 0.15s' }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#1e2540')}>
-              {/* Top row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: getContractColor(getMemberContract(m)) || m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                  {m.initials}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{m.name}</span>
-                    <StatusBadge status={m.status} />
-                  </div>
-                  <div style={{ color: '#8892b0', fontSize: '12px', marginTop: '2px' }}>{Array.isArray(m.role) ? m.role.join(', ') : m.role}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); guardAction(() => handleEditMember(m)); }}
-                    title="Edit member"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#3b82f6')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); guardAction(() => setConfirmDeleteId(m._id)); }}
-                    title="Delete member"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px', borderRadius: '6px', transition: 'color 0.15s' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              {/* Stats */}
-              <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '13px', color: '#8892b0' }}>
-                <span>Registrations: <strong style={{ color: '#fff' }}>{m.registrations}</strong></span>
-              </div>
-              {/* Tags */}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <StatusBadge status={`KYC: ${m.kycStatus}`} colors={{ 'KYC: Verified': { bg: '#065f46', text: '#34d399' }, 'KYC: Pending': { bg: '#7f1d1d', text: '#f87171' } }} />
-              </div>
-
-              {/* Delete confirmation */}
-              {confirmDeleteId === m._id && (
-                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', background: '#450a0a', border: '1px solid #7f1d1d', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '12px', color: '#fca5a5' }}>Delete this member?</span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #7f1d1d', background: 'transparent', color: '#fca5a5', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMember(m._id); setConfirmDeleteId(null); }} style={{ padding: '5px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
-                  </div>
-                </div>
+      {/* A pointer, not a report: the number itself stays on the "No owner" chip. */}
+      {!loading && members.length > 0 && (
+        unassignedCount > 0
+          ? (
+            <Banner
+              tone="amber"
+              icon={AlertTriangle}
+              action={(
+                <Button
+                  icon={ArrowRight}
+                  onClick={() => pickStatus('unassigned')}
+                  title="Filter the list down to members with nobody assigned"
+                  style={{ padding: '8px 14px', fontSize: '13px' }}
+                >
+                  Show them
+                </Button>
               )}
-            </div>
-          ))}
-        </div>
+            >
+              Some members have nobody looking after them.
+            </Banner>
+          )
+          : <Banner tone="green" icon={CheckCircle2}>Every member has somebody looking after them.</Banner>
       )}
 
-      {/* Pagination */}
-      {filteredMembers.length > 0 && (
-        <Pagination
-          page={safePage}
-          pageSize={pageSize}
-          total={totalFiltered}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-          pageSizeOptions={[10, 50, 100]}
+      <Panel>
+        <DistributionBar
+          segments={contractSegments}
+          active={view.contract}
+          onSelect={pickContract}
+          emptyLabel="No members yet"
         />
-      )}
 
-      {/* Modals */}
-      {showAddModal && <AddMemberModal onClose={() => setShowAddModal(false)} onAdd={handleAddMember} teamMembers={teamMembers} />}
-      {editingMember && <AddMemberModal onClose={() => setEditingMember(null)} onAdd={handleEditSubmit} teamMembers={teamMembers} initialData={editingMember} />}
-      {selectedMember && <MemberProfileModal member={selectedMember} onClose={() => setSelectedMember(null)} onUpdate={() => {}} onDelete={handleDeleteMember} onEdit={handleEditMember} onAddTask={handleAddTask} onToggleTask={handleToggleTask} teamMembers={teamMembers} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.border}` }}>
+          <Segmented options={statusOptions} value={view.status} onChange={pickStatus} tone="purple" />
+          <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: '380px', marginLeft: 'auto' }}>
+            <SearchInput
+              ref={searchRef}
+              icon={Search}
+              placeholder="Search name, MRM ID, email, role or owner"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: '100%' }}
+            />
+            {!searchQuery && (
+              <kbd
+                aria-hidden
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  padding: '2px 7px', borderRadius: '5px', pointerEvents: 'none',
+                  background: T.bg, border: `1px solid ${T.border}`,
+                  color: T.faint, fontSize: '11px', fontWeight: 700, fontFamily: 'inherit',
+                }}
+              >
+                /
+              </kbd>
+            )}
+          </div>
+          {filtersOn && (
+            <Button variant="ghost" icon={X} onClick={resetAll} title="Clear the search, the contract and the status filter" style={{ padding: '9px 14px', fontSize: '13px' }}>
+              Reset
+            </Button>
+          )}
+        </div>
+      </Panel>
+
+      <Card bodyStyle={{ padding: 0 }}>
+        {selected.size > 0 && (
+          <SelectionBar count={selected.size} onClear={() => setSelected(new Set())}>
+            <Button
+              variant="ghost"
+              icon={Download}
+              title={`Download the ${selected.size} ticked member${selected.size === 1 ? '' : 's'} as Excel`}
+              style={{ padding: '7px 13px', fontSize: '13px' }}
+              onClick={() => exportRows(members.filter((m) => selected.has(m._id)), 'selected')}
+            >
+              Export selected
+            </Button>
+          </SelectionBar>
+        )}
+
+        {!loading && rows.length === 0 ? (
+          <EmptyState icon={Search} title={members.length === 0 ? 'No members yet' : 'Nothing matches these filters'}>
+            {members.length === 0
+              ? 'Use “New Member” above to add the first artist to the roster.'
+              : <button type="button" onClick={resetAll} style={{ background: 'none', border: 'none', color: T.accent, fontSize: '13.5px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Reset the filters</button>}
+          </EmptyState>
+        ) : (
+          <>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: '1120px', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <TH width="44px">
+                      {!loading && pageIds.length > 0 && (
+                        <Checkbox
+                          checked={allPageSelected}
+                          indeterminate={selectedOnPage > 0 && !allPageSelected}
+                          onChange={togglePage}
+                          label="Select every member on this page"
+                        />
+                      )}
+                    </TH>
+                    {COLUMNS.map((col) => (
+                      <TH
+                        key={col.key}
+                        sortable
+                        width={col.width}
+                        active={view.sort === col.key}
+                        dir={view.dir}
+                        onClick={() => toggleSort(col.key)}
+                      >
+                        {col.label}
+                      </TH>
+                    ))}
+                    <TH width="96px" align="right" />
+                  </tr>
+                </thead>
+                {loading ? (
+                  <TableSkeleton columns={['17px', '60%', '70%', '55%', '65%', '60%', '40px']} rows={8} />
+                ) : (
+                  <tbody>
+                    {pageRows.map((m) => (
+                      <MemberRow
+                        key={m._id}
+                        member={m}
+                        contract={contractOf(m)}
+                        onOpen={openMember}
+                        onEdit={(mm) => guardAction(() => startEdit(mm))}
+                        onDelete={handleDelete}
+                        confirming={confirmDeleteId === m._id}
+                        onCancelDelete={() => setConfirmDeleteId(null)}
+                        selected={selected.has(m._id)}
+                        onToggleSelect={() => toggleRow(m._id)}
+                      />
+                    ))}
+                  </tbody>
+                )}
+              </table>
+            </div>
+            {!loading && (
+              <div style={{ padding: '0 16px' }}>
+                <Pagination
+                  page={safePage}
+                  pageSize={view.size}
+                  total={rows.length}
+                  onPageChange={(p) => setView({ page: p })}
+                  onPageSizeChange={(n) => setView({ size: n, page: 1 })}
+                  pageSizeOptions={[25, 50, 100]}
+                  label="Rows per page"
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {showAddModal && (
+        <MemberFormModal onClose={() => setShowAddModal(false)} onSubmit={handleAdd} />
+      )}
+      {editing && (
+        <MemberFormModal onClose={() => setEditing(null)} onSubmit={handleEdit} initialData={editing} />
+      )}
     </div>
   );
 };

@@ -28,19 +28,19 @@ const STEP_DEFINITIONS = [
 ];
 
 /* ─── Shared styles ─── */
-const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box' };
-const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' };
-const cardBg = '#161b2e';
-const cardBorder = '1px solid #1e2540';
+const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '14px', outline: 'none', boxSizing: 'border-box' };
+const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' };
+const cardBg = '#FFFFFF';
+const cardBorder = '1px solid rgba(165, 214, 167, 0.55)';
 const sectionStyle = { backgroundColor: cardBg, border: cardBorder, borderRadius: '10px', padding: '16px', marginBottom: '10px' };
 
 /* Status badges */
 const STATUS = {
-  Registered: { bg: '#064e3b', color: '#6ee7b7', text: 'Registered' },
-  'In Progress': { bg: '#1e3a5f', color: '#7dd3fc', text: 'In Progress' },
-  'Not Started': { bg: '#27272a', color: '#a1a1aa', text: 'Not Started' },
-  'N/A': { bg: '#1c1c1e', color: '#52525b', text: 'N/A' },
-  Overdue: { bg: '#991b1b', color: '#fca5a5', text: 'Overdue' },
+  Registered: { bg: '#E8F5E9', color: '#2E7D32', text: 'Registered' },
+  'In Progress': { bg: '#E3F2FD', color: '#0D47A1', text: 'In Progress' },
+  'Not Started': { bg: '#FFFFFF', color: '#4A6851', text: 'Not Started' },
+  'N/A': { bg: '#FFFFFF', color: '#5B7362', text: 'N/A' },
+  Overdue: { bg: '#FFEBEE', color: '#B71C1C', text: 'Overdue' },
 };
 
 const StatusBadge = ({ status, isOverdue }) => {
@@ -53,9 +53,9 @@ const TripleToggle = ({ value, onChange }) => {
   const btnBase = { padding: '5px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.2s' };
   return (
     <div style={{ display: 'flex', gap: '4px' }}>
-      <button onClick={() => onChange('Yes')} style={{ ...btnBase, background: value === 'Yes' ? '#166534' : '#1e2540', color: value === 'Yes' ? '#86efac' : '#6b7280', border: value === 'Yes' ? '1px solid #22c55e' : '1px solid #2d3348' }}>Yes</button>
-      <button onClick={() => onChange('No')} style={{ ...btnBase, background: value === 'No' ? '#991b1b' : '#1e2540', color: value === 'No' ? '#fca5a5' : '#6b7280', border: value === 'No' ? '1px solid #ef4444' : '1px solid #2d3348' }}>No</button>
-      <button onClick={() => onChange('NA')} style={{ ...btnBase, background: value === 'NA' ? '#854d0e' : '#1e2540', color: value === 'NA' ? '#fde047' : '#6b7280', border: value === 'NA' ? '1px solid #f59e0b' : '1px solid #2d3348' }}>N/A</button>
+      <button onClick={() => onChange('Yes')} style={{ ...btnBase, background: value === 'Yes' ? '#E8F5E9' : '#F1F6F1', color: value === 'Yes' ? '#2E7D32' : '#5B7362', border: value === 'Yes' ? '1px solid #66BB6A' : '1px solid #A5D6A7' }}>Yes</button>
+      <button onClick={() => onChange('No')} style={{ ...btnBase, background: value === 'No' ? '#FFEBEE' : '#F1F6F1', color: value === 'No' ? '#B71C1C' : '#5B7362', border: value === 'No' ? '1px solid #FFCDD2' : '1px solid #A5D6A7' }}>No</button>
+      <button onClick={() => onChange('NA')} style={{ ...btnBase, background: value === 'NA' ? '#FFF8E1' : '#F1F6F1', color: value === 'NA' ? '#7A4400' : '#5B7362', border: value === 'NA' ? '1px solid #FFE082' : '1px solid #A5D6A7' }}>N/A</button>
     </div>
   );
 };
@@ -178,12 +178,12 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
   };
 
   return (
-    <div style={{ padding: '16px 18px', borderTop: '1px solid #1e2540' }}>
-      <p style={{ fontSize: '12px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: notAssigned ? '8px' : '14px' }}>Registration Progress — {societyKey}</p>
+    <div style={{ padding: '16px 18px', borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
+      <p style={{ fontSize: '12px', fontWeight: 700, color: '#4A6851', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: notAssigned ? '8px' : '14px' }}>Registration Progress — {societyKey}</p>
       {notAssigned && (
-        <div style={{ marginBottom: '14px', padding: '8px 14px', backgroundColor: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ marginBottom: '14px', padding: '8px 14px', backgroundColor: 'rgba(249, 168, 37, 0.07)', border: '1px solid rgba(249, 168, 37, 0.25)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '14px' }}>🔒</span>
-          <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 500 }}>You are not assigned to this society — view only.</span>
+          <span style={{ fontSize: '12px', color: '#7A4400', fontWeight: 500 }}>You are not assigned to this society — view only.</span>
         </div>
       )}
 
@@ -195,16 +195,16 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0,
-                  background: localSteps[step.key] === 'Yes' ? '#166534' : localSteps[step.key] === 'No' ? '#991b1b' : localSteps[step.key] === 'NA' ? '#854d0e' : '#1e2540',
-                  color: localSteps[step.key] === 'Yes' ? '#86efac' : localSteps[step.key] === 'No' ? '#fca5a5' : localSteps[step.key] === 'NA' ? '#fde047' : '#6b7280',
-                  border: localSteps[step.key] === 'Yes' ? '1px solid #22c55e' : localSteps[step.key] === 'No' ? '1px solid #ef4444' : localSteps[step.key] === 'NA' ? '1px solid #f59e0b' : '1px solid #2d3348',
+                  background: localSteps[step.key] === 'Yes' ? '#E8F5E9' : localSteps[step.key] === 'No' ? '#FFEBEE' : localSteps[step.key] === 'NA' ? '#FFF8E1' : '#F1F6F1',
+                  color: localSteps[step.key] === 'Yes' ? '#2E7D32' : localSteps[step.key] === 'No' ? '#B71C1C' : localSteps[step.key] === 'NA' ? '#7A4400' : '#5B7362',
+                  border: localSteps[step.key] === 'Yes' ? '1px solid #66BB6A' : localSteps[step.key] === 'No' ? '1px solid #FFCDD2' : localSteps[step.key] === 'NA' ? '1px solid #FFE082' : '1px solid #A5D6A7',
                 }}>{step.num}</span>
-                <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>{step.label}</span>
+                <span style={{ fontSize: '13px', color: '#1B5E20', fontWeight: 500 }}>{step.label}</span>
               </div>
               {readOnly ? (
                 <span style={{ fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '6px',
-                  background: (localSteps[step.key] || 'NA') === 'Yes' ? '#166534' : (localSteps[step.key] || 'NA') === 'No' ? '#991b1b' : '#854d0e',
-                  color: (localSteps[step.key] || 'NA') === 'Yes' ? '#86efac' : (localSteps[step.key] || 'NA') === 'No' ? '#fca5a5' : '#fde047',
+                  background: (localSteps[step.key] || 'NA') === 'Yes' ? '#E8F5E9' : (localSteps[step.key] || 'NA') === 'No' ? '#FFEBEE' : '#FFF8E1',
+                  color: (localSteps[step.key] || 'NA') === 'Yes' ? '#2E7D32' : (localSteps[step.key] || 'NA') === 'No' ? '#B71C1C' : '#7A4400',
                 }}>{localSteps[step.key] || 'N/A'}</span>
               ) : (
                 <TripleToggle value={localSteps[step.key] || 'NA'} onChange={(val) => saveStep(step.key, val)} />
@@ -220,18 +220,18 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                 <div style={{ marginTop: '10px', paddingLeft: '34px' }}>
                   {fileName ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <FileText style={{ width: '14px', height: '14px', color: '#10b981' }} />
+                      <FileText style={{ width: '14px', height: '14px', color: '#2E7D32' }} />
                       {fileUrl ? (
-                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#818cf8', textDecoration: 'underline' }}>{fileName}</a>
+                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#256B29', textDecoration: 'underline' }}>{fileName}</a>
                       ) : (
-                        <span style={{ fontSize: '13px', color: '#e5e7eb' }}>{fileName}</span>
+                        <span style={{ fontSize: '13px', color: '#1B5E20' }}>{fileName}</span>
                       )}
                     </div>
                   ) : null}
                   {!readOnly && (
                     <>
                       <input type="file" ref={(el) => { fileRefs.current[step.key] = el; }} style={{ display: 'none' }} onChange={(e) => { if (e.target.files[0]) uploadFile(e.target.files[0], step.key); }} />
-                      <button onClick={() => fileRefs.current[step.key]?.click()} disabled={uploading} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px dashed #3a3f60', background: 'transparent', color: '#6366f1', fontSize: '12px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
+                      <button onClick={() => fileRefs.current[step.key]?.click()} disabled={uploading} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', border: '1px dashed #A5D6A7', background: 'transparent', color: '#256B29', fontSize: '12px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
                         <Upload style={{ width: '14px', height: '14px' }} /> {uploading ? 'Uploading...' : fileName ? 'Replace Document' : 'Upload Document'}
                       </button>
                     </>
@@ -248,7 +248,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Primary Login ID</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginId || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.loginId || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter primary login ID..."
@@ -262,7 +262,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Primary Password</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.loginPassword || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.loginPassword || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter primary password..."
@@ -279,7 +279,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Secondary Login ID</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.secondaryLoginId || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.secondaryLoginId || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter secondary login ID..."
@@ -293,7 +293,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Secondary Password</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.secondaryLoginPassword || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.secondaryLoginPassword || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter secondary password..."
@@ -310,7 +310,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>CAE Number</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.caeNumber || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.caeNumber || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="Enter CAE number..."
@@ -324,7 +324,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
                   <div style={{ flex: 1, minWidth: '160px' }}>
                     <label style={{ ...labelStyle, marginBottom: '4px', fontSize: '10px' }}>Commission Rate</label>
                     {readOnly ? (
-                      <p style={{ fontSize: '13px', color: '#e5e7eb', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '8px', border: '1px solid #2d3348' }}>{localSteps.commissionRate || '—'}</p>
+                      <p style={{ fontSize: '13px', color: '#1B5E20', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px solid #A5D6A7' }}>{localSteps.commissionRate || '—'}</p>
                     ) : (
                       <input style={{ ...inputStyle, padding: '8px 12px', fontSize: '13px' }}
                         placeholder="e.g. 15%"
@@ -345,20 +345,20 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
       {/* Step 11: Remarks */}
       <div style={{ ...sectionStyle, marginTop: '8px', marginBottom: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-          <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, background: '#1e2540', color: '#6b7280', border: '1px solid #2d3348' }}>11</span>
-          <span style={{ fontSize: '13px', color: '#e5e7eb', fontWeight: 500 }}>Remarks</span>
+          <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, background: '#F1F6F1', color: '#5B7362', border: '1px solid #A5D6A7' }}>11</span>
+          <span style={{ fontSize: '13px', color: '#1B5E20', fontWeight: 500 }}>Remarks</span>
         </div>
 
         {/* Existing remarks */}
         {(remarks || []).length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px', paddingLeft: '34px' }}>
             {remarks.map((r) => (
-              <div key={r._id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#1a1e2e', borderRadius: '6px', border: '1px solid #2d3348' }}>
+              <div key={r._id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: '#FFFFFF', borderRadius: '6px', border: '1px solid #A5D6A7' }}>
                 <div>
-                  <p style={{ fontSize: '13px', color: '#e5e7eb', lineHeight: '1.4' }}>{r.text}</p>
-                  <p style={{ fontSize: '10px', color: '#6b7280', marginTop: '4px' }}>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</p>
+                  <p style={{ fontSize: '13px', color: '#1B5E20', lineHeight: '1.4' }}>{r.text}</p>
+                  <p style={{ fontSize: '10px', color: '#5B7362', marginTop: '4px' }}>{r.createdAt ? new Date(r.createdAt).toLocaleString() : ''}</p>
                 </div>
-                {!readOnly && <button onClick={() => deleteRemark(r._id)} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
+                {!readOnly && <button onClick={() => deleteRemark(r._id)} style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '2px', flexShrink: 0 }}>
                   <Trash2 style={{ width: '12px', height: '12px' }} />
                 </button>}
               </div>
@@ -375,7 +375,7 @@ const StepsPanel = ({ regId, societyKey, steps, remarks, onUpdated, authFetch, t
               onChange={(e) => setNewRemark(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addRemark()}
             />
-            <button onClick={addRemark} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 14px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={addRemark} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 14px', borderRadius: '6px', border: 'none', background: 'linear-gradient(135deg, #256B29, #1B5E20)', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <MessageSquarePlus style={{ width: '14px', height: '14px' }} /> Add
             </button>
           </div>
@@ -401,14 +401,14 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
+      <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '32px', width: '560px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #A5D6A7' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>Start Society Registration</h2>
-          <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1B5E20' }}>Start Society Registration</h2>
+          <X style={{ width: '20px', height: '20px', color: '#4A6851', cursor: 'pointer' }} onClick={onClose} />
         </div>
 
-        <div style={{ backgroundColor: '#1a2440', border: '1px solid #2d3a5a', borderRadius: '10px', padding: '14px 18px', marginBottom: '24px' }}>
-          <p style={{ fontSize: '13px', color: '#93a3c0', lineHeight: '1.5' }}>
+        <div style={{ backgroundColor: '#F1F6F1', border: '1px solid #A5D6A7', borderRadius: '10px', padding: '14px 18px', marginBottom: '24px' }}>
+          <p style={{ fontSize: '13px', color: '#4A6851', lineHeight: '1.5' }}>
             Select a member and a collecting society to initiate the registration process.
           </p>
         </div>
@@ -444,8 +444,8 @@ const StartRegModal = ({ members, teamMembers, onClose, onStart }) => {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-          <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#e5e7eb', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={handleSubmit} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={onClose} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: 'transparent', color: '#1B5E20', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={handleSubmit} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #256B29, #1B5E20)', color: 'white', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <ArrowRight style={{ width: '16px', height: '16px' }} /> Start Registration
           </button>
         </div>
@@ -562,22 +562,22 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <div style={{ backgroundColor: '#1e2235', borderRadius: '16px', padding: '0', width: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348' }}>
-        <div style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #2d3348', position: 'sticky', top: 0, backgroundColor: '#1e2235', zIndex: 2 }}>
+      <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '0', width: '700px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #A5D6A7' }}>
+        <div style={{ padding: '24px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #A5D6A7', position: 'sticky', top: 0, backgroundColor: '#FFFFFF', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name} — Registrations</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1B5E20', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name} — Registrations</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, marginLeft: '12px' }}>
             {!confirmDelete ? (
-              <Trash2 style={{ width: '18px', height: '18px', color: '#ef4444', cursor: 'pointer', opacity: 0.7 }} onClick={() => { if (blockGuestAction()) return; setConfirmDelete(true); }} title="Delete registration" />
+              <Trash2 style={{ width: '18px', height: '18px', color: '#B71C1C', cursor: 'pointer', opacity: 0.7 }} onClick={() => { if (blockGuestAction()) return; setConfirmDelete(true); }} title="Delete registration" />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '12px', color: '#fca5a5' }}>Delete?</span>
-                <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '3px 12px', borderRadius: '6px', border: 'none', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Yes</button>
-                <button onClick={() => setConfirmDelete(false)} style={{ padding: '3px 10px', borderRadius: '6px', border: '1px solid #2d3348', background: 'transparent', color: '#9ca3af', fontSize: '11px', cursor: 'pointer' }}>No</button>
+                <span style={{ fontSize: '12px', color: '#B71C1C' }}>Delete?</span>
+                <button onClick={() => { if (blockGuestAction()) return; onDelete(member._id); onClose(); }} style={{ padding: '3px 12px', borderRadius: '6px', border: 'none', background: '#C62828', color: '#fff', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}>Yes</button>
+                <button onClick={() => setConfirmDelete(false)} style={{ padding: '3px 10px', borderRadius: '6px', border: '1px solid #A5D6A7', background: 'transparent', color: '#4A6851', fontSize: '11px', cursor: 'pointer' }}>No</button>
               </div>
             )}
-            <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
+            <X style={{ width: '20px', height: '20px', color: '#4A6851', cursor: 'pointer' }} onClick={onClose} />
           </div>
         </div>
 
@@ -601,21 +601,21 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                 const now = new Date(); now.setHours(0,0,0,0);
                 const dl = new Date(d); dl.setHours(0,0,0,0);
                 const diff = (dl - now) / (1000*60*60*24);
-                if (diff < 0) return { bg: '#991b1b', color: '#fca5a5', label: 'Overdue' };
-                if (diff <= 2) return { bg: '#854d0e', color: '#fde047', label: 'Near Deadline' };
-                return { bg: '#166534', color: '#86efac', label: 'On Track' };
+                if (diff < 0) return { bg: '#FFEBEE', color: '#B71C1C', label: 'Overdue' };
+                if (diff <= 2) return { bg: '#FFF8E1', color: '#7A4400', label: 'Near Deadline' };
+                return { bg: '#E8F5E9', color: '#2E7D32', label: 'On Track' };
               };
               const dlColor = getDeadlineColor(entryDeadline);
 
               return (
-                <div key={soc.key} style={{ backgroundColor: cardBg, border: (status === 'In Progress' && dlColor && dlColor.label === 'Overdue') ? '1px solid #991b1b' : cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
+                <div key={soc.key} style={{ backgroundColor: cardBg, border: (status === 'In Progress' && dlColor && dlColor.label === 'Overdue') ? '1px solid #FFCDD2' : cardBorder, borderRadius: '10px', overflow: 'hidden' }}>
                   {/* Top row — identity + status + actions */}
                   <div style={{ padding: '14px 18px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                       <span style={{ fontSize: '20px', flexShrink: 0 }}>{soc.flag}</span>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{soc.key}</p>
-                        <p style={{ fontSize: '11px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soc.name}</p>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#1B5E20' }}>{soc.key}</p>
+                        <p style={{ fontSize: '11px', color: '#5B7362', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{soc.name}</p>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -623,7 +623,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
                       {(status === 'Not Started' || status === 'N/A') && (
                         <button onClick={() => { if (blockGuestAction()) return; setAssigningKey(isAssigning ? null : soc.key); setExpandedKey(null); setConfirmDone(null); }} disabled={isLoading}
-                          style={{ fontSize: '12px', fontWeight: 600, color: '#818cf8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                          style={{ fontSize: '12px', fontWeight: 600, color: '#256B29', background: 'rgba(46, 125, 50, 0.1)', border: '1px solid rgba(46, 125, 50, 0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                           Assign
                         </button>
                       )}
@@ -631,7 +631,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       {status === 'In Progress' && (
                         <>
                           <button onClick={() => { setExpandedKey(isExpanded ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#60a5fa', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#0D47A1', background: 'rgba(30, 136, 229, 0.1)', border: '1px solid rgba(30, 136, 229, 0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isExpanded ? 'Close' : 'View'}
                           </button>
                           <button onClick={() => {
@@ -639,11 +639,11 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                             setConfirmDone(isConfirmingDone ? null : soc.key); setExpandedKey(null); setAssigningKey(null);
                           }} disabled={isLoading}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#34d399', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#2E7D32', background: 'rgba(67, 160, 71, 0.1)', border: '1px solid rgba(67, 160, 71, 0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             Done
                           </button>
                           <button onClick={() => { if (blockGuestAction()) return; setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#B71C1C', background: 'rgba(229, 57, 53, 0.1)', border: '1px solid rgba(229, 57, 53, 0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
                             ✕
                           </button>
                         </>
@@ -652,15 +652,15 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                       {status === 'Registered' && (
                         <>
                           <button onClick={() => { setExpandedKey(isExpanded ? null : soc.key); setEditingRegistered(null); setAssigningKey(null); setConfirmDone(null); }}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#10b981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#2E7D32', background: 'rgba(67, 160, 71, 0.1)', border: '1px solid rgba(67, 160, 71, 0.3)', borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isExpanded && !isEditingRegistered ? 'Close' : 'View'}
                           </button>
                           <button onClick={() => { if (blockGuestAction()) return; setExpandedKey(soc.key); setEditingRegistered(isEditingRegistered ? null : soc.key); setAssigningKey(null); setConfirmDone(null); }}
-                            style={{ fontSize: '12px', fontWeight: 600, color: isEditingRegistered ? '#f97316' : '#818cf8', background: isEditingRegistered ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)', border: `1px solid ${isEditingRegistered ? 'rgba(249,115,22,0.3)' : 'rgba(99,102,241,0.3)'}`, borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: isEditingRegistered ? '#BF360C' : '#256B29', background: isEditingRegistered ? 'rgba(239, 108, 0, 0.1)' : 'rgba(46, 125, 50, 0.1)', border: `1px solid ${isEditingRegistered ? 'rgba(239, 108, 0, 0.3)' : 'rgba(46, 125, 50, 0.3)'}`, borderRadius: '6px', padding: '4px 14px', cursor: 'pointer' }}>
                             {isEditingRegistered ? 'Done Editing' : 'Edit'}
                           </button>
                           <button onClick={() => { if (blockGuestAction()) return; setConfirmDeleteSoc(confirmDeleteSoc === soc.key ? null : soc.key); setExpandedKey(null); setAssigningKey(null); setConfirmDone(null); }}
-                            style={{ fontSize: '12px', fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
+                            style={{ fontSize: '12px', fontWeight: 600, color: '#B71C1C', background: 'rgba(229, 57, 53, 0.1)', border: '1px solid rgba(229, 57, 53, 0.3)', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer' }}>
                             ✕
                           </button>
                         </>
@@ -672,20 +672,20 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                   {(status === 'In Progress' || status === 'Registered' || (assignee && assignee.name)) && (
                     <div style={{ padding: '0 18px 12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginLeft: '32px' }}>
                       {assignee && assignee.name ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px 3px 3px', borderRadius: '999px', border: '1px solid rgba(99,102,241,0.28)', backgroundColor: 'rgba(99,102,241,0.12)', maxWidth: '200px' }} title={assignee.name}>
-                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: assignee.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px 3px 3px', borderRadius: '999px', border: '1px solid rgba(46, 125, 50, 0.28)', backgroundColor: 'rgba(46, 125, 50, 0.12)', maxWidth: '200px' }} title={assignee.name}>
+                          <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: assignee.color || '#256B29', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
                             {assignee.initials || assignee.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
                           </div>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#c7d2fe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#256B29', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {assignee.name}
                           </span>
                         </div>
                       ) : status === 'In Progress' ? (
-                        <span style={{ fontSize: '11px', color: '#6b7280', fontStyle: 'italic' }}>Unassigned</span>
+                        <span style={{ fontSize: '11px', color: '#5B7362', fontStyle: 'italic' }}>Unassigned</span>
                       ) : null}
 
                       {entryStartDate && (
-                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: 'rgba(99,102,241,0.12)', color: '#a5b4fc', whiteSpace: 'nowrap' }}
+                        <span style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: 'rgba(46, 125, 50, 0.12)', color: '#256B29', whiteSpace: 'nowrap' }}
                           title={`Start: ${fmtDeadline(entryStartDate)}`}>
                           ▶ Start {fmtDeadline(entryStartDate)}
                         </span>
@@ -699,7 +699,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                             defaultValue={fmtDateISO(entryDeadline)}
                             onBlur={(e) => handleUpdateDeadline(soc.key, e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateDeadline(soc.key, e.target.value); if (e.key === 'Escape') setEditingDeadline(null); }}
-                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #6366f1', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '12px', outline: 'none' }}
+                            style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(165, 214, 167, 0.75)', backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '12px', outline: 'none' }}
                           />
                         ) : entryDeadline ? (
                           <span
@@ -709,7 +709,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                               if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                               setEditingDeadline(soc.key);
                             }}
-                            style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#1e2540', color: dlColor?.color || '#9ca3af', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px', backgroundColor: dlColor?.bg || '#F1F6F1', color: dlColor?.color || '#4A6851', cursor: 'pointer', whiteSpace: 'nowrap' }}
                             title={`Deadline: ${fmtDeadline(entryDeadline)} — ${dlColor?.label || ''} (click to edit)`}
                           >
                             📅 {fmtDeadline(entryDeadline)} — {dlColor?.label}
@@ -722,7 +722,7 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
                               if (!isAssignedToSoc(soc.key)) { addToast('You are not assigned to this task', 'error'); return; }
                               setEditingDeadline(soc.key);
                             }}
-                            style={{ fontSize: '11px', fontWeight: 500, color: '#6b7280', background: 'rgba(99,102,241,0.06)', border: '1px dashed #2d3348', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            style={{ fontSize: '11px', fontWeight: 500, color: '#5B7362', background: 'rgba(46, 125, 50, 0.06)', border: '1px dashed #A5D6A7', borderRadius: '6px', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                           >
                             + Set Deadline
                           </button>
@@ -733,31 +733,31 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
                   {/* Assign dropdown */}
                   {isAssigning && (
-                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid #1e2540' }}>
-                      <p style={{ fontSize: '12px', color: '#9ca3af', margin: '12px 0 8px', fontWeight: 500 }}>Assign team member & set deadline:</p>
+                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
+                      <p style={{ fontSize: '12px', color: '#4A6851', margin: '12px 0 8px', fontWeight: 500 }}>Assign team member & set deadline:</p>
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                         <select autoFocus value={assignForm.spoc} onChange={(e) => setAssignForm((p) => ({ ...p, spoc: e.target.value }))}
-                          style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', cursor: 'pointer' }}>
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', outline: 'none', cursor: 'pointer' }}>
                           <option value="">Select team member...</option>
                           {teamMembers.map((m) => <option key={m._id} value={m.name}>{m.name}</option>)}
                         </select>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Start Date</label>
+                          <label style={{ fontSize: '11px', color: '#5B7362', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Start Date</label>
                           <input type="date" value={assignForm.startDate} onChange={(e) => setAssignForm((p) => ({ ...p, startDate: e.target.value }))}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }} />
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'light' }} />
                         </div>
                         <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: '11px', color: '#6b7280', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
+                          <label style={{ fontSize: '11px', color: '#5B7362', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Deadline</label>
                           <input type="date" value={assignForm.deadline} onChange={(e) => setAssignForm((p) => ({ ...p, deadline: e.target.value }))}
-                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'dark' }} />
+                            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', outline: 'none', boxSizing: 'border-box', colorScheme: 'light' }} />
                         </div>
                         <button disabled={!assignForm.spoc || isLoading} onClick={() => handleAssign(soc.key)}
-                          style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: assignForm.spoc ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#2d3348', color: assignForm.spoc ? 'white' : '#6b7280', fontSize: '12px', fontWeight: 600, cursor: assignForm.spoc ? 'pointer' : 'not-allowed', marginTop: '18px' }}>
+                          style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: assignForm.spoc ? 'linear-gradient(135deg, #256B29, #1B5E20)' : '#C8E6C9', color: assignForm.spoc ? 'white' : '#5B7362', fontSize: '12px', fontWeight: 600, cursor: assignForm.spoc ? 'pointer' : 'not-allowed', marginTop: '18px' }}>
                           {isLoading ? 'Assigning...' : 'Assign & Start'}
                         </button>
-                        <button onClick={() => { setAssigningKey(null); setAssignForm({ spoc: '', startDate: '', deadline: '' }); }} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', cursor: 'pointer', marginTop: '18px' }}>Cancel</button>
+                        <button onClick={() => { setAssigningKey(null); setAssignForm({ spoc: '', startDate: '', deadline: '' }); }} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #A5D6A7', backgroundColor: 'transparent', color: '#4A6851', fontSize: '12px', cursor: 'pointer', marginTop: '18px' }}>Cancel</button>
                       </div>
                     </div>
                   )}
@@ -779,15 +779,15 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
                   {/* Done confirmation */}
                   {isConfirmingDone && (
-                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid #1e2540' }}>
-                      <div style={{ marginTop: '12px', padding: '14px 16px', backgroundColor: 'rgba(16,185,129,0.06)', borderRadius: '8px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        <p style={{ fontSize: '13px', color: '#a7f3d0', marginBottom: '12px', fontWeight: 500 }}>
+                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
+                      <div style={{ marginTop: '12px', padding: '14px 16px', backgroundColor: 'rgba(67, 160, 71, 0.06)', borderRadius: '8px', border: '1px solid rgba(67, 160, 71, 0.2)' }}>
+                        <p style={{ fontSize: '13px', color: '#2E7D32', marginBottom: '12px', fontWeight: 500 }}>
                           Confirm that <strong>{soc.key}</strong> registration for <strong>{member.name}</strong> is completed?
                         </p>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button onClick={() => setConfirmDone(null)} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                          <button onClick={() => setConfirmDone(null)} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid #A5D6A7', backgroundColor: 'transparent', color: '#4A6851', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
                           <button onClick={() => handleDone(soc.key)} disabled={isLoading}
-                            style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#059669', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                            style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#2E7D32', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
                             {isLoading ? 'Saving...' : 'Confirm Done'}
                           </button>
                         </div>
@@ -797,15 +797,15 @@ const MemberDetailModal = ({ member, onClose, onAssignAndStart, onMarkDone, onUp
 
                   {/* Delete society confirmation */}
                   {confirmDeleteSoc === soc.key && (
-                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid #1e2540' }}>
-                      <div style={{ marginTop: '12px', padding: '14px 16px', backgroundColor: 'rgba(239,68,68,0.06)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.2)' }}>
-                        <p style={{ fontSize: '13px', color: '#fca5a5', marginBottom: '12px', fontWeight: 500 }}>
+                    <div style={{ padding: '0 18px 14px', borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
+                      <div style={{ marginTop: '12px', padding: '14px 16px', backgroundColor: 'rgba(229, 57, 53, 0.06)', borderRadius: '8px', border: '1px solid rgba(229, 57, 53, 0.2)' }}>
+                        <p style={{ fontSize: '13px', color: '#B71C1C', marginBottom: '12px', fontWeight: 500 }}>
                           Delete <strong>{soc.key}</strong> registration for <strong>{member.name}</strong>? This cannot be undone.
                         </p>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button onClick={() => setConfirmDeleteSoc(null)} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid #2d3348', backgroundColor: 'transparent', color: '#9ca3af', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                          <button onClick={() => setConfirmDeleteSoc(null)} style={{ padding: '6px 16px', borderRadius: '6px', border: '1px solid #A5D6A7', backgroundColor: 'transparent', color: '#4A6851', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
                           <button onClick={() => handleDeleteSoc(soc.key)} disabled={isLoading}
-                            style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#dc2626', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
+                            style={{ padding: '6px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#C62828', color: 'white', fontSize: '12px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', opacity: isLoading ? 0.7 : 1 }}>
                             {isLoading ? 'Deleting...' : 'Confirm Delete'}
                           </button>
                         </div>
@@ -898,9 +898,9 @@ const SocietyReg = () => {
     const dl = new Date(d); dl.setHours(0, 0, 0, 0);
     const diff = (dl - now) / (1000 * 60 * 60 * 24);
     const fmt = dl.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    if (diff < 0) return { bg: '#991b1b', color: '#fca5a5', label: 'Overdue', text: fmt };
-    if (diff <= 2) return { bg: '#854d0e', color: '#fde047', label: 'Near Deadline', text: fmt };
-    return { bg: '#166534', color: '#86efac', label: 'On Track', text: fmt };
+    if (diff < 0) return { bg: '#FFEBEE', color: '#B71C1C', label: 'Overdue', text: fmt };
+    if (diff <= 2) return { bg: '#FFF8E1', color: '#7A4400', label: 'Near Deadline', text: fmt };
+    return { bg: '#E8F5E9', color: '#2E7D32', label: 'On Track', text: fmt };
   };
 
   const isSocOverdue = (member, socKey) => {
@@ -935,7 +935,7 @@ const SocietyReg = () => {
       const assignee = {
         name: teamMember.name,
         initials: teamMember.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
-        color: '#6366f1',
+        color: '#256B29',
       };
       const res = await authFetch(`/api/societyregs/${reg._id}`, { method: 'PUT', body: JSON.stringify({ society: societyKey, status: 'In Progress', assignee, deadline: deadline || null, startDate: startDate || null }) });
       const data = await res.json();
@@ -988,7 +988,7 @@ const SocietyReg = () => {
   };
 
   const statCardStyle = { backgroundColor: cardBg, border: cardBorder, borderRadius: '12px', padding: '20px 24px', minWidth: '140px' };
-  const cellStyle = { padding: '14px 6px', textAlign: 'center', borderBottom: '1px solid #1e2540', fontSize: '11px' };
+  const cellStyle = { padding: '14px 6px', textAlign: 'center', borderBottom: '1px solid rgba(165, 214, 167, 0.55)', fontSize: '11px' };
 
   const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'All').length;
 
@@ -1146,13 +1146,13 @@ const SocietyReg = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading registrations...</div>;
+  if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#4A6851' }}>Loading registrations...</div>;
 
   return (
     <div style={{ padding: '32px 36px', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, color: 'white' }}>Collecting Society Registrations</h1>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#1B5E20' }}>Collecting Society Registrations</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               onClick={() => { setExportMode('login'); setShowExportModal(true); }}
@@ -1164,43 +1164,43 @@ const SocietyReg = () => {
                 padding: '10px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #059669, #10b981)',
+                background: 'linear-gradient(135deg, #2E7D32, #2E7D32)',
                 color: 'white',
                 fontSize: '13px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(16,185,129,0.25)',
+                boxShadow: '0 2px 8px rgba(67, 160, 71, 0.25)',
               }}
             >
               <Download size={15} />
               Export Excel
             </button>
             <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#5B7362' }} />
               <input
                 placeholder="Search members..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ width: '240px', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+                style={{ width: '240px', padding: '10px 14px 10px 36px', background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '8px', color: '#1B5E20', fontSize: '13px', outline: 'none' }}
               />
             </div>
           </div>
         </div>
-        <p style={{ fontSize: '14px', color: '#9ca3af' }}>Manage member registrations across 12 collecting societies</p>
+        <p style={{ fontSize: '14px', color: '#4A6851' }}>Manage member registrations across 12 collecting societies</p>
       </div>
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '28px' }}>
         <div style={statCardStyle}>
-          <p style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Registered</p>
-          <p style={{ fontSize: '28px', fontWeight: 700, color: '#10b981' }}>{registeredCount}</p>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: '#5B7362', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Registered</p>
+          <p style={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32' }}>{registeredCount}</p>
         </div>
         <div style={statCardStyle}>
-          <p style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>In Progress</p>
-          <p style={{ fontSize: '28px', fontWeight: 700, color: '#f97316' }}>{inProgressCount}</p>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: '#5B7362', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>In Progress</p>
+          <p style={{ fontSize: '28px', fontWeight: 700, color: '#BF360C' }}>{inProgressCount}</p>
         </div>
         <div style={statCardStyle}>
-          <p style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Not Started</p>
-          <p style={{ fontSize: '28px', fontWeight: 700, color: '#9ca3af' }}>{notStartedCount}</p>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: '#5B7362', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Not Started</p>
+          <p style={{ fontSize: '28px', fontWeight: 700, color: '#4A6851' }}>{notStartedCount}</p>
         </div>
       </div>
 
@@ -1211,9 +1211,9 @@ const SocietyReg = () => {
             onClick={() => setShowFilters((p) => !p)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px',
-              border: activeFilterCount > 0 ? '1px solid #6366f1' : '1px solid #2d3348',
-              backgroundColor: activeFilterCount > 0 ? 'rgba(99,102,241,0.1)' : 'transparent',
-              color: activeFilterCount > 0 ? '#a5b4fc' : '#9ca3af', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              border: activeFilterCount > 0 ? '1px solid rgba(165, 214, 167, 0.75)' : '1px solid #A5D6A7',
+              backgroundColor: activeFilterCount > 0 ? 'rgba(46, 125, 50, 0.1)' : 'transparent',
+              color: activeFilterCount > 0 ? '#256B29' : '#4A6851', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             <Filter style={{ width: '14px', height: '14px' }} />
@@ -1221,7 +1221,7 @@ const SocietyReg = () => {
             <ChevronDown style={{ width: '14px', height: '14px', transform: showFilters ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
           </button>
           {activeFilterCount > 0 && (
-            <button onClick={clearAllFilters} style={{ fontSize: '12px', fontWeight: 500, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
+            <button onClick={clearAllFilters} style={{ fontSize: '12px', fontWeight: 500, color: '#B71C1C', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
               Clear all
             </button>
           )}
@@ -1231,7 +1231,7 @@ const SocietyReg = () => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', padding: '16px 18px', backgroundColor: cardBg, border: cardBorder, borderRadius: '12px' }}>
             {SOCIETIES.map((soc) => (
               <div key={soc.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '120px' }}>
-                <label style={{ fontSize: '10px', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <label style={{ fontSize: '10px', fontWeight: 700, color: '#5B7362', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   {soc.flag} {soc.key}
                 </label>
                 <select
@@ -1239,9 +1239,9 @@ const SocietyReg = () => {
                   onChange={(e) => setFilter(soc.key, e.target.value)}
                   style={{
                     padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', outline: 'none',
-                    border: filters[soc.key] ? '1px solid #6366f1' : '1px solid #2d3348',
-                    backgroundColor: filters[soc.key] ? 'rgba(99,102,241,0.08)' : '#1a1e2e',
-                    color: filters[soc.key] ? '#c7d2fe' : '#9ca3af',
+                    border: filters[soc.key] ? '1px solid rgba(165, 214, 167, 0.75)' : '1px solid #A5D6A7',
+                    backgroundColor: filters[soc.key] ? 'rgba(46, 125, 50, 0.08)' : '#FFFFFF',
+                    color: filters[soc.key] ? '#256B29' : '#4A6851',
                   }}
                 >
                   <option value="All">All</option>
@@ -1256,18 +1256,18 @@ const SocietyReg = () => {
         )}
       </div>
 
-      <div style={{ backgroundColor: '#111525', border: '1px solid #1e2540', borderRadius: '14px', flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
+      <div style={{ backgroundColor: '#E8F5E9', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '14px', flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
         {filteredMembers.length === 0 ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
-            <p style={{ fontSize: '14px', color: '#6b7280' }}>{members.length === 0 ? 'No registrations yet. Click "+ Start Registration" to begin.' : 'No members match the selected filters.'}</p>
+            <p style={{ fontSize: '14px', color: '#5B7362' }}>{members.length === 0 ? 'No registrations yet. Click "+ Start Registration" to begin.' : 'No members match the selected filters.'}</p>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #1e2540' }}>
-                <th style={{ padding: '14px 18px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#9ca3af', position: 'sticky', left: 0, backgroundColor: '#111525', zIndex: 1 }}>Member</th>
+              <tr style={{ borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
+                <th style={{ padding: '14px 18px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#4A6851', position: 'sticky', left: 0, backgroundColor: '#E8F5E9', zIndex: 1 }}>Member</th>
                 {SOCIETIES.map((soc) => (
-                  <th key={soc.key} style={{ padding: '10px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#9ca3af' }}>
+                  <th key={soc.key} style={{ padding: '10px 4px', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#4A6851' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                       <span style={{ fontSize: '16px' }}>{soc.flag}</span>
                       <span style={{ lineHeight: 1.2 }}>{soc.key}</span>
@@ -1279,10 +1279,10 @@ const SocietyReg = () => {
             <tbody>
               {pagedMembers.map((member) => (
                 <tr key={member._id || member.name} style={{ cursor: 'pointer', transition: 'background 0.15s' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#161b2e'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1B5E20'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                   onClick={() => setSelectedMember(member)}>
-                  <td style={{ padding: '14px 18px', fontSize: '14px', fontWeight: 600, color: 'white', borderBottom: '1px solid #1e2540', position: 'sticky', left: 0, backgroundColor: '#111525', zIndex: 1 }}>
+                  <td style={{ padding: '14px 18px', fontSize: '14px', fontWeight: 600, color: '#1B5E20', borderBottom: '1px solid rgba(165, 214, 167, 0.55)', position: 'sticky', left: 0, backgroundColor: '#E8F5E9', zIndex: 1 }}>
                     {member.name}
                   </td>
                   {SOCIETIES.map((soc) => {
@@ -1339,14 +1339,14 @@ const SocietyReg = () => {
       {showExportModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}
           onClick={() => setShowExportModal(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1a1e2e', border: '1px solid #2d3348', borderRadius: '14px', width: '460px', maxWidth: '92vw', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', border: '1px solid #A5D6A7', borderRadius: '14px', width: '460px', maxWidth: '92vw', padding: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={{ color: '#fff', fontSize: '17px', fontWeight: 700 }}>Export to Excel</h2>
-              <button onClick={() => setShowExportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}>
+              <h2 style={{ color: '#1B5E20', fontSize: '17px', fontWeight: 700 }}>Export to Excel</h2>
+              <button onClick={() => setShowExportModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6851' }}>
                 <X size={18} />
               </button>
             </div>
-            <p style={{ color: '#9ca3af', fontSize: '12px', marginBottom: '14px' }}>
+            <p style={{ color: '#4A6851', fontSize: '12px', marginBottom: '14px' }}>
               Choose what data to export. {Object.keys(filters).length > 0 || searchQuery ? 'Active search/filters will apply.' : 'All registrations included.'}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
@@ -1363,19 +1363,19 @@ const SocietyReg = () => {
                     style={{
                       textAlign: 'left', cursor: 'pointer',
                       padding: '12px 14px', borderRadius: '9px',
-                      background: active ? 'rgba(16,185,129,0.12)' : '#141720',
-                      border: active ? '1px solid #10b981' : '1px solid #1e2540',
-                      color: '#e5e7eb',
+                      background: active ? 'rgba(67, 160, 71, 0.12)' : '#FFFFFF',
+                      border: active ? '1px solid #66BB6A' : '1px solid rgba(165, 214, 167, 0.55)',
+                      color: '#1B5E20',
                       display: 'flex', alignItems: 'flex-start', gap: '10px',
                     }}>
                     <span style={{
                       width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, marginTop: '2px',
-                      border: active ? '5px solid #10b981' : '2px solid #3a4060',
-                      background: active ? '#0b1a1a' : 'transparent',
+                      border: active ? '5px solid #66BB6A' : '2px solid #A5D6A7',
+                      background: active ? '#E8F5E9' : 'transparent',
                     }} />
                     <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#fff' }}>{opt.label}</span>
-                      <span style={{ display: 'block', fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{opt.hint}</span>
+                      <span style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#1B5E20' }}>{opt.label}</span>
+                      <span style={{ display: 'block', fontSize: '11px', color: '#4A6851', marginTop: '2px' }}>{opt.hint}</span>
                     </span>
                   </button>
                 );
@@ -1383,11 +1383,11 @@ const SocietyReg = () => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button onClick={() => setShowExportModal(false)}
-                style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #2d3348', background: 'transparent', color: '#cbd5e1', fontSize: '13px', cursor: 'pointer' }}>
+                style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #A5D6A7', background: 'transparent', color: '#2F4A36', fontSize: '13px', cursor: 'pointer' }}>
                 Cancel
               </button>
               <button onClick={() => { handleExportExcel(exportMode); setShowExportModal(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #059669, #10b981)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #2E7D32, #2E7D32)', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                 <Download size={14} /> Download
               </button>
             </div>

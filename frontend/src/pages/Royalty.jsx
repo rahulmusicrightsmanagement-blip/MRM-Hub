@@ -11,8 +11,8 @@ import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import Pagination from '../components/Pagination';
 
-const CONTRACT_COLORS = { Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' };
-const FALLBACK_AVATAR_COLORS = ['#8b5cf6', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#6366f1', '#14b8a6'];
+const CONTRACT_COLORS = { Royalty: '#2E7D32', Retainer: '#0D47A1', 'Work-Based': '#7A4400', Inhouse: '#256B29' };
+const FALLBACK_AVATAR_COLORS = ['#1B5E20', '#2E7D32', '#7A4400', '#AD1457', '#0D47A1', '#BF360C', '#256B29', '#004D40'];
 const normalizeLookupId = (value) => String(value?._id || value || '');
 const setUniqueLookup = (map, key, value, identity = value) => {
   if (!key || !value) return;
@@ -36,11 +36,11 @@ const getInitials = (name) => String(name || '').trim().split(/\s+/).map((w) => 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const inputStyle = {
-  width: '100%', padding: '10px 14px', background: '#1a1f2e', border: '1px solid #2a3050',
-  borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+  width: '100%', padding: '10px 14px', background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)',
+  borderRadius: '8px', color: '#1B5E20', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
 };
 const labelStyle = {
-  fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase',
+  fontSize: '11px', fontWeight: 600, color: '#4A6851', textTransform: 'uppercase',
   letterSpacing: '0.05em', marginBottom: '6px', display: 'block',
 };
 
@@ -165,29 +165,29 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
   };
 
   return (
-    <div style={{ borderBottom: '1px solid #1e2540' }}>
+    <div style={{ borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
           display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
           cursor: 'pointer', transition: 'background 0.15s',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = '#161b2e'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#1B5E20'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
-        {expanded ? <ChevronDown size={14} color="#8892b0" /> : <ChevronRight size={14} color="#8892b0" />}
-        <span style={{ color: '#fff', fontSize: '13px', fontWeight: 600, width: '40px' }}>{month}</span>
+        {expanded ? <ChevronDown size={14} color="#4A6851" /> : <ChevronRight size={14} color="#4A6851" />}
+        <span style={{ color: '#1B5E20', fontSize: '13px', fontWeight: 600, width: '40px' }}>{month}</span>
         {/* Upload badge */}
         {data?.fileName && (
           <span style={{
             fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '6px',
-            background: '#166534', color: '#86efac',
+            background: '#E8F5E9', color: '#2E7D32',
           }}>
             Uploaded
           </span>
         )}
         {hasAnySavedData && (
-          <span style={{ fontSize: '11px', color: '#8892b0', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '11px', color: '#4A6851', marginLeft: 'auto' }}>
             Songs: {data?.totalSongs || 0} | BGM: {data?.totalBGMMovies || 0} | TVBGM: {data?.totalTVBGM || 0} | Ep: {data?.totalTVBGMEpisode || 0}
           </span>
         )}
@@ -202,9 +202,9 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
               {/* Choose file button — only in edit mode */}
               {editing && (
                 <label style={{
-                  padding: '8px 16px', background: '#2a3050', borderRadius: '8px', color: '#8892b0',
+                  padding: '8px 16px', background: '#F1F6F1', borderRadius: '8px', color: '#4A6851',
                   fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-                  border: '1px solid #3a4070', transition: 'all 0.15s',
+                  border: '1px solid #A5D6A7', transition: 'all 0.15s',
                 }}>
                   <FileText size={14} /> Choose File
                   <input type="file" style={{ display: 'none' }} onChange={handleFileSelect} />
@@ -215,8 +215,8 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
               {stagedFile && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{
-                    fontSize: '12px', color: '#f59e0b', background: 'rgba(245,158,11,0.1)',
-                    padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.3)',
+                    fontSize: '12px', color: '#7A4400', background: 'rgba(249, 168, 37, 0.1)',
+                    padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(249, 168, 37, 0.3)',
                   }}>
                     {stagedFile.name} ({(stagedFile.size / 1024).toFixed(1)} KB)
                   </span>
@@ -224,8 +224,8 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
                     onClick={handleUploadToDrive}
                     disabled={uploading}
                     style={{
-                      padding: '8px 16px', background: uploading ? '#1a3a5c' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                      border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                      padding: '8px 16px', background: uploading ? '#E3F2FD' : 'linear-gradient(135deg, #1565C0, #1d4ed8)',
+                      border: 'none', borderRadius: '8px', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
                       cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
                       opacity: uploading ? 0.7 : 1,
                     }}
@@ -235,7 +235,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
                   {!uploading && (
                     <button
                       onClick={() => setStagedFile(null)}
-                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                      style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', padding: '4px' }}
                     >
                       <X size={14} />
                     </button>
@@ -246,7 +246,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
               {/* Already uploaded file */}
               {!stagedFile && data?.fileName && (
                 <>
-                  <span style={{ fontSize: '12px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontSize: '12px', color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Check size={12} /> {data.fileName}
                   </span>
                   <a
@@ -255,9 +255,9 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                      padding: '5px 12px', background: '#1a3a5c', borderRadius: '6px', fontSize: '11px',
-                      fontWeight: 600, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                      border: '1px solid #2563eb',
+                      padding: '5px 12px', background: '#E3F2FD', borderRadius: '6px', fontSize: '11px',
+                      fontWeight: 600, color: '#0D47A1', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                      border: '1px solid #BBDEFB',
                     }}
                   >
                     <FileText size={12} /> View in Drive
@@ -266,7 +266,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
               )}
 
               {!stagedFile && !data?.fileName && !editing && (
-                <span style={{ fontSize: '12px', color: '#6b7280' }}>No file uploaded</span>
+                <span style={{ fontSize: '12px', color: '#5B7362' }}>No file uploaded</span>
               )}
             </div>
           </div>
@@ -317,8 +317,8 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
               <button
                 onClick={() => { if (blockGuestAction()) return; setEditing(true); }}
                 style={{
-                  padding: '8px 20px', background: '#2a3050', border: '1px solid #3a4060', borderRadius: '8px',
-                  color: '#60a5fa', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  padding: '8px 20px', background: '#F1F6F1', border: '1px solid #A5D6A7', borderRadius: '8px',
+                  color: '#0D47A1', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '6px',
                 }}
               >
@@ -329,8 +329,8 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
                 <button
                   onClick={() => { setEditing(false); setStagedFile(null); setForm({ totalSongs: data?.totalSongs || '', totalBGMMovies: data?.totalBGMMovies || '', totalTVBGM: data?.totalTVBGM || '', totalTVBGMEpisode: data?.totalTVBGMEpisode || '' }); }}
                   style={{
-                    padding: '8px 20px', background: 'transparent', border: '1px solid #3a4060', borderRadius: '8px',
-                    color: '#8892b0', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                    padding: '8px 20px', background: 'transparent', border: '1px solid #A5D6A7', borderRadius: '8px',
+                    color: '#4A6851', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: '6px',
                   }}
                 >
@@ -340,7 +340,7 @@ const MonthRow = ({ clientId, year, month, data, authFetch, token, onUpdate, add
                   onClick={async () => { await handleSave(); setEditing(false); }}
                   disabled={saving}
                   style={{
-                    padding: '8px 20px', background: '#22c55e', border: 'none', borderRadius: '8px',
+                    padding: '8px 20px', background: '#2E7D32', border: 'none', borderRadius: '8px',
                     color: '#fff', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                     opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px',
                   }}
@@ -362,18 +362,18 @@ const YearSection = ({ clientId, yearData, authFetch, token, onUpdate, addToast 
   const months = yearData.months || {};
 
   return (
-    <div style={{ background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', overflow: 'hidden' }}>
+    <div style={{ background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '12px', overflow: 'hidden' }}>
       <div
         onClick={() => setExpanded(!expanded)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 18px', cursor: 'pointer', background: '#1a1f2e',
+          padding: '14px 18px', cursor: 'pointer', background: '#FFFFFF',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {expanded ? <ChevronDown size={16} color="#60a5fa" /> : <ChevronRight size={16} color="#60a5fa" />}
-          <Calendar size={16} color="#60a5fa" />
-          <span style={{ color: '#fff', fontSize: '16px', fontWeight: 700 }}>{yearData.year}</span>
+          {expanded ? <ChevronDown size={16} color="#0D47A1" /> : <ChevronRight size={16} color="#0D47A1" />}
+          <Calendar size={16} color="#0D47A1" />
+          <span style={{ color: '#1B5E20', fontSize: '16px', fontWeight: 700 }}>{yearData.year}</span>
         </div>
       </div>
 
@@ -488,38 +488,38 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#1e2235', borderRadius: '16px', width: '800px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '800px', maxHeight: '90vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#1f2d1f', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <DollarSign size={22} color="#22c55e" />
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DollarSign size={22} color="#2E7D32" />
             </div>
             <div>
-              <h2 style={{ color: '#fff', fontSize: '20px', fontWeight: 700, margin: 0 }}>{client.clientName}</h2>
-              {client.clientEmail && <p style={{ color: '#8892b0', fontSize: '13px', margin: '2px 0 0' }}>{client.clientEmail}</p>}
+              <h2 style={{ color: '#1B5E20', fontSize: '20px', fontWeight: 700, margin: 0 }}>{client.clientName}</h2>
+              {client.clientEmail && <p style={{ color: '#4A6851', fontSize: '13px', margin: '2px 0 0' }}>{client.clientEmail}</p>}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6851' }}><X size={20} /></button>
         </div>
 
         {/* Documents Received Yes/No */}
         <div style={{
-          padding: '14px 18px', background: '#161b2e', borderRadius: '10px', marginBottom: '20px',
+          padding: '14px 18px', background: '#FFFFFF', borderRadius: '10px', marginBottom: '20px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <FileText size={16} color="#8892b0" />
-              <span style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>Documents Received from Client</span>
+              <FileText size={16} color="#4A6851" />
+              <span style={{ color: '#1B5E20', fontSize: '14px', fontWeight: 600 }}>Documents Received from Client</span>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={() => setDocumentsReceived(true)}
                 style={{
                   padding: '6px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  border: client.documentsReceived ? '2px solid #22c55e' : '1px solid #3a4060',
-                  background: client.documentsReceived ? 'rgba(34,197,94,0.15)' : 'transparent',
-                  color: client.documentsReceived ? '#22c55e' : '#8892b0',
+                  border: client.documentsReceived ? '2px solid #66BB6A' : '1px solid #A5D6A7',
+                  background: client.documentsReceived ? 'rgba(67, 160, 71, 0.15)' : 'transparent',
+                  color: client.documentsReceived ? '#2E7D32' : '#4A6851',
                 }}
               >
                 Yes
@@ -528,9 +528,9 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                 onClick={() => setDocumentsReceived(false)}
                 style={{
                   padding: '6px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  border: !client.documentsReceived ? '2px solid #ef4444' : '1px solid #3a4060',
-                  background: !client.documentsReceived ? 'rgba(239,68,68,0.15)' : 'transparent',
-                  color: !client.documentsReceived ? '#ef4444' : '#8892b0',
+                  border: !client.documentsReceived ? '2px solid #FFCDD2' : '1px solid #A5D6A7',
+                  background: !client.documentsReceived ? 'rgba(229, 57, 53, 0.15)' : 'transparent',
+                  color: !client.documentsReceived ? '#B71C1C' : '#4A6851',
                 }}
               >
                 No
@@ -540,14 +540,14 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
 
           {/* Show upload to GDrive when documentsReceived is Yes */}
           {client.documentsReceived && (
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid #2a3050' }}>
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
               <label style={labelStyle}>Upload Document to Drive</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 {/* Choose file button */}
                 <label style={{
-                  padding: '8px 16px', background: '#2a3050', borderRadius: '8px', color: '#8892b0',
+                  padding: '8px 16px', background: '#F1F6F1', borderRadius: '8px', color: '#4A6851',
                   fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-                  border: '1px solid #3a4070', transition: 'all 0.15s',
+                  border: '1px solid #A5D6A7', transition: 'all 0.15s',
                 }}>
                   <FileText size={14} /> Choose File
                   <input type="file" style={{ display: 'none' }} onChange={handleDocFileSelect} />
@@ -557,8 +557,8 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                 {stagedDocFile && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
-                      fontSize: '12px', color: '#f59e0b', background: 'rgba(245,158,11,0.1)',
-                      padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.3)',
+                      fontSize: '12px', color: '#7A4400', background: 'rgba(249, 168, 37, 0.1)',
+                      padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(249, 168, 37, 0.3)',
                     }}>
                       {stagedDocFile.name} ({(stagedDocFile.size / 1024).toFixed(1)} KB)
                     </span>
@@ -566,8 +566,8 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                       onClick={handleDocUploadToDrive}
                       disabled={docUploading}
                       style={{
-                        padding: '8px 16px', background: docUploading ? '#1a3a5c' : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                        border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                        padding: '8px 16px', background: docUploading ? '#E3F2FD' : 'linear-gradient(135deg, #1565C0, #1d4ed8)',
+                        border: 'none', borderRadius: '8px', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
                         cursor: docUploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
                         opacity: docUploading ? 0.7 : 1,
                       }}
@@ -577,7 +577,7 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                     {!docUploading && (
                       <button
                         onClick={() => setStagedDocFile(null)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                        style={{ background: 'none', border: 'none', color: '#B71C1C', cursor: 'pointer', padding: '4px' }}
                       >
                         <X size={14} />
                       </button>
@@ -588,7 +588,7 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                 {/* Already uploaded file */}
                 {!stagedDocFile && client.documentFileName && (
                   <>
-                    <span style={{ fontSize: '12px', color: '#22c55e', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#2E7D32', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Check size={12} /> {client.documentFileName}
                     </span>
                     <a
@@ -597,9 +597,9 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       style={{
-                        padding: '5px 12px', background: '#1a3a5c', borderRadius: '6px', fontSize: '11px',
-                        fontWeight: 600, color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
-                        border: '1px solid #2563eb',
+                        padding: '5px 12px', background: '#E3F2FD', borderRadius: '6px', fontSize: '11px',
+                        fontWeight: 600, color: '#0D47A1', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                        border: '1px solid #BBDEFB',
                       }}
                     >
                       <FileText size={12} /> View in Drive
@@ -616,12 +616,12 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
           <button
             onClick={() => handleAddYear(minYear - 1)}
             style={{
-              padding: '6px 18px', background: 'transparent', border: '1px dashed #3a4060', borderRadius: '8px',
-              color: '#8892b0', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              padding: '6px 18px', background: 'transparent', border: '1px dashed #A5D6A7', borderRadius: '8px',
+              color: '#4A6851', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#60a5fa'; e.currentTarget.style.color = '#60a5fa'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#3a4060'; e.currentTarget.style.color = '#8892b0'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0D47A1'; e.currentTarget.style.color = '#0D47A1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#4A6851'; e.currentTarget.style.color = '#4A6851'; }}
           >
             <Plus size={14} /> Add {minYear - 1}
           </button>
@@ -647,12 +647,12 @@ const ClientDetailModal = ({ client, onClose, onUpdate, authFetch, token, addToa
           <button
             onClick={() => handleAddYear(maxYear + 1)}
             style={{
-              padding: '6px 18px', background: 'transparent', border: '1px dashed #3a4060', borderRadius: '8px',
-              color: '#8892b0', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              padding: '6px 18px', background: 'transparent', border: '1px dashed #A5D6A7', borderRadius: '8px',
+              color: '#4A6851', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.15s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#60a5fa'; e.currentTarget.style.color = '#60a5fa'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#3a4060'; e.currentTarget.style.color = '#8892b0'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0D47A1'; e.currentTarget.style.color = '#0D47A1'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#4A6851'; e.currentTarget.style.color = '#4A6851'; }}
           >
             <Plus size={14} /> Add {maxYear + 1}
           </button>
@@ -850,8 +850,8 @@ const Royalty = () => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#fff', margin: 0 }}>Music Works</h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#1B5E20', margin: 0 }}>Music Works</h1>
+          <p style={{ color: '#5B7362', fontSize: '14px', marginTop: '4px' }}>
             Manage client music works from completed onboarding
           </p>
         </div>
@@ -859,7 +859,7 @@ const Royalty = () => {
           onClick={() => { if (blockGuestAction()) return; setShowAddModal(true); }}
           style={{
             display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px',
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)', border: 'none',
+            background: 'linear-gradient(135deg, #2E7D32, #2E7D32)', border: 'none',
             borderRadius: '10px', color: '#fff', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
           }}
         >
@@ -868,12 +868,12 @@ const Royalty = () => {
       </div>
 
       {/* Contract color legend */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '16px', padding: '10px 14px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px' }}>
-        <span style={{ color: '#8892b0', fontSize: '12px', fontWeight: 600 }}>Contract Type:</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', marginBottom: '16px', padding: '10px 14px', background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '8px' }}>
+        <span style={{ color: '#4A6851', fontSize: '12px', fontWeight: 600 }}>Contract Type:</span>
         {Object.entries(CONTRACT_COLORS).map(([label, col]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: col }} />
-            <span style={{ color: '#e5e7eb', fontSize: '12px' }}>{label}</span>
+            <span style={{ color: '#1B5E20', fontSize: '12px' }}>{label}</span>
           </div>
         ))}
       </div>
@@ -881,26 +881,26 @@ const Royalty = () => {
       {/* Search + Contract Filter */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
         <div style={{ position: 'relative', flex: '0 1 360px', minWidth: '240px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#5B7362' }} />
           <input
             placeholder="Search clients by name or email..."
             value={search} onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#141720', border: '1px solid #1e2540', borderRadius: '8px', color: '#fff', fontSize: '14px', outline: 'none' }}
+            style={{ width: '100%', padding: '10px 14px 10px 36px', background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '8px', color: '#1B5E20', fontSize: '14px', outline: 'none' }}
           />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {['All', ...Object.keys(CONTRACT_COLORS)].map((label) => {
             const active = contractFilter === label;
-            const accent = label === 'All' ? '#6366f1' : CONTRACT_COLORS[label];
+            const accent = label === 'All' ? '#256B29' : CONTRACT_COLORS[label];
             const count = contractCounts[label] ?? 0;
             return (
               <button key={label} onClick={() => setContractFilter(label)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   padding: '8px 14px', borderRadius: '9999px',
-                  background: active ? accent : '#141720',
-                  border: `1px solid ${active ? accent : '#1e2540'}`,
-                  color: active ? '#fff' : '#e5e7eb',
+                  background: active ? accent : '#FFFFFF',
+                  border: `1px solid ${active ? accent : 'rgba(165, 214, 167, 0.55)'}`,
+                  color: active ? '#fff' : '#1B5E20',
                   fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}>
@@ -911,8 +911,8 @@ const Royalty = () => {
                 <span style={{
                   fontSize: '11px', fontWeight: 700,
                   padding: '1px 7px', borderRadius: '9999px',
-                  background: active ? 'rgba(255,255,255,0.22)' : '#1e2540',
-                  color: active ? '#fff' : '#9ca3af',
+                  background: active ? 'rgba(27, 94, 32, 0.132)' : '#F1F6F1',
+                  color: active ? '#fff' : '#4A6851',
                 }}>{count}</span>
               </button>
             );
@@ -922,7 +922,7 @@ const Royalty = () => {
 
       {/* Client Grid */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#5B7362' }}>
           <DollarSign size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
           <p style={{ fontSize: '16px', fontWeight: 600 }}>{clients.length === 0 ? 'No clients yet' : 'No clients match your filters'}</p>
           <p style={{ fontSize: '13px' }}>{clients.length === 0 ? 'Add clients from completed onboarding' : 'Try changing the search or contract filter'}</p>
@@ -940,30 +940,30 @@ const Royalty = () => {
                 key={client._id}
                 onClick={() => setSelectedClient(client)}
                 style={{
-                  background: '#161b2e', border: '1px solid #1e2540', borderRadius: '12px',
+                  background: '#FFFFFF', border: '1px solid rgba(165, 214, 167, 0.55)', borderRadius: '12px',
                   padding: '20px', cursor: 'pointer', transition: 'all 0.2s', position: 'relative',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3a4060'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#1e2540'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#4A6851'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#5B7362'; }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                   <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                     {initials}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3 style={{ color: '#fff', fontSize: '15px', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientName}</h3>
-                    {client.clientEmail && <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientEmail}</p>}
+                    <h3 style={{ color: '#1B5E20', fontSize: '15px', fontWeight: 600, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientName}</h3>
+                    {client.clientEmail && <p style={{ color: '#5B7362', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.clientEmail}</p>}
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); if (blockGuestAction()) return; if (confirm('Delete this client?')) handleDeleteClient(client._id); }}
-                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', padding: '4px' }}
+                    style={{ background: 'none', border: 'none', color: '#5B7362', cursor: 'pointer', padding: '4px' }}
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#8892b0', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: '#4A6851', flexWrap: 'wrap' }}>
                   {contract && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(255,255,255,0.04)', color: CONTRACT_COLORS[contract], fontWeight: 600 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '9999px', background: 'rgba(27, 94, 32, 0.024)', color: CONTRACT_COLORS[contract], fontWeight: 600 }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: CONTRACT_COLORS[contract] }} />
                       {contract}
                     </span>
@@ -973,9 +973,9 @@ const Royalty = () => {
                   </span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <FileText size={12} /> Docs: {client.documentsReceived ? (
-                      <span style={{ color: '#22c55e', fontWeight: 600 }}>Yes</span>
+                      <span style={{ color: '#2E7D32', fontWeight: 600 }}>Yes</span>
                     ) : (
-                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>No</span>
+                      <span style={{ color: '#7A4400', fontWeight: 600 }}>No</span>
                     )}
                   </span>
                 </div>
@@ -999,14 +999,14 @@ const Royalty = () => {
       {/* Add Client Modal — pick from completed onboarding */}
       {showAddModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-          <div style={{ background: '#1e2235', borderRadius: '16px', width: '480px', maxHeight: '80vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ background: '#FFFFFF', borderRadius: '16px', width: '480px', maxHeight: '80vh', overflow: 'auto', padding: '28px' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ color: '#fff', fontSize: '18px', fontWeight: 700 }}>Add Client from Onboarding</h2>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8892b0' }}><X size={20} /></button>
+              <h2 style={{ color: '#1B5E20', fontSize: '18px', fontWeight: 700 }}>Add Client from Onboarding</h2>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4A6851' }}><X size={20} /></button>
             </div>
 
             {completedOnboarding.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b7280' }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#5B7362' }}>
                 <Users size={36} style={{ marginBottom: '12px', opacity: 0.3 }} />
                 <p style={{ fontSize: '14px' }}>No completed onboarding entries available</p>
                 <p style={{ fontSize: '12px' }}>Clients appear here once their onboarding stage is "Completed"</p>
@@ -1018,18 +1018,18 @@ const Royalty = () => {
                     key={entry._id}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '12px 16px', background: '#161b2e', borderRadius: '10px',
-                      border: '1px solid #1e2540',
+                      padding: '12px 16px', background: '#FFFFFF', borderRadius: '10px',
+                      border: '1px solid rgba(165, 214, 167, 0.55)',
                     }}
                   >
                     <div>
-                      <p style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{entry.name}</p>
-                      <p style={{ color: '#6b7280', fontSize: '12px' }}>{entry.email}</p>
+                      <p style={{ color: '#1B5E20', fontSize: '14px', fontWeight: 600 }}>{entry.name}</p>
+                      <p style={{ color: '#5B7362', fontSize: '12px' }}>{entry.email}</p>
                     </div>
                     <button
                       onClick={() => handleAddClient(entry)}
                       style={{
-                        padding: '6px 16px', background: '#22c55e', border: 'none', borderRadius: '8px',
+                        padding: '6px 16px', background: '#2E7D32', border: 'none', borderRadius: '8px',
                         color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: '4px',
                       }}

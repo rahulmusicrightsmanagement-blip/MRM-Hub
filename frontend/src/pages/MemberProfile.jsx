@@ -1,183 +1,284 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Mail, Phone, Music, FileText, Shield, Copy, Check,
-  ExternalLink, Calendar, User, Globe, Hash, Edit3, ChevronDown, ChevronUp, RefreshCw, Trash2,
+  Mail, Phone, FileText, Shield, ExternalLink, Calendar, User, Globe,
+  RefreshCw, Trash2, IdCard, Music, TrendingUp, UserPlus, CheckCircle2,
+  AlertTriangle, X, Landmark, ListChecks, Sparkles, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { useDataCache } from '../context/DataCacheContext';
+import { usePicklist } from '../context/PicklistContext';
+import { useCachedFetch, useDataCache } from '../context/DataCacheContext';
+import { useUrlState } from '../hooks/useUrlState';
+import { journeyStages } from '../components/onboardingStyles';
+import { T, TONES, LABEL } from '../theme';
+import {
+  PageHeader, Button, Card, Pill, Banner, Segmented, EmptyState, Avatar,
+  ContactRow, Field, FieldGrid, SubHead, ListPanel, ListRow, Collapsible,
+  ProgressBar, Ring, MicroFacts, PageBody, Input, Summary,
+} from '../components/studio';
 
-/* ─── Helpers ─── */
+/* Imported records carry junk dates, so this never renders "Invalid Date". */
 const fmtDate = (d) => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (!d) return '';
+  const t = new Date(d);
+  return Number.isNaN(t.getTime())
+    ? ''
+    : t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-/* ─── Status / KYC badges ─── */
-const statusColors = {
-  Active: { bg: '#065f46', text: '#34d399' },
-  Onboarding: { bg: '#713f12', text: '#fbbf24' },
-  Inactive: { bg: '#374151', text: '#9ca3af' },
+const STATUS_TONES = { Active: 'green', Onboarding: 'amber', Inactive: 'grey' };
+const KYC_TONES = { Verified: 'green', Pending: 'amber', Rejected: 'red' };
+const STAGE_TONES = {
+  'New Enquiry': 'blue', 'Meeting Set': 'amber', 'Qualified Lead': 'green', 'Not Qualified': 'red',
+  'Document Submission': 'blue', 'KYC Verification': 'amber', 'Contract Signing': 'purple',
+  'Active Member': 'green', 'Contact Made': 'teal', Completed: 'green',
 };
-const kycColors = {
-  Verified: { bg: '#065f46', text: '#34d399' },
-  Pending: { bg: '#7f1d1d', text: '#f87171' },
-  Rejected: { bg: '#7f1d1d', text: '#f87171' },
-};
-const Badge = ({ label, colorMap, fallbackBg = '#374151', fallbackText = '#9ca3af' }) => {
-  const c = (colorMap || {})[label] || { bg: fallbackBg, text: fallbackText };
-  return (
-    <span style={{ background: c.bg, color: c.text, padding: '3px 10px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {label}
-    </span>
-  );
+const REG_TONES = {
+  Registered: 'green', 'In Progress': 'amber', Overdue: 'red', 'Not Started': 'grey', 'N/A': 'grey',
 };
 
-/* ─── Reusable "Link" button — opens a document URL in a new tab ─── */
-const DocLinkBtn = ({ url, title = 'Open document', compact = false }) => {
+const VIEW_DEFAULTS = { tab: 'overview' };
+
+const roleText = (r) => {
+  const list = Array.isArray(r) ? r : (r ? [r] : []);
+  return list.filter(Boolean).join(', ');
+};
+
+/* ─── A file that lives on Drive ─── */
+const DocLink = ({ url, name, label = 'Open' }) => {
   if (!url) return null;
-  const base = {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: compact ? '2px 8px' : '4px 10px',
-    borderRadius: '6px',
-    background: 'rgba(59,130,246,0.12)',
-    border: '1px solid #1e3a5f',
-    color: '#60a5fa',
-    fontSize: compact ? '10px' : '11px',
-    fontWeight: 600,
-    textDecoration: 'none',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  };
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      title={title}
-      style={base}
+      title={name ? `Open ${name}` : label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0,
+        padding: '3px 9px', borderRadius: '7px', textDecoration: 'none',
+        background: TONES.blue.bg, border: `1px solid ${TONES.blue.bd}`,
+        color: TONES.blue.fg, fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap',
+      }}
     >
-      <ExternalLink size={compact ? 10 : 12} /> Link
+      <ExternalLink style={{ width: '11px', height: '11px' }} /> File
     </a>
   );
 };
 
-const SourceRecordLink = ({ label, onClick }) => (
+/* ─── "Go to the record this came from" ─── */
+/* The label used to read "Open Onboarding Modal". Those modals were replaced by
+   real pages a while back, so it named a thing that no longer exists — and it
+   routed through the notification deeplink rather than straight to the record.
+   Sales and Onboarding have their own routes now; Society and Music Works do
+   not, so those two still deeplink. */
+const RecordLink = ({ label, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '5px',
-      padding: '6px 10px',
-      borderRadius: '7px',
-      border: '1px solid #1e3a5f',
-      background: 'rgba(59,130,246,0.12)',
-      color: '#60a5fa',
-      fontSize: '11px',
-      fontWeight: 700,
-      cursor: 'pointer',
-      whiteSpace: 'nowrap',
-    }}
     title={label}
+    style={{
+      display: 'inline-flex', alignItems: 'center', gap: '6px',
+      padding: '6px 11px', borderRadius: '8px', whiteSpace: 'nowrap',
+      border: `1px solid ${T.border}`, background: T.surface,
+      color: T.body, fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+    }}
   >
-    <ExternalLink size={12} /> {label}
+    <ExternalLink style={{ width: '12px', height: '12px' }} /> {label}
   </button>
 );
 
-const stageColors = {
-  'New Enquiry': { bg: '#1e3a5f', text: '#60a5fa' },
-  'Meeting Set': { bg: '#713f12', text: '#fbbf24' },
-  'Qualified Lead': { bg: '#065f46', text: '#34d399' },
-  'Not Qualified': { bg: '#7f1d1d', text: '#f87171' },
-  'Document Submission': { bg: '#1e3a5f', text: '#60a5fa' },
-  'KYC Verification': { bg: '#713f12', text: '#fbbf24' },
-  'Contract Signing': { bg: '#4c1d95', text: '#c4b5fd' },
-  'Active Member': { bg: '#065f46', text: '#34d399' },
-  'Contact Made': { bg: '#374151', text: '#9ca3af' },
-  Completed: { bg: '#065f46', text: '#34d399' },
-  'Under Review': { bg: '#713f12', text: '#fbbf24' },
+/**
+ * What has actually been done on an onboarding entry.
+ *
+ * This used to read `entry.checklist`, which the model itself labels "legacy
+ * (backward compat)" — nothing in the app has written it for a long time, so
+ * every member showed five empty circles no matter how far along they were.
+ * A record marked *Completed*, with every document ticked Received and the
+ * contract signed, still reported nothing done. It is computed from the same
+ * fields the Onboarding page writes, so the two pages can never disagree.
+ */
+const progressOf = (entry, stages) => {
+  const docs = Array.isArray(entry.documents) ? entry.documents : [];
+  const here = stages.indexOf(entry.stage);
+  const reached = (stage) => here >= 0 && here >= stages.indexOf(stage);
+  return [
+    { label: 'Documents requested', done: docs.length > 0 && docs.every((d) => d.requested) },
+    { label: 'Documents received', done: docs.length > 0 && docs.every((d) => d.received) },
+    { label: 'Contract signed', done: !!(entry.contractSent && entry.contractReceived) },
+    { label: 'Reviewed', done: reached('Active Member') },
+    { label: 'Client set up', done: !!(entry.addedToWhatsApp && entry.emailCreated) },
+  ];
 };
 
-const regStatusColors = {
-  Registered: { bg: '#065f46', text: '#34d399' },
-  'In Progress': { bg: '#713f12', text: '#fbbf24' },
-  Overdue: { bg: '#7f1d1d', text: '#f87171' },
-  'Not Started': { bg: '#374151', text: '#9ca3af' },
-  'N/A': { bg: '#1f2937', text: '#6b7280' },
+/** One derived tick, said in words. */
+const Tick = ({ done, children }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    fontSize: '12.5px', fontWeight: 600,
+    color: done ? TONES.green.fg : T.faint,
+  }}>
+    <span style={{
+      width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      background: done ? TONES.green.fg : 'transparent',
+      border: done ? 'none' : `1.5px solid ${T.borderHi}`,
+      color: T.surface, fontSize: '9px', fontWeight: 900, lineHeight: 1,
+    }}>
+      {done ? '✓' : ''}
+    </span>
+    {children}
+  </span>
+);
+
+const DerivedChecklist = ({ entry, stages }) => {
+  const items = progressOf(entry, stages);
+  const done = items.filter((i) => i.done).length;
+  return (
+    <div>
+      <SubHead icon={ListChecks}>Progress · {done} of {items.length}</SubHead>
+      <div style={{ marginBottom: '12px' }}>
+        <ProgressBar value={done} total={items.length} tone={done === items.length ? 'green' : 'indigo'} />
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px' }}>
+        {items.map((i) => <Tick key={i.label} done={i.done}>{i.label}</Tick>)}
+      </div>
+    </div>
+  );
 };
 
-/* ─── Reusable card styles ─── */
-const card = { background: '#141720', border: '1px solid #1e2540', borderRadius: '12px', padding: '20px' };
-const sectionTitle = { color: '#fff', fontSize: '16px', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' };
-const infoBox = { background: '#161b2e', borderRadius: '10px', padding: '14px 16px' };
-const infoLabel = { fontSize: '11px', fontWeight: 600, color: '#8892b0', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' };
-const infoVal = { color: '#fff', fontSize: '14px', fontWeight: 500 };
-const emptyState = { color: '#6b7280', fontSize: '13px', textAlign: 'center', padding: '32px 0' };
+/* ─── Sync name, as a dialog rather than a browser prompt ─── */
+const SyncNameDialog = ({ name, busy, onClose, onConfirm }) => {
+  const [previousName, setPreviousName] = useState('');
 
-const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'sales', label: 'Sales Pipeline' },
-  { key: 'onboarding', label: 'Onboarding' },
-  { key: 'society', label: 'Society Reg.' },
-  { key: 'royalty', label: 'Royalty' },
-];
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
 
-/* ────────────── MAIN COMPONENT ────────────── */
+  return (
+    <div
+      onClick={() => !busy && onClose()}
+      role="presentation"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(27, 94, 32, 0.28)',
+        backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 60, padding: '24px',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Sync ${name} across the app`}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: T.surface, borderRadius: '16px', width: '100%', maxWidth: '460px',
+          border: `1px solid ${T.border}`, boxShadow: '0 24px 60px rgba(27, 94, 32, 0.18)', padding: '24px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+          <span style={{
+            width: '38px', height: '38px', borderRadius: '11px', flexShrink: 0,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            background: TONES.indigo.bg, border: `1px solid ${TONES.indigo.bd}`, color: TONES.indigo.fg,
+          }}>
+            <RefreshCw style={{ width: '17px', height: '17px' }} />
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: T.heading }}>Sync this name everywhere</h3>
+            <p style={{ fontSize: '12.5px', color: T.faint, marginTop: '2px' }}>
+              Sales Pipeline, Onboarding, Society Reg., Music Works and Client Tasks.
+            </p>
+          </div>
+        </div>
+        <p style={{ fontSize: '13px', color: T.muted, lineHeight: 1.5, margin: '4px 0 16px' }}>
+          Records that still name <strong style={{ color: T.body }}>{name}</strong> will be left alone —
+          they already match. Fill the box below only if some records still carry an <em>older</em> name.
+        </p>
+        <Input
+          label="Previous name (optional)"
+          placeholder="e.g. Rahul Jadhav"
+          hint="Leave blank to sync on the current name only."
+          value={previousName}
+          onChange={(e) => setPreviousName(e.target.value)}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button icon={RefreshCw} onClick={() => onConfirm(previousName.trim())} disabled={busy}>
+            {busy ? 'Syncing...' : 'Sync name'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   MAIN PROFILE PAGE
+   ═══════════════════════════════════════════ */
 const MemberProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { authFetch, isGuest } = useAuth();
   const { addToast } = useToast();
-  const { invalidate } = useDataCache();
+  const { getOptions } = usePicklist();
+  const { setCached, invalidate } = useDataCache();
 
-  const [loading, setLoading] = useState(true);
-  const [member, setMember] = useState(null);
-  const [leads, setLeads] = useState([]);
-  const [onboarding, setOnboarding] = useState([]);
-  const [societyRegs, setSocietyRegs] = useState([]);
-  const [royalties, setRoyalties] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [copiedField, setCopiedField] = useState('');
+  /* Every other page loads through the shared cache; this one had its own
+     effect-into-local-state, so the whole profile was refetched on every visit
+     and nothing outside the component could see or refresh it. */
+  const cacheKey = `members:profile:${id}`;
+  const profileQ = useCachedFetch(cacheKey, async () => {
+    const res = await authFetch(`/api/members/${id}/profile`);
+    if (!res.ok) throw new Error('Failed to load');
+    return res.json();
+  });
+
+  const profile = profileQ.data || {};
+  const loading = profileQ.loading && !profileQ.data;
+  const member = profile.member || null;
+  const leads = useMemo(() => profile.leads || [], [profile.leads]);
+  const onboarding = useMemo(() => profile.onboarding || [], [profile.onboarding]);
+  const societyRegs = useMemo(() => profile.societyRegs || [], [profile.societyRegs]);
+  const royalties = useMemo(() => profile.royalties || [], [profile.royalties]);
+  /* Which tab is open is view state, so it lives in the query string — the
+     Society Reg. tab of a member is now a link you can send somebody. */
+  const [view, setView] = useUrlState(VIEW_DEFAULTS);
+  const activeTab = view.tab;
+  const setActiveTab = (tab) => setView({ tab });
   const [syncing, setSyncing] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const [confirmRoyalty, setConfirmRoyalty] = useState(null);
 
-  const blockGuestAction = () => {
+  const STAGES = useMemo(() => journeyStages(getOptions('onboarding_stage')), [getOptions]);
+
+  const blockGuestAction = useCallback(() => {
     if (!isGuest) return false;
     addToast('Guest users have view-only access', 'error');
     return true;
-  };
+  }, [isGuest, addToast]);
 
-  const handleSyncName = async () => {
+  const handleSyncName = async (previousName) => {
     if (blockGuestAction()) return;
-    const previousName = window.prompt(
-      `Sync "${member?.name}" across Sales, Onboarding, Society Reg, Music Works, and Client Tasks.\n\nOptional: enter the PREVIOUS name if records still show an older value (e.g. "Rahul Jadhav"). Leave blank to sync using current name only.`,
-      '',
-    );
-    if (previousName === null) return;
     setSyncing(true);
     try {
       const res = await authFetch(`/api/members/${id}/sync-name`, {
-        method: 'POST',
-        body: JSON.stringify({ previousName: previousName.trim() }),
+        method: 'POST', body: JSON.stringify({ previousName }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Sync failed');
       const s = data.synced || {};
       const total = (s.leads || 0) + (s.onboarding || 0) + (s.societyRegs || 0) + (s.royalties || 0) + (s.clientMessages || 0);
-      const breakdown = `Sales:${s.leads || 0} · Onboarding:${s.onboarding || 0} · Society Reg:${s.societyRegs || 0} · Music Works:${s.royalties || 0} · Tasks:${s.clientMessages || 0}`;
-      addToast(total > 0 ? `Synced ${total} record${total === 1 ? '' : 's'} — ${breakdown}` : `No records matched — ${breakdown}`, total > 0 ? 'success' : 'info');
+      const breakdown = `Sales ${s.leads || 0} · Onboarding ${s.onboarding || 0} · Society ${s.societyRegs || 0} · Music Works ${s.royalties || 0} · Tasks ${s.clientMessages || 0}`;
+      addToast(total > 0 ? `Synced ${total} record${total === 1 ? '' : 's'} — ${breakdown}` : `Nothing needed changing — ${breakdown}`, total > 0 ? 'success' : 'info');
       if (total > 0) {
         const refreshed = await authFetch(`/api/members/${id}/profile`);
-        const fresh = await refreshed.json();
-        setMember(fresh.member);
-        setLeads(fresh.leads || []);
-        setOnboarding(fresh.onboarding || []);
-        setSocietyRegs(fresh.societyRegs || []);
-        setRoyalties(fresh.royalties || []);
+        setCached(cacheKey, await refreshed.json());
+        ['leads:list', 'onboarding:list', 'societyregs:list', 'royalty:list', 'members:list'].forEach(invalidate);
       }
+      setShowSync(false);
     } catch (err) {
       console.error(err);
       addToast('Failed to sync name', 'error');
@@ -186,47 +287,16 @@ const MemberProfile = () => {
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await authFetch(`/api/members/${id}/profile`);
-        if (!res.ok) throw new Error('Failed to load');
-        const data = await res.json();
-        setMember(data.member);
-        setLeads(data.leads || []);
-        setOnboarding(data.onboarding || []);
-        setSocietyRegs(data.societyRegs || []);
-        setRoyalties(data.royalties || []);
-      } catch (err) {
-        console.error(err);
-        addToast('Failed to load member profile', 'error');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id, authFetch, addToast]);
-
-  const copyToClipboard = (text, field) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(''), 1500);
-  };
-
-  const openSourceRecord = (path, type, recordId) => {
-    if (!recordId) return;
-    navigate(`${path}?notifType=${type}&notifId=${recordId}`);
-  };
-
-  const handleDeleteRoyalty = async (royaltyId, royaltyName) => {
+  const handleDeleteRoyalty = async (royaltyId) => {
     if (blockGuestAction()) return;
-    if (!royaltyId || !window.confirm(`Delete Music Works entry for ${royaltyName || 'this client'}?`)) return;
+    setConfirmRoyalty(null);
     try {
       const res = await authFetch(`/api/royalty/${royaltyId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Failed to delete');
       }
-      setRoyalties((prev) => prev.filter((r) => r._id !== royaltyId));
+      setCached(cacheKey, { ...profile, royalties: royalties.filter((r) => r._id !== royaltyId) });
       invalidate('royalty:list');
       addToast('Music Works entry deleted');
     } catch (err) {
@@ -235,42 +305,66 @@ const MemberProfile = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Loading profile...</div>;
-  if (!member) return <div style={{ padding: '60px', textAlign: 'center', color: '#8892b0' }}>Member not found.</div>;
-
-  /* ─── Counts for tabs ─── */
-  const counts = {
-    sales: leads.length,
-    onboarding: onboarding.length,
-    society: societyRegs.length,
-    royalty: royalties.length,
+  const deeplink = (path, type, recordId) => {
+    if (!recordId) return;
+    navigate(`${path}?notifType=${type}&notifId=${recordId}`);
   };
 
-  /* ─────── RENDERERS ─────── */
-  /* ─── Helpers for overview aggregation ─── */
+  if (loading) {
+    return <div style={{ padding: '60px', textAlign: 'center', color: T.muted }}>Loading profile...</div>;
+  }
+
+  if (!member) {
+    return (
+      <div style={{ padding: '26px 30px', maxWidth: '1560px', margin: '0 auto' }}>
+        <PageHeader
+          breadcrumb={[{ label: 'Dashboard', to: '/' }, { label: 'Members', to: '/members' }, { label: 'Not found' }]}
+          title="Member not found"
+        />
+        <Card>
+          <EmptyState icon={X} title="This member is no longer available">
+            It may have been deleted.{' '}
+            <button
+              type="button"
+              onClick={() => navigate('/members')}
+              style={{ background: 'none', border: 'none', color: T.accent, fontSize: '13.5px', fontWeight: 600, cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+            >
+              Back to Members
+            </button>
+          </EmptyState>
+        </Card>
+      </div>
+    );
+  }
+
+  const ob = onboarding[0] || null;
+  const counts = { sales: leads.length, onboarding: onboarding.length, society: societyRegs.length, royalty: royalties.length };
+  const TABS = [
+    { value: 'overview', label: 'Overview' },
+    { value: 'sales', label: 'Sales Pipeline', count: counts.sales },
+    { value: 'onboarding', label: 'Onboarding', count: counts.onboarding },
+    { value: 'society', label: 'Society Reg.', count: counts.society },
+    { value: 'royalty', label: 'Music Works', count: counts.royalty },
+  ];
+
+  /* Every person who owns a piece of this member's journey, gathered from the
+     four record types that each carry their own assignee. */
   const allSpocs = (() => {
-    const spocs = [];
-    if (member.spoc) spocs.push({ page: 'Member', name: member.spoc });
-    leads.forEach((l) => { if (l.spoc) spocs.push({ page: 'Sales Pipeline', name: l.spoc }); });
-    onboarding.forEach((o) => { if (o.spoc) spocs.push({ page: 'Onboarding', name: o.spoc }); });
+    const out = [];
+    if (member.spoc) out.push({ page: 'Member', name: member.spoc });
+    leads.forEach((l) => { if (l.spoc) out.push({ page: 'Sales Pipeline', name: l.spoc }); });
+    onboarding.forEach((o) => { if (o.spoc) out.push({ page: 'Onboarding', name: o.spoc }); });
     societyRegs.forEach((reg) => {
-      if (reg.societies) {
-        const entries = reg.societies instanceof Map ? Object.fromEntries(reg.societies) : reg.societies;
-        Object.entries(entries).forEach(([soc, data]) => {
-          if (data && data.assignee && data.assignee.name) spocs.push({ page: `Society Reg — ${soc}`, name: data.assignee.name });
-        });
-      }
-      // Also check top-level assignees map
-      if (reg.assignees) {
-        const assigneeEntries = reg.assignees instanceof Map ? Object.fromEntries(reg.assignees) : reg.assignees;
-        Object.entries(assigneeEntries).forEach(([soc, asg]) => {
-          if (asg && asg.name) spocs.push({ page: `Society Reg — ${soc}`, name: asg.name });
-        });
-      }
+      const asMap = (v) => (v instanceof Map ? Object.fromEntries(v) : v || {});
+      Object.entries(asMap(reg.societies)).forEach(([soc, data]) => {
+        if (data && data.assignee && data.assignee.name) out.push({ page: `Society — ${soc}`, name: data.assignee.name });
+      });
+      Object.entries(asMap(reg.assignees)).forEach(([soc, asg]) => {
+        if (asg && asg.name) out.push({ page: `Society — ${soc}`, name: asg.name });
+      });
     });
-    // Deduplicate by name+page
     const seen = new Set();
-    return spocs.filter((s) => {
+    return out.filter((s) => {
       const key = `${s.name}::${s.page}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -281,778 +375,686 @@ const MemberProfile = () => {
   const allSocietyEntries = (() => {
     const result = [];
     societyRegs.forEach((reg) => {
-      if (reg.societies) {
-        const entries = reg.societies instanceof Map ? Object.fromEntries(reg.societies) : reg.societies;
-        Object.entries(entries).forEach(([soc, data]) => {
-          result.push({ society: soc, data });
-        });
-      }
+      const entries = reg.societies instanceof Map ? Object.fromEntries(reg.societies) : (reg.societies || {});
+      Object.entries(entries).forEach(([society, data]) => result.push({ society, data }));
     });
     return result;
   })();
 
+  /* ── Where this member stands, in one sentence ── */
+  const journey = (() => {
+    if (member.status === 'Inactive') return { tone: 'grey', icon: User, text: 'This member is inactive.' };
+    if (ob && ob.stage === 'Completed') return { tone: 'green', icon: CheckCircle2, text: 'Onboarding is complete. This member is fully set up.' };
+    if (ob) {
+      const i = STAGES.indexOf(ob.stage);
+      return {
+        tone: 'amber', icon: UserPlus,
+        text: i >= 0
+          ? `Onboarding is under way — step ${i + 1} of ${STAGES.length}, ${ob.stage}.`
+          : `Onboarding is at the “${ob.stage}” stage.`,
+      };
+    }
+    if (leads.length > 0) return { tone: 'blue', icon: TrendingUp, text: 'Still in the Sales Pipeline — no onboarding has started.' };
+    return { tone: 'grey', icon: User, text: 'No pipeline or onboarding record is attached to this member yet.' };
+  })();
+
+  /* ═════ OVERVIEW ═════ */
   const renderOverview = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Basic Info */}
-      <div style={card}>
-        <div style={sectionTitle}><User size={16} /> Basic Information</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
-          <div style={infoBox}><div style={infoLabel}>MRM Membership ID</div><div style={infoVal}>{member.clientNumber || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Email</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Mail size={13} color="#8892b0" />{member.email || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Phone</div><div style={{ ...infoVal, display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={13} color="#8892b0" />{member.phone || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(member.role) ? member.role.join(', ') : member.role || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Genre</div><div style={infoVal}>{member.genre || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Languages</div><div style={infoVal}>{member.languages || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Join Date</div><div style={infoVal}>{member.joinDate || '—'}</div></div>
-        </div>
+    <>
+      <Card icon={User} title="About this artist" description="What the roster record itself holds." tone="purple">
+        <FieldGrid min="200px">
+          <Field icon={IdCard} label="MRM membership ID">{member.clientNumber || 'Not set'}</Field>
+          <Field icon={Music} label="Roles">{roleText(member.role) || 'None set'}</Field>
+          <Field icon={Sparkles} label="Genre">{member.genre || 'Not set'}</Field>
+          <Field icon={Globe} label="Languages">{member.languages || 'Not set'}</Field>
+          <Field icon={Calendar} label="Joined">{member.joinDate || fmtDate(member.createdAt) || 'Unknown'}</Field>
+          <Field icon={Sparkles} label="Lead source">{member.leadSource || 'Not set'}</Field>
+        </FieldGrid>
+
         {member.bio && (
-          <div style={{ ...infoBox, marginTop: '12px' }}><div style={infoLabel}>Bio</div><div style={infoVal}>{member.bio}</div></div>
+          <>
+            <SubHead icon={FileText} style={{ marginTop: '24px' }}>Bio</SubHead>
+            <p style={{ fontSize: '13.5px', color: T.body, lineHeight: 1.6 }}>{member.bio}</p>
+          </>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
-          <div style={infoBox}><div style={infoLabel}>Referred</div><div style={{ ...infoVal, color: member.isReferred ? '#34d399' : '#9ca3af' }}>{member.isReferred ? 'Yes' : 'No'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Referred By</div><div style={infoVal}>{member.referredBy || '—'}</div></div>
-          <div style={infoBox}><div style={infoLabel}>Referral Commission</div><div style={infoVal}>{member.referralCommission || '—'}</div></div>
+
+        {member.isReferred && (
+          <>
+            <SubHead icon={User} style={{ marginTop: '24px' }}>Referral</SubHead>
+            <MicroFacts items={[
+              { label: 'Referred by', value: member.referredBy || 'Not recorded' },
+              { label: 'Commission', value: member.referralCommission || 'Not recorded' },
+            ]} />
+          </>
+        )}
+      </Card>
+
+      <Card icon={Shield} title="KYC" description="Identity documents, pulled together from the member record and the onboarding entry." tone="teal">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <Pill tone={KYC_TONES[member.kycStatus] || 'grey'} dot>KYC {member.kycStatus || 'unknown'}</Pill>
+          {ob && <Pill tone={STAGE_TONES[ob.stage] || 'grey'} dot>{ob.stage}</Pill>}
         </div>
 
-        {/* Renewal Details & Notes from Onboarding */}
-        {onboarding.length > 0 && (onboarding[0].renewalType || onboarding[0].renewalRemarks || onboarding[0].contractStartDate || onboarding[0].contractRenewalDate || onboarding[0].notes || onboarding[0].contractFileUrl) && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', marginTop: '12px' }}>
-            {onboarding[0].contractType && <div style={infoBox}><div style={infoLabel}>Contract Type</div><div style={infoVal}>{onboarding[0].contractType}</div></div>}
-            {onboarding[0].contractStartDate && <div style={infoBox}><div style={infoLabel}>Contract Start</div><div style={infoVal}>{fmtDate(onboarding[0].contractStartDate)}</div></div>}
-            {onboarding[0].contractRenewalDate && <div style={infoBox}><div style={infoLabel}>Contract Renewal</div><div style={infoVal}>{fmtDate(onboarding[0].contractRenewalDate)}</div></div>}
-            {onboarding[0].renewalType && <div style={infoBox}><div style={infoLabel}>Renewal Type</div><div style={{ ...infoVal, color: '#c4b5fd' }}>{onboarding[0].renewalType}</div></div>}
-            {onboarding[0].renewalRemarks && <div style={infoBox}><div style={infoLabel}>Renewal Remarks</div><div style={infoVal}>{onboarding[0].renewalRemarks}</div></div>}
-            {onboarding[0].notes && <div style={infoBox}><div style={infoLabel}>Notes</div><div style={infoVal}>{onboarding[0].notes}</div></div>}
-            {onboarding[0].contractFileUrl && (
-              <div style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={infoLabel}>Contract File</div>
-                  <div style={{ ...infoVal, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{onboarding[0].contractFileName || 'Contract'}</div>
-                </div>
-                <DocLinkBtn url={onboarding[0].contractFileUrl} title={`Open ${onboarding[0].contractFileName || 'Contract'}`} />
-              </div>
-            )}
+        {(() => {
+          const obDocs = ob && Array.isArray(ob.documents) ? ob.documents : [];
+          const panDoc = obDocs.find((d) => d.docType === 'pan');
+          const aadhaarDoc = obDocs.find((d) => d.docType === 'aadhaar');
+          const others = obDocs.filter((d) => d.docType !== 'pan' && d.docType !== 'aadhaar');
+          const rows = [
+            { key: 'pan', label: 'PAN', value: member.panCard || panDoc?.docNumber || '', doc: panDoc, fallbackDone: member.panVerified },
+            { key: 'aadhaar', label: 'Aadhaar', value: member.aadhaar || aadhaarDoc?.docNumber || '', doc: aadhaarDoc, fallbackDone: member.aadhaarVerified },
+            ...others.map((d) => ({ key: d._id || d.label, label: d.label, value: d.docNumber || '', doc: d })),
+          ];
+          return (
+            <ListPanel>
+              {rows.map((r) => {
+                const received = r.doc ? r.doc.received : r.fallbackDone;
+                const requested = r.doc ? r.doc.requested : false;
+                return (
+                  <ListRow
+                    key={r.key}
+                    icon={FileText}
+                    tone={received ? 'green' : requested ? 'amber' : 'grey'}
+                    title={r.label}
+                    subtitle={r.value || 'No number recorded'}
+                    muted={!received}
+                    right={(
+                      <>
+                        <DocLink url={r.doc?.fileUrl} name={r.doc?.fileName} />
+                        <Pill tone={received ? 'green' : requested ? 'amber' : 'grey'} dot>
+                          {received ? 'Received' : requested ? 'Asked for' : 'Not started'}
+                        </Pill>
+                      </>
+                    )}
+                  />
+                );
+              })}
+            </ListPanel>
+          );
+        })()}
+
+        {ob && (
+          <div style={{ marginTop: '22px' }}>
+            <DerivedChecklist entry={ob} stages={STAGES} />
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* SPOC Summary */}
       {allSpocs.length > 0 && (
-        <div style={card}>
-          <div style={sectionTitle}><User size={16} /> Assigned SPOCs</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
-            {allSpocs.map((s, i) => (
-              <div key={i} style={{ ...infoBox, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                  {s.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                </div>
-                <div>
-                  <div style={infoVal}>{s.name}</div>
-                  <div style={{ fontSize: '11px', color: '#8892b0' }}>{s.page}</div>
+        <Card icon={User} title="Who looks after this member" description="Every record that names an owner." tone="indigo">
+          <FieldGrid min="220px">
+            {allSpocs.map((s) => (
+              <div key={`${s.name}-${s.page}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <Avatar name={s.name} size={32} tone="auto" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13.5px', fontWeight: 600, color: T.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                  <div style={{ ...LABEL, fontSize: '9.5px' }}>{s.page}</div>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
+          </FieldGrid>
+        </Card>
       )}
 
-      {/* Society Registration Overview */}
       {allSocietyEntries.length > 0 && (
-        <div style={card}>
-          <div style={sectionTitle}><Globe size={16} /> Society Registrations Overview</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+        <Card icon={Landmark} title="Society registrations at a glance" description="One line per society; the full detail is on the Society Reg. tab." tone="amber">
+          <ListPanel>
             {allSocietyEntries.map(({ society, data }) => {
               const steps = data.steps || {};
-              const stepEntries = [
+              const done = [
                 steps.territoryWithdrawal, steps.nocReceived, steps.applicationFiled,
                 steps.paymentDone, steps.applicationSigned, steps.applicationSentToSociety,
                 steps.membershipConfirmation, steps.loginDetails, steps.thirdPartyAuthorization, steps.bankMandateUpdate,
-              ];
-              const completedSteps = stepEntries.filter((v) => v === 'Yes').length;
-              const isOverdue = data.status === 'In Progress' && data.deadline && new Date(data.deadline) < new Date(new Date().toDateString());
-              const displayStatus = isOverdue ? 'Overdue' : (data.status || 'N/A');
-              const deadlineStr = data.deadline ? new Date(data.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
+              ].filter((v) => v === 'Yes').length;
+              const overdue = data.status === 'In Progress' && data.deadline && new Date(data.deadline) < new Date(new Date().toDateString());
+              const status = overdue ? 'Overdue' : (data.status || 'N/A');
               return (
-                <div key={society} style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', border: isOverdue ? '1px solid rgba(239,68,68,0.3)' : '1px solid transparent' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{society}</div>
-                    <Badge label={displayStatus} colorMap={regStatusColors} />
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#8892b0', marginBottom: '6px' }}>{completedSteps}/10 steps</div>
-                  <div style={{ height: '3px', background: '#1e2540', borderRadius: '3px', marginBottom: '8px' }}>
-                    <div style={{ height: '100%', width: `${(completedSteps / 10) * 100}%`, background: isOverdue ? '#ef4444' : '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
-                  </div>
-                  {deadlineStr && (
-                    <div style={{ fontSize: '11px', color: isOverdue ? '#f87171' : '#8892b0', marginBottom: '4px' }}>
-                      📅 {deadlineStr}{isOverdue ? ' — Overdue' : ''}
-                    </div>
-                  )}
-                  {(steps.caeNumber || steps.commissionRate) && (
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                      {steps.caeNumber && (
-                        <div style={{ fontSize: '11px' }}>
-                          <span style={{ color: '#8892b0' }}>CAE: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.caeNumber}</span>
-                        </div>
-                      )}
-                      {steps.commissionRate && (
-                        <div style={{ fontSize: '11px' }}>
-                          <span style={{ color: '#8892b0' }}>Commission: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.commissionRate}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ListRow
+                  key={society}
+                  icon={Landmark}
+                  tone={REG_TONES[status] || 'grey'}
+                  title={society}
+                  subtitle={`${done} of 10 steps${data.deadline ? ` · due ${fmtDate(data.deadline)}` : ''}`}
+                  right={<Pill tone={REG_TONES[status] || 'grey'} dot>{status}</Pill>}
+                >
+                  <ProgressBar value={done} total={10} tone={overdue ? 'red' : done === 10 ? 'green' : 'indigo'} />
+                </ListRow>
               );
             })}
-          </div>
-        </div>
+          </ListPanel>
+        </Card>
       )}
 
-      {/* KYC & Onboarding Status */}
-      <div style={card}>
-        <div style={sectionTitle}><Shield size={16} /> KYC Information</div>
-
-        {/* KYC Status + Onboarding Stage */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#8892b0', fontSize: '13px', fontWeight: 600 }}>KYC Status:</span>
-            <Badge label={member.kycStatus} colorMap={kycColors} />
+      {member.subTasks && member.subTasks.length > 0 && (
+        <Card
+          icon={ClipboardList}
+          title="Sub-tasks"
+          description={`${member.subTasks.filter((t) => t.done).length} of ${member.subTasks.length} done.`}
+          tone="indigo"
+        >
+          <div style={{ marginBottom: '12px' }}>
+            <ProgressBar
+              value={member.subTasks.filter((t) => t.done).length}
+              total={member.subTasks.length}
+              tone={member.subTasks.every((t) => t.done) ? 'green' : 'indigo'}
+            />
           </div>
-          {onboarding.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ color: '#8892b0', fontSize: '13px', fontWeight: 600 }}>Onboarding Stage:</span>
-              <Badge label={onboarding[0].stage} colorMap={stageColors} />
-            </div>
-          )}
-        </div>
+          <ListPanel>
+            {member.subTasks.map((task, i) => (
+              <ListRow
+                key={task._id || i}
+                icon={task.done ? CheckCircle2 : ClipboardList}
+                tone={task.done ? 'green' : 'grey'}
+                title={task.text}
+                muted={task.done}
+                right={task.assignee ? <Pill tone="indigo">{task.assignee}</Pill> : null}
+              />
+            ))}
+          </ListPanel>
+        </Card>
+      )}
+    </>
+  );
 
-        {/* Onboarding Stage Progress */}
-        {onboarding.length > 0 && (() => {
-          const OB_STAGES = ['Document Submission', 'KYC Verification', 'Contract Signing', 'Active Member', 'Contact Made', 'Completed'];
-          const currentIdx = OB_STAGES.indexOf(onboarding[0].stage);
-          return (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-                {OB_STAGES.map((s, i) => (
-                  <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ width: '100%', height: '4px', borderRadius: '2px', background: i <= currentIdx ? '#6366f1' : '#1e2540' }} />
-                    <span style={{ fontSize: '9px', color: i <= currentIdx ? '#c4b5fd' : '#4b5563', textAlign: 'center', lineHeight: 1.2 }}>{s}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+  /* ═════ SALES PIPELINE ═════ */
+  const renderSales = () => (
+    leads.length === 0 ? (
+      <Card><EmptyState icon={TrendingUp} title="No pipeline record">This member has never been a lead.</EmptyState></Card>
+    ) : leads.map((lead) => (
+      <Card
+        key={lead._id}
+        icon={TrendingUp}
+        tone="blue"
+        title={lead.name || 'Unnamed lead'}
+        description={lead.email || 'No email on the lead'}
+        actions={(
+          <>
+            <Pill tone={STAGE_TONES[lead.stage] || 'grey'} dot>{lead.stage}</Pill>
+            <RecordLink label="Open in Sales Pipeline" onClick={() => navigate(`/sales-pipeline/${lead._id}`)} />
+          </>
+        )}
+      >
+        <FieldGrid min="180px">
+          <Field label="Source">{lead.source || 'Not set'}</Field>
+          <Field label="Priority"><span style={{ textTransform: 'capitalize' }}>{lead.priority || 'medium'}</span></Field>
+          <Field label="Phone">{lead.phone || 'Not recorded'}</Field>
+          <Field label="Owner">{lead.spoc || 'Nobody yet'}</Field>
+          <Field label="Created">{fmtDate(lead.createdAt) || 'Unknown'}</Field>
+        </FieldGrid>
 
-        {/* Documents from Onboarding */}
-        {(() => {
-          // Merge PAN/Aadhaar from onboarding documents with member-level data
-          const obDocs = onboarding.length > 0 && onboarding[0].documents ? onboarding[0].documents : [];
-          const panDoc = obDocs.find(d => d.docType === 'pan');
-          const aadhaarDoc = obDocs.find(d => d.docType === 'aadhaar');
-          const otherDocs = obDocs.filter(d => d.docType !== 'pan' && d.docType !== 'aadhaar');
-          const panValue = member.panCard || (panDoc && panDoc.docNumber) || '';
-          const aadhaarValue = member.aadhaar || (aadhaarDoc && aadhaarDoc.docNumber) || '';
-          const panReceived = panDoc ? panDoc.received : member.panVerified;
-          const aadhaarReceived = aadhaarDoc ? aadhaarDoc.received : member.aadhaarVerified;
+        {lead.stage === 'New Enquiry' && (
+          <>
+            <SubHead icon={Phone} style={{ marginTop: '24px' }}>First call</SubHead>
+            <MicroFacts items={[{ label: 'Call done', value: lead.callDone ? 'Yes' : 'Not yet', tone: lead.callDone ? 'green' : 'grey' }]} />
+            {lead.inquiryNotes && <p style={{ fontSize: '13px', color: T.muted, marginTop: '10px', lineHeight: 1.55 }}>{lead.inquiryNotes}</p>}
+          </>
+        )}
 
-          return (
+        {lead.stage === 'Meeting Set' && (
+          <>
+            <SubHead icon={Calendar} style={{ marginTop: '24px' }}>Meeting</SubHead>
+            <MicroFacts items={[
+              { label: 'Date', value: lead.meetingDate || 'Not set' },
+              { label: 'With', value: lead.meetingAssignedWith || 'Not set' },
+            ]} />
+            {lead.meetingLink && (
+              <a href={lead.meetingLink} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '10px', fontSize: '13px', color: TONES.blue.fg }}>
+                {lead.meetingLink}
+              </a>
+            )}
+            {lead.meetingNotes && <p style={{ fontSize: '13px', color: T.muted, marginTop: '10px', lineHeight: 1.55 }}>{lead.meetingNotes}</p>}
+          </>
+        )}
+
+        {lead.stage === 'Qualified Lead' && (
+          <>
+            <SubHead icon={CheckCircle2} style={{ marginTop: '24px' }}>Qualification</SubHead>
+            <MicroFacts items={[
+              { label: 'Enquiry verified', value: lead.inquiryVerified ? 'Yes' : 'Not yet', tone: lead.inquiryVerified ? 'green' : 'grey' },
+              { label: 'Meeting verified', value: lead.meetingVerified ? 'Yes' : 'Not yet', tone: lead.meetingVerified ? 'green' : 'grey' },
+            ]} />
+          </>
+        )}
+
+        {lead.movedToOnboarding && (
+          <div style={{ marginTop: '16px' }}>
+            {/* this strip used to be white text on a near-white tint — a
+                leftover from the dark theme, and completely unreadable */}
+            <Banner tone="green" icon={CheckCircle2}>
+              Handed over to onboarding{lead.onboardedAt ? ` on ${fmtDate(lead.onboardedAt)}` : ''}
+              {lead.onboardingSpoc ? `, owned by ${lead.onboardingSpoc}` : ''}.
+            </Banner>
+          </div>
+        )}
+
+        {lead.notes && (
+          <>
+            <SubHead icon={FileText} style={{ marginTop: '24px' }}>Notes</SubHead>
+            <p style={{ fontSize: '13px', color: T.muted, lineHeight: 1.55 }}>{lead.notes}</p>
+          </>
+        )}
+      </Card>
+    ))
+  );
+
+  /* ═════ ONBOARDING ═════ */
+  const renderOnboarding = () => (
+    onboarding.length === 0 ? (
+      <Card><EmptyState icon={UserPlus} title="No onboarding record">This member has not been handed over from the pipeline.</EmptyState></Card>
+    ) : onboarding.map((entry) => {
+      const docs = Array.isArray(entry.documents) ? entry.documents : [];
+      const received = docs.filter((d) => d.received).length;
+      return (
+        <Card
+          key={entry._id}
+          icon={UserPlus}
+          tone={entry.stage === 'Completed' ? 'green' : 'amber'}
+          title={entry.name || member.name}
+          description={[entry.email, entry.contractType].filter(Boolean).join('  ·  ') || 'No contract type set'}
+          actions={(
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px', marginBottom: otherDocs.length > 0 ? '12px' : '0' }}>
-                {[
-                  { label: 'PAN Card', value: panValue, verified: panReceived, requested: panDoc?.requested, fileUrl: panDoc?.fileUrl, fileName: panDoc?.fileName, key: 'pan' },
-                  { label: 'Aadhaar', value: aadhaarValue, verified: aadhaarReceived, requested: aadhaarDoc?.requested, fileUrl: aadhaarDoc?.fileUrl, fileName: aadhaarDoc?.fileName, key: 'aadhaar' },
-                ].map(({ label, value, verified, requested, fileUrl, fileName, key }) => (
-                  <div key={key} style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={infoLabel}>{label}</div>
-                      <div style={{ ...infoVal, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{value || '—'}</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {verified ? (
-                        <Badge label="Received" colorMap={{ Received: { bg: '#065f46', text: '#34d399' } }} />
-                      ) : requested ? (
-                        <Badge label="Requested" colorMap={{ Requested: { bg: '#713f12', text: '#fbbf24' } }} />
-                      ) : (
-                        <Badge label="Pending" colorMap={{ Pending: { bg: '#7f1d1d', text: '#f87171' } }} />
-                      )}
-                      <DocLinkBtn url={fileUrl} title={fileName ? `Open ${fileName}` : `Open ${label}`} />
-                      {value && (
-                        <button onClick={() => copyToClipboard(value, key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedField === key ? '#22c55e' : '#8892b0', padding: '4px' }}>
-                          {copiedField === key ? <Check size={14} /> : <Copy size={14} />}
-                        </button>
-                      )}
-                    </div>
-                  </div>
+              <Pill tone={STAGE_TONES[entry.stage] || 'grey'} dot>{entry.stage}</Pill>
+              <RecordLink label="Open in Onboarding" onClick={() => navigate(`/onboarding/${entry._id}`)} />
+            </>
+          )}
+        >
+          <Summary
+            left={<Ring value={received} total={docs.length} tone={docs.length && received === docs.length ? 'green' : 'amber'} caption="in hand" />}
+            headline={<DerivedChecklist entry={entry} stages={STAGES} />}
+          />
+
+          <FieldGrid min="180px">
+            <Field label="Roles">{roleText(entry.role) || 'None set'}</Field>
+            <Field label="Phone">{entry.phone || 'Not recorded'}</Field>
+            <Field label="Owner">{entry.spoc || 'Nobody yet'}</Field>
+            <Field label="Priority"><span style={{ textTransform: 'capitalize' }}>{entry.priority || 'medium'}</span></Field>
+            <Field label="Created">{fmtDate(entry.createdAt) || 'Unknown'}</Field>
+          </FieldGrid>
+
+          {docs.length > 0 && (
+            <>
+              <SubHead icon={FileText} style={{ marginTop: '24px' }}>Documents</SubHead>
+              <ListPanel>
+                {docs.map((doc, i) => (
+                  <ListRow
+                    key={doc._id || i}
+                    icon={FileText}
+                    tone={doc.received ? 'green' : doc.requested ? 'amber' : 'grey'}
+                    title={doc.label}
+                    subtitle={doc.docNumber || undefined}
+                    muted={!doc.received}
+                    right={(
+                      <>
+                        <DocLink url={doc.fileUrl} name={doc.fileName} />
+                        <Pill tone={doc.received ? 'green' : doc.requested ? 'amber' : 'grey'} dot>
+                          {doc.received ? 'Received' : doc.requested ? 'Asked for' : 'Not started'}
+                        </Pill>
+                      </>
+                    )}
+                  />
                 ))}
-              </div>
+              </ListPanel>
+            </>
+          )}
 
-              {/* Other onboarding documents */}
-              {otherDocs.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-                  {otherDocs.map((doc, i) => (
-                    <div key={i} style={{ ...infoBox, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div>
-                        <div style={infoLabel}>{doc.label}</div>
-                        <div style={{ ...infoVal, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{doc.docNumber || '—'}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {doc.received ? (
-                          <Badge label="Received" colorMap={{ Received: { bg: '#065f46', text: '#34d399' } }} />
-                        ) : doc.requested ? (
-                          <Badge label="Requested" colorMap={{ Requested: { bg: '#713f12', text: '#fbbf24' } }} />
-                        ) : (
-                          <Badge label="Pending" colorMap={{ Pending: { bg: '#7f1d1d', text: '#f87171' } }} />
-                        )}
-                        <DocLinkBtn url={doc.fileUrl} title={doc.fileName ? `Open ${doc.fileName}` : `Open ${doc.label}`} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          {(entry.contractSent || entry.contractReceived || entry.contractStartDate) && (
+            <>
+              <SubHead icon={FileText} style={{ marginTop: '24px' }}>Contract</SubHead>
+              <MicroFacts items={[
+                { label: 'Sent', value: entry.contractSent ? 'Yes' : 'Not yet', tone: entry.contractSent ? 'green' : 'grey' },
+                { label: 'Signed copy back', value: entry.contractReceived ? 'Yes' : 'Not yet', tone: entry.contractReceived ? 'green' : 'grey' },
+                entry.contractStartDate && { label: 'Start', value: fmtDate(entry.contractStartDate) },
+                entry.contractRenewalDate && { label: 'Renewal', value: fmtDate(entry.contractRenewalDate) },
+                entry.renewalType && { label: 'Renewal type', value: entry.renewalType },
+              ].filter(Boolean)} />
+              {entry.renewalRemarks && (
+                <p style={{ fontSize: '13px', color: T.muted, marginTop: '10px', lineHeight: 1.55 }}>{entry.renewalRemarks}</p>
               )}
-
-              {/* Onboarding checklist */}
-              {onboarding.length > 0 && onboarding[0].checklist && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '14px', padding: '12px 16px', background: '#161b2e', borderRadius: '8px' }}>
-                  {[
-                    { key: 'docs_submitted', label: 'Docs Submitted' },
-                    { key: 'kyc_verified', label: 'KYC Verified' },
-                    { key: 'contract_signed', label: 'Contract Signed' },
-                    { key: 'review_complete', label: 'Review Complete' },
-                    { key: 'member_activated', label: 'Member Activated' },
-                  ].map(({ key, label }) => (
-                    <span key={key} style={{ color: onboarding[0].checklist[key] ? '#34d399' : '#6b7280', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                      {onboarding[0].checklist[key] ? <Check size={12} /> : '○'} {label}
-                    </span>
-                  ))}
+              {entry.contractFileUrl && (
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '13px', color: T.body }}>{entry.contractFileName || 'Contract'}</span>
+                  <DocLink url={entry.contractFileUrl} name={entry.contractFileName} />
                 </div>
               )}
             </>
-          );
-        })()}
+          )}
+
+          {entry.selectedSocieties && entry.selectedSocieties.length > 0 && (
+            <>
+              <SubHead icon={Landmark} style={{ marginTop: '24px' }}>Societies registered</SubHead>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {entry.selectedSocieties.map((s) => <Pill key={s} tone="indigo">{s}</Pill>)}
+              </div>
+            </>
+          )}
+
+          {(entry.addedToWhatsApp || entry.emailCreated || entry.clientNumber) && (
+            <>
+              <SubHead icon={Mail} style={{ marginTop: '24px' }}>Set-up</SubHead>
+              <MicroFacts items={[
+                { label: 'WhatsApp group', value: entry.addedToWhatsApp ? (entry.whatsAppGroupName || 'Added') : 'Not added', tone: entry.addedToWhatsApp ? 'green' : 'grey' },
+                { label: 'Work email', value: entry.emailCreated ? (entry.createdEmailAddress || 'Created') : 'Not created', tone: entry.emailCreated ? 'green' : 'grey' },
+                entry.clientNumber && { label: 'MRM ID', value: entry.clientNumber },
+              ].filter(Boolean)} />
+            </>
+          )}
+
+          {entry.notes && (
+            <>
+              <SubHead icon={FileText} style={{ marginTop: '24px' }}>Notes</SubHead>
+              <p style={{ fontSize: '13px', color: T.muted, lineHeight: 1.55 }}>{entry.notes}</p>
+            </>
+          )}
+        </Card>
+      );
+    })
+  );
+
+  /* ═════ SOCIETY REG. ═════ */
+  const renderSociety = () => (
+    societyRegs.length === 0 ? (
+      <Card><EmptyState icon={Landmark} title="No society registrations">Nothing has been filed for this member yet.</EmptyState></Card>
+    ) : societyRegs.map((reg) => {
+      const entries = reg.societies instanceof Map ? Object.fromEntries(reg.societies) : (reg.societies || {});
+      return (
+        <Card
+          key={reg._id}
+          icon={Landmark}
+          tone="amber"
+          title={reg.name || member.name}
+          description={`${Object.keys(entries).length} society registration${Object.keys(entries).length === 1 ? '' : 's'}.`}
+          actions={<RecordLink label="Open in Society Reg." onClick={() => deeplink('/society-reg', 'societyreg', reg._id)} />}
+        >
+          <ListPanel>
+            {Object.entries(entries).map(([society, data]) => (
+              <SocietyRow key={society} society={society} data={data} />
+            ))}
+          </ListPanel>
+        </Card>
+      );
+    })
+  );
+
+  /* ═════ MUSIC WORKS ═════ */
+  const renderRoyalty = () => (
+    royalties.length === 0 ? (
+      <Card><EmptyState icon={Music} title="No Music Works record">No royalty statements have been logged for this member.</EmptyState></Card>
+    ) : royalties.map((royalty) => (
+      <Card
+        key={royalty._id}
+        icon={Music}
+        tone="teal"
+        title={royalty.clientName || member.name}
+        description={royalty.clientEmail || 'No email on the record'}
+        actions={(
+          <>
+            <Pill tone={royalty.documentsReceived ? 'green' : 'grey'} dot>
+              {royalty.documentsReceived ? 'Documents received' : 'Documents pending'}
+            </Pill>
+            <RecordLink label="Open in Music Works" onClick={() => deeplink('/royalty', 'royalty', royalty._id)} />
+          </>
+        )}
+      >
+        {royalty.documentFileUrl && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '13px', color: T.body }}>{royalty.documentFileName || 'Document'}</span>
+            <DocLink url={royalty.documentFileUrl} name={royalty.documentFileName} />
+          </div>
+        )}
+
+        {royalty.years && royalty.years.length > 0 ? (
+          <ListPanel>
+            {royalty.years.map((yearData, yi) => <RoyaltyYearRow key={yi} yearData={yearData} />)}
+          </ListPanel>
+        ) : (
+          <p style={{ fontSize: '13px', color: T.faint }}>No yearly statements recorded yet.</p>
+        )}
+
+        <div style={{ borderTop: `1px solid ${T.border}`, marginTop: '16px', paddingTop: '14px' }}>
+          {confirmRoyalty === royalty._id ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <AlertTriangle style={{ width: '15px', height: '15px', color: TONES.red.fg, flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: '200px', fontSize: '12.5px', color: TONES.red.fg }}>
+                Delete this Music Works entry and every statement on it? This cannot be undone.
+              </span>
+              <Button variant="ghost" onClick={() => setConfirmRoyalty(null)} style={{ padding: '7px 13px', fontSize: '12.5px' }}>Cancel</Button>
+              <Button variant="danger" icon={Trash2} onClick={() => handleDeleteRoyalty(royalty._id)} style={{ padding: '7px 13px', fontSize: '12.5px' }}>
+                Yes, delete
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { if (!blockGuestAction()) setConfirmRoyalty(royalty._id); }}
+              title="Delete this Music Works entry"
+              className="mrm-icon-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', padding: '4px 6px' }}
+            >
+              <Trash2 style={{ width: '13px', height: '13px' }} /> Delete this Music Works entry
+            </button>
+          )}
+        </div>
+      </Card>
+    ))
+  );
+
+  return (
+    <div style={{ padding: '26px 30px 50px', maxWidth: '1560px', margin: '0 auto' }}>
+      <PageHeader
+        breadcrumb={[
+          { label: 'Dashboard', to: '/' },
+          { label: 'Members', to: '/members' },
+          { label: member.name || 'Member' },
+        ]}
+        title={member.name || 'Unnamed member'}
+        subtitle={[roleText(member.role), member.genre].filter(Boolean).join('  ·  ') || 'No roles or genre recorded'}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => navigate('/members')} title="Back to the members list">Back</Button>
+            <Button
+              icon={RefreshCw}
+              onClick={() => { if (!blockGuestAction()) setShowSync(true); }}
+              disabled={syncing}
+              title="Rewrite this member's name across every record that still carries an older one"
+            >
+              {syncing ? 'Syncing...' : 'Sync name'}
+            </Button>
+          </>
+        }
+      />
+
+      <Banner
+        tone={journey.tone}
+        icon={journey.icon}
+        action={<>
+          <Pill tone={STATUS_TONES[member.status] || 'grey'} dot>{member.status || 'Unknown'}</Pill>
+          <Pill tone={KYC_TONES[member.kycStatus] || 'grey'} dot>KYC {member.kycStatus || 'unknown'}</Pill>
+        </>}
+      >
+        {journey.text}
+      </Banner>
+
+      <div style={{ marginBottom: '16px' }}>
+        <Segmented options={TABS} value={activeTab} onChange={setActiveTab} tone="purple" />
       </div>
 
-      {/* Sub-Tasks */}
-      {member.subTasks && member.subTasks.length > 0 && (
-        <div style={card}>
-          <div style={sectionTitle}>Sub-Tasks ({member.subTasks.filter(t => t.done).length}/{member.subTasks.length})</div>
-          <div style={{ height: '4px', background: '#1e2540', borderRadius: '4px', marginBottom: '12px' }}>
-            <div style={{ height: '100%', width: `${member.subTasks.length > 0 ? (member.subTasks.filter(t => t.done).length / member.subTasks.length) * 100 : 0}%`, background: '#22c55e', borderRadius: '4px', transition: 'width 0.3s' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {member.subTasks.map((task, i) => (
-              <div key={task._id || i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: '#161b2e', borderRadius: '8px' }}>
-                <span style={{ width: '20px', height: '20px', borderRadius: '6px', border: task.done ? 'none' : '2px solid #3a4060', background: task.done ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {task.done && <Check size={12} color="#fff" />}
-                </span>
-                <span style={{ flex: 1, color: task.done ? '#6b7280' : '#fff', fontSize: '13px', textDecoration: task.done ? 'line-through' : 'none' }}>{task.text}</span>
-                {task.assignee && <span style={{ color: '#8892b0', fontSize: '11px' }}>{task.assignee}</span>}
+      <PageBody
+        rail={(
+          <Card icon={User} title="Who this is" tone="purple" bodyStyle={{ padding: '15px 17px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <Avatar name={member.name} size={42} tone="auto" />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '14.5px', fontWeight: 700, color: T.heading, lineHeight: 1.25, wordBreak: 'break-word' }}>
+                  {member.name || 'Unnamed member'}
+                </div>
+                <div style={{ fontSize: '12px', color: T.faint, marginTop: '2px' }}>
+                  {member.clientNumber ? `MRM ${member.clientNumber}` : 'No MRM ID yet'}
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+            <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: '2px' }}>
+              <ContactRow icon={Mail} label="Email" tone="blue" empty="No email" value={member.email} href={member.email ? `mailto:${member.email}` : undefined} />
+              <ContactRow icon={Phone} label="Phone" tone="teal" empty="No phone" value={member.phone} href={member.phone ? `tel:${member.phone}` : undefined} />
+              <ContactRow icon={User} label="Owner" tone="grey" empty="Nobody yet" copyable={false} value={member.spoc} />
+              <ContactRow icon={Calendar} label="Added on" tone="grey" empty="Unknown" copyable={false} value={fmtDate(member.createdAt)} />
+            </div>
+            <p style={{ fontSize: '11px', color: T.faint, marginTop: '10px', lineHeight: 1.5 }}>
+              Edit these on the Members list, so every record that names them follows.
+            </p>
+          </Card>
+        )}
+      >
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'sales' && renderSales()}
+        {activeTab === 'onboarding' && renderOnboarding()}
+        {activeTab === 'society' && renderSociety()}
+        {activeTab === 'royalty' && renderRoyalty()}
+      </PageBody>
+
+      {showSync && (
+        <SyncNameDialog
+          name={member.name}
+          busy={syncing}
+          onClose={() => setShowSync(false)}
+          onConfirm={handleSyncName}
+        />
       )}
     </div>
   );
+};
 
-  const renderSales = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {leads.length === 0 ? (
-        <div style={{ ...card, ...emptyState }}>No sales pipeline entries found for this member.</div>
-      ) : leads.map((lead) => (
-        <div key={lead._id} style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: lead.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff' }}>{lead.initials}</div>
-              <div>
-                <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{lead.name}</div>
-                <div style={{ color: '#8892b0', fontSize: '12px' }}>{lead.email}</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <SourceRecordLink label="Open Sales Modal" onClick={() => openSourceRecord('/sales-pipeline', 'lead', lead._id)} />
-              <Badge label={lead.stage} colorMap={stageColors} />
-            </div>
-          </div>
+/* ─── One society inside a registration ─── */
+const SOCIETY_STEPS = [
+  ['Territory withdrawal', 'territoryWithdrawal'],
+  ['NOC received', 'nocReceived'],
+  ['Application filed', 'applicationFiled'],
+  ['Payment done', 'paymentDone'],
+  ['Application signed', 'applicationSigned'],
+  ['Sent to society', 'applicationSentToSociety'],
+  ['Membership confirmed', 'membershipConfirmation'],
+  ['Login details', 'loginDetails'],
+  ['3rd party authorisation', 'thirdPartyAuthorization'],
+  ['Bank mandate', 'bankMandateUpdate'],
+];
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-            <div style={infoBox}><div style={infoLabel}>Source</div><div style={infoVal}>{lead.source || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>Priority</div><div style={infoVal}><span style={{ textTransform: 'capitalize' }}>{lead.priority}</span></div></div>
-            <div style={infoBox}><div style={infoLabel}>Phone</div><div style={infoVal}>{lead.phone || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>SPOC</div><div style={infoVal}>{lead.spoc || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>Created</div><div style={infoVal}>{fmtDate(lead.createdAt)}</div></div>
-          </div>
+const STEP_FILES = {
+  nocReceived: ['nocReceivedFileUrl', 'nocReceivedFileName'],
+  applicationSentToSociety: ['applicationSentFileUrl', 'applicationSentFileName'],
+  thirdPartyAuthorization: ['thirdPartyAuthFileUrl', 'thirdPartyAuthFileName'],
+  bankMandateUpdate: ['bankMandateFileUrl', 'bankMandateFileName'],
+};
 
-          {/* Stage-specific details */}
-          {lead.stage === 'New Enquiry' && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>New Enquiry Details</div>
-              <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                <span>Call Done: <strong style={{ color: lead.callDone ? '#34d399' : '#f87171' }}>{lead.callDone ? 'Yes' : 'No'}</strong></span>
-              </div>
-              {lead.inquiryNotes && <div style={{ color: '#8892b0', fontSize: '12px', marginTop: '6px' }}>Notes: {lead.inquiryNotes}</div>}
-            </div>
-          )}
+const SocietyRow = ({ society, data }) => {
+  const steps = data.steps || {};
+  const done = SOCIETY_STEPS.filter(([, key]) => steps[key] === 'Yes').length;
+  const overdue = data.status === 'In Progress' && data.deadline && new Date(data.deadline) < new Date(new Date().toDateString());
+  const status = overdue ? 'Overdue' : (data.status || 'N/A');
 
-          {lead.stage === 'Meeting Set' && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>Meeting Details</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                <span>Date: {lead.meetingDate || '—'}</span>
-                <span>With: {lead.meetingAssignedWith || '—'}</span>
-                {lead.meetingLink && <span style={{ gridColumn: '1/3' }}>Link: <a href={lead.meetingLink} target="_blank" rel="noreferrer" style={{ color: '#60a5fa' }}>{lead.meetingLink}</a></span>}
-              </div>
-              {lead.meetingNotes && <div style={{ color: '#8892b0', fontSize: '12px', marginTop: '6px' }}>Notes: {lead.meetingNotes}</div>}
-            </div>
-          )}
+  return (
+    <Collapsible
+      icon={Landmark}
+      tone={REG_TONES[status] || 'grey'}
+      title={society}
+      meta={`${done}/${SOCIETY_STEPS.length} steps`}
+      pill={<Pill tone={REG_TONES[status] || 'grey'} dot>{status}</Pill>}
+    >
+      <div style={{ marginBottom: '12px' }}>
+        <ProgressBar value={done} total={SOCIETY_STEPS.length} tone={overdue ? 'red' : done === SOCIETY_STEPS.length ? 'green' : 'indigo'} />
+      </div>
 
-          {lead.stage === 'Qualified Lead' && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>Qualification</div>
-              <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                <span>Inquiry Verified: <strong style={{ color: lead.inquiryVerified ? '#34d399' : '#f87171' }}>{lead.inquiryVerified ? 'Yes' : 'No'}</strong></span>
-                <span>Meeting Verified: <strong style={{ color: lead.meetingVerified ? '#34d399' : '#f87171' }}>{lead.meetingVerified ? 'Yes' : 'No'}</strong></span>
-              </div>
-            </div>
-          )}
-
-          {lead.movedToOnboarding && (
-            <div style={{ padding: '10px 16px', background: '#065f4620', borderRadius: '8px', border: '1px solid #065f46', fontSize: '13px', color: '#34d399' }}>
-              ✓ Moved to Onboarding {lead.onboardedAt ? `on ${fmtDate(lead.onboardedAt)}` : ''} {lead.onboardingSpoc ? `— SPOC: ${lead.onboardingSpoc}` : ''}
-            </div>
-          )}
-
-          {lead.notes && (
-            <div style={{ fontSize: '12px', color: '#8892b0', marginTop: '8px' }}>Notes: {lead.notes}</div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderOnboarding = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {onboarding.length === 0 ? (
-        <div style={{ ...card, ...emptyState }}>No onboarding entries found for this member.</div>
-      ) : onboarding.map((entry) => (
-        <div key={entry._id} style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div>
-              <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{entry.name}</div>
-              <div style={{ color: '#8892b0', fontSize: '12px' }}>{entry.email} · {entry.contractType}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <SourceRecordLink label="Open Onboarding Modal" onClick={() => openSourceRecord('/onboarding', 'onboarding', entry._id)} />
-              <Badge label={entry.stage} colorMap={stageColors} />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-            <div style={infoBox}><div style={infoLabel}>Role</div><div style={infoVal}>{Array.isArray(entry.role) ? entry.role.join(', ') : entry.role || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>Phone</div><div style={infoVal}>{entry.phone || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>SPOC</div><div style={infoVal}>{entry.spoc || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>Priority</div><div style={{ ...infoVal, textTransform: 'capitalize' }}>{entry.priority || '—'}</div></div>
-            <div style={infoBox}><div style={infoLabel}>Created</div><div style={infoVal}>{fmtDate(entry.createdAt)}</div></div>
-          </div>
-
-          {/* Documents */}
-          {entry.documents && entry.documents.length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ ...infoLabel, marginBottom: '8px' }}>Documents</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {entry.documents.map((doc, i) => (
-                  <div key={i} style={{ padding: '8px 14px', background: '#161b2e', borderRadius: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <FileText size={13} color="#8892b0" />
-                    <span style={{ color: '#fff', fontWeight: 500 }}>{doc.label}</span>
-                    <span style={{ color: doc.received ? '#34d399' : doc.requested ? '#fbbf24' : '#6b7280', fontSize: '11px' }}>
-                      {doc.received ? '✓ Received' : doc.requested ? '● Requested' : '○ Not Requested'}
-                    </span>
-                    {doc.docNumber && <span style={{ color: '#8892b0', fontSize: '11px', fontFamily: 'monospace' }}>{doc.docNumber}</span>}
-                    <DocLinkBtn url={doc.fileUrl} title={doc.fileName ? `Open ${doc.fileName}` : `Open ${doc.label}`} compact />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Contract Details */}
-          {(entry.contractSent || entry.contractReceived || entry.contractStartDate) && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>Contract</div>
-              <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                <span>Sent: <strong style={{ color: entry.contractSent ? '#34d399' : '#f87171' }}>{entry.contractSent ? 'Yes' : 'No'}</strong></span>
-                <span>Received: <strong style={{ color: entry.contractReceived ? '#34d399' : '#f87171' }}>{entry.contractReceived ? 'Yes' : 'No'}</strong></span>
-                {entry.contractStartDate && <span>Start: {fmtDate(entry.contractStartDate)}</span>}
-                {entry.contractRenewalDate && <span>Renewal: {fmtDate(entry.contractRenewalDate)}</span>}
-              </div>
-              {(entry.contractFileName || entry.contractFileUrl) && (
-                <div style={{ color: '#60a5fa', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <FileText size={12} /> {entry.contractFileName || 'Contract'}
-                  </span>
-                  <DocLinkBtn url={entry.contractFileUrl} title={`Open ${entry.contractFileName || 'Contract'}`} compact />
-                </div>
-              )}
-              {(entry.renewalType || entry.renewalRemarks) && (
-                <div style={{ display: 'flex', gap: '20px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                  {entry.renewalType && <span>Renewal Type: <strong style={{ color: '#c4b5fd' }}>{entry.renewalType}</strong></span>}
-                  {entry.renewalRemarks && <span>Remarks: <strong style={{ color: '#9ca3af' }}>{entry.renewalRemarks}</strong></span>}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Selected Societies */}
-          {entry.selectedSocieties && entry.selectedSocieties.length > 0 && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>Selected Societies</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                {entry.selectedSocieties.map((s) => (
-                  <span key={s} style={{ padding: '3px 10px', background: '#4c1d95', color: '#c4b5fd', borderRadius: '9999px', fontSize: '11px', fontWeight: 600 }}>{s}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Contact Made */}
-          {(entry.addedToWhatsApp || entry.emailCreated) && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px', marginBottom: '10px' }}>
-              <div style={infoLabel}>Contact Made</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px', fontSize: '13px', color: '#fff' }}>
-                {entry.addedToWhatsApp && <span>✓ Added to WhatsApp {entry.whatsAppGroupName ? `(${entry.whatsAppGroupName})` : ''}</span>}
-                {entry.emailCreated && <span>✓ Email Created: {entry.createdEmailAddress || '—'}</span>}
-                {entry.clientNumber && <span>MRM Membership ID: <strong>{entry.clientNumber}</strong></span>}
-              </div>
-            </div>
-          )}
-
-          {/* Checklist */}
-          {entry.checklist && (
-            <div style={{ padding: '12px 16px', background: '#161b2e', borderRadius: '8px' }}>
-              <div style={infoLabel}>Checklist</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '6px', fontSize: '12px' }}>
-                {[
-                  { key: 'docs_submitted', label: 'Docs Submitted' },
-                  { key: 'kyc_verified', label: 'KYC Verified' },
-                  { key: 'contract_signed', label: 'Contract Signed' },
-                  { key: 'review_complete', label: 'Review Complete' },
-                  { key: 'member_activated', label: 'Member Activated' },
-                ].map(({ key, label }) => (
-                  <span key={key} style={{ color: entry.checklist[key] ? '#34d399' : '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {entry.checklist[key] ? <Check size={12} /> : '○'} {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderSociety = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {societyRegs.length === 0 ? (
-        <div style={{ ...card, ...emptyState }}>No society registration entries found for this member.</div>
-      ) : societyRegs.map((reg) => (
-        <div key={reg._id} style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-            <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{reg.name}</div>
-            <SourceRecordLink label="Open Society Modal" onClick={() => openSourceRecord('/society-reg', 'societyreg', reg._id)} />
-          </div>
-
-          {/* Society grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-            {reg.societies && Object.entries(
-              reg.societies instanceof Map ? Object.fromEntries(reg.societies) : reg.societies
-            ).map(([society, data]) => (
-              <SocietyCard key={society} society={society} data={data} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderRoyalty = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {royalties.length === 0 ? (
-        <div style={{ ...card, ...emptyState }}>No royalty entries found for this member.</div>
-      ) : royalties.map((royalty) => (
-        <div key={royalty._id} style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div>
-              <div style={{ color: '#fff', fontSize: '15px', fontWeight: 600 }}>{royalty.clientName}</div>
-              <div style={{ color: '#8892b0', fontSize: '12px' }}>{royalty.clientEmail || '—'}</div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <SourceRecordLink label="Open Royalty Modal" onClick={() => openSourceRecord('/royalty', 'royalty', royalty._id)} />
-              <button
-                type="button"
-                onClick={() => handleDeleteRoyalty(royalty._id, royalty.clientName)}
-                title="Delete Music Works entry"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '7px',
-                  border: '1px solid rgba(239,68,68,0.35)',
-                  background: 'rgba(239,68,68,0.08)',
-                  color: '#f87171',
-                  cursor: 'pointer',
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: royalty.documentsReceived ? '#34d399' : '#f87171' }}>
-                <FileText size={13} /> {royalty.documentsReceived ? 'Documents Received' : 'Documents Pending'}
-              </div>
-            </div>
-          </div>
-
-          {(royalty.documentFileName || royalty.documentFileUrl) && (
-            <div style={{ fontSize: '12px', color: '#60a5fa', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <FileText size={12} /> {royalty.documentFileName || 'Document'}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {SOCIETY_STEPS.map(([label, key]) => {
+          const val = steps[key];
+          const [urlKey, nameKey] = STEP_FILES[key] || [];
+          const stepTone = val === 'Yes' ? TONES.green.fg : val === 'No' ? TONES.red.fg : T.faint;
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '5px 0', fontSize: '12.5px' }}>
+              <span style={{ color: T.muted, minWidth: 0 }}>{label}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                {urlKey && <DocLink url={steps[urlKey]} name={steps[nameKey]} />}
+                <span style={{ color: stepTone, fontWeight: 700 }}>{val || 'Not set'}</span>
               </span>
-              <DocLinkBtn url={royalty.documentFileUrl} title={`Open ${royalty.documentFileName || 'Document'}`} compact />
             </div>
-          )}
+          );
+        })}
+      </div>
 
-          {/* Year-wise data */}
-          {royalty.years && royalty.years.length > 0 && royalty.years.map((yearData, yi) => (
-            <RoyaltyYearCard key={yi} yearData={yearData} />
+      {(steps.loginId || steps.caeNumber || steps.commissionRate || (data.assignee && data.assignee.name) || data.deadline) && (
+        <div style={{ marginTop: '12px' }}>
+          <MicroFacts items={[
+            data.assignee && data.assignee.name && { label: 'Assigned to', value: data.assignee.name },
+            data.deadline && { label: 'Deadline', value: fmtDate(data.deadline), tone: overdue ? 'red' : undefined },
+            steps.loginId && { label: 'Login', value: steps.loginId },
+            steps.caeNumber && { label: 'CAE', value: steps.caeNumber },
+            steps.commissionRate && { label: 'Commission', value: steps.commissionRate },
+          ].filter(Boolean)} />
+        </div>
+      )}
+
+      {data.remarks && data.remarks.length > 0 && (
+        <div style={{ marginTop: '12px' }}>
+          <div style={{ ...LABEL, fontSize: '9.5px', marginBottom: '6px' }}>Remarks</div>
+          {data.remarks.map((r, i) => (
+            <div key={i} style={{ fontSize: '12.5px', color: T.body, padding: '3px 0', lineHeight: 1.5 }}>
+              {r.text} <span style={{ color: T.faint }}>({fmtDate(r.createdAt) || 'undated'})</span>
+            </div>
           ))}
         </div>
-      ))}
-    </div>
+      )}
+    </Collapsible>
   );
+};
+
+/* ─── One year of royalty statements ─── */
+const RoyaltyYearRow = ({ yearData }) => {
+  const months = yearData.months instanceof Map
+    ? Object.fromEntries(yearData.months)
+    : (yearData.months && typeof yearData.months === 'object' ? yearData.months : {});
+  const monthKeys = Object.keys(months);
+  const received = monthKeys.filter((m) => months[m]?.fileReceived).length;
 
   return (
-    <div style={{ padding: '28px 32px', minHeight: '100%' }}>
-      {/* Back Button */}
-      <button
-        onClick={() => navigate('/members')}
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#8892b0', cursor: 'pointer', fontSize: '13px', marginBottom: '20px', padding: 0 }}
-      >
-        <ArrowLeft size={16} /> Back to Members
-      </button>
-
-      {/* Profile Header */}
-      <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px', padding: '24px 28px' }}>
-        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: ({ Royalty: '#10b981', Retainer: '#3b82f6', 'Work-Based': '#f59e0b', Inhouse: '#a855f7' }[onboarding[0]?.contractType]) || member.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-          {member.initials}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-            <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>{member.name}</h1>
-            <Badge label={member.status} colorMap={statusColors} />
-            <Badge label={`KYC: ${member.kycStatus}`} colorMap={{ 'KYC: Verified': kycColors.Verified, 'KYC: Pending': kycColors.Pending, 'KYC: Rejected': kycColors.Rejected }} />
-            <button
-              onClick={handleSyncName}
-              disabled={syncing}
-              title="Sync this member's name across Sales, Onboarding, Society Reg, Music Works & Client Tasks"
+    <Collapsible
+      icon={Calendar}
+      tone={monthKeys.length > 0 && received === monthKeys.length ? 'green' : 'grey'}
+      title={String(yearData.year)}
+      meta={`${received}/${monthKeys.length} months in`}
+    >
+      <div style={{ marginBottom: '12px' }}>
+        <ProgressBar value={received} total={monthKeys.length} tone={received === monthKeys.length && monthKeys.length > 0 ? 'green' : 'indigo'} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px' }}>
+        {monthKeys.map((mon) => {
+          const md = months[mon] || {};
+          return (
+            <div
+              key={mon}
               style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '5px 12px', borderRadius: '9999px',
-                border: '1px solid #2d3348', background: '#141720', color: '#cbd5e1',
-                fontSize: '11px', fontWeight: 600, cursor: syncing ? 'not-allowed' : 'pointer',
-                opacity: syncing ? 0.6 : 1,
+                padding: '10px 12px', borderRadius: '10px',
+                background: md.fileReceived ? TONES.green.bg : T.bg,
+                border: `1px solid ${md.fileReceived ? TONES.green.bd : T.border}`,
               }}
             >
-              <RefreshCw size={12} style={syncing ? { animation: 'spin 1s linear infinite' } : {}} />
-              {syncing ? 'Syncing...' : 'Sync name'}
-            </button>
-          </div>
-          <div style={{ color: '#8892b0', fontSize: '14px' }}>
-            {Array.isArray(member.role) ? member.role.join(', ') : member.role} {member.genre ? `· ${member.genre}` : ''}
-          </div>
-          <div style={{ display: 'flex', gap: '20px', marginTop: '8px', fontSize: '13px', color: '#8892b0' }}>
-            {member.email && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={13} /> {member.email}</span>}
-            {member.phone && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={13} /> {member.phone}</span>}
-            {member.spoc && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={13} /> SPOC: {member.spoc}</span>}
-          </div>
-        </div>
-      </div>
-
-      {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: '4px', background: '#141720', borderRadius: '10px', padding: '4px', marginBottom: '24px', overflowX: 'auto' }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 500,
-              background: activeTab === tab.key ? '#1e2540' : 'transparent',
-              color: activeTab === tab.key ? '#fff' : '#8892b0',
-              transition: 'all 0.15s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px',
-            }}
-          >
-            {tab.label}
-            {counts[tab.key] !== undefined && (
-              <span style={{
-                background: activeTab === tab.key ? '#3b82f6' : '#2a3050',
-                color: activeTab === tab.key ? '#fff' : '#8892b0',
-                padding: '1px 7px', borderRadius: '9999px', fontSize: '11px', fontWeight: 600, minWidth: '20px', textAlign: 'center',
-              }}>
-                {counts[tab.key]}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'overview' && renderOverview()}
-      {activeTab === 'sales' && renderSales()}
-      {activeTab === 'onboarding' && renderOnboarding()}
-      {activeTab === 'society' && renderSociety()}
-      {activeTab === 'royalty' && renderRoyalty()}
-    </div>
-  );
-};
-
-/* ─── Society Card sub-component ─── */
-const SocietyCard = ({ society, data }) => {
-  const [expanded, setExpanded] = useState(false);
-  const steps = data.steps || {};
-  const stepEntries = [
-    ['Territory Withdrawal', steps.territoryWithdrawal],
-    ['NOC Received', steps.nocReceived],
-    ['Application Filed', steps.applicationFiled],
-    ['Payment Done', steps.paymentDone],
-    ['Application Signed', steps.applicationSigned],
-    ['Sent to Society', steps.applicationSentToSociety],
-    ['Membership Confirmed', steps.membershipConfirmation],
-    ['Login Details', steps.loginDetails],
-    ['3rd Party Auth', steps.thirdPartyAuthorization],
-    ['Bank Mandate', steps.bankMandateUpdate],
-  ];
-  const completedSteps = stepEntries.filter(([, v]) => v === 'Yes').length;
-
-  const stepColor = (val) => {
-    if (val === 'Yes') return '#34d399';
-    if (val === 'No') return '#f87171';
-    return '#6b7280';
-  };
-
-  return (
-    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px' }}>
-      <div onClick={() => setExpanded(!expanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
-        <div>
-          <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}>{society}</div>
-          <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{completedSteps}/{stepEntries.length} steps</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Badge label={data.status || 'N/A'} colorMap={regStatusColors} />
-          {expanded ? <ChevronUp size={14} color="#8892b0" /> : <ChevronDown size={14} color="#8892b0" />}
-        </div>
-      </div>
-
-      {/* Progress bar */}
-      <div onClick={() => setExpanded(!expanded)} style={{ height: '3px', background: '#1e2540', borderRadius: '3px', marginTop: '8px', cursor: 'pointer' }}>
-        <div style={{ height: '100%', width: `${stepEntries.length > 0 ? (completedSteps / stepEntries.length) * 100 : 0}%`, background: '#22c55e', borderRadius: '3px', transition: 'width 0.3s' }} />
-      </div>
-
-      {expanded && (
-        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {(() => {
-            const STEP_FILES = {
-              'NOC Received': { url: steps.nocReceivedFileUrl, name: steps.nocReceivedFileName },
-              'Sent to Society': { url: steps.applicationSentFileUrl, name: steps.applicationSentFileName },
-              '3rd Party Auth': { url: steps.thirdPartyAuthFileUrl, name: steps.thirdPartyAuthFileName },
-              'Bank Mandate': { url: steps.bankMandateFileUrl, name: steps.bankMandateFileName },
-            };
-            return stepEntries.map(([label, val]) => {
-              const file = STEP_FILES[label];
-              return (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', fontSize: '12px', padding: '3px 0' }}>
-                  <span style={{ color: '#8892b0' }}>{label}</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <DocLinkBtn url={file?.url} title={file?.name ? `Open ${file.name}` : `Open ${label}`} compact />
-                    <span style={{ color: stepColor(val), fontWeight: 600 }}>{val || 'NA'}</span>
-                  </span>
-                </div>
-              );
-            });
-          })()}
-          {steps.loginId && (
-            <div style={{ marginTop: '4px', padding: '8px 10px', background: '#1a1f2e', borderRadius: '6px', fontSize: '11px' }}>
-              <span style={{ color: '#8892b0' }}>Login: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.loginId}</span>
-            </div>
-          )}
-          {steps.caeNumber && (
-            <div style={{ marginTop: '4px', padding: '8px 10px', background: '#1a1f2e', borderRadius: '6px', fontSize: '11px' }}>
-              <span style={{ color: '#8892b0' }}>CAE Number: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.caeNumber}</span>
-            </div>
-          )}
-          {steps.commissionRate && (
-            <div style={{ marginTop: '4px', padding: '8px 10px', background: '#1a1f2e', borderRadius: '6px', fontSize: '11px' }}>
-              <span style={{ color: '#8892b0' }}>Commission Rate: </span><span style={{ color: '#fff', fontFamily: 'monospace' }}>{steps.commissionRate}</span>
-            </div>
-          )}
-          {data.assignee && data.assignee.name && (
-            <div style={{ marginTop: '4px', fontSize: '11px', color: '#8892b0' }}>Assigned to: <span style={{ color: '#fff' }}>{data.assignee.name}</span></div>
-          )}
-          {data.remarks && data.remarks.length > 0 && (
-            <div style={{ marginTop: '6px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: '#8892b0', marginBottom: '4px' }}>Remarks</div>
-              {data.remarks.map((r, i) => (
-                <div key={i} style={{ fontSize: '11px', color: '#cbd5e1', padding: '2px 0' }}>• {r.text} <span style={{ color: '#6b7280' }}>({fmtDate(r.createdAt)})</span></div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-/* ─── Royalty Year Card sub-component ─── */
-const RoyaltyYearCard = ({ yearData }) => {
-  const [expanded, setExpanded] = useState(false);
-  const months = yearData.months
-    ? (yearData.months instanceof Map ? Object.fromEntries(yearData.months) : (typeof yearData.months === 'object' ? yearData.months : {}))
-    : {};
-  const monthKeys = Object.keys(months);
-
-  return (
-    <div style={{ background: '#161b2e', borderRadius: '10px', padding: '14px 16px', marginBottom: '10px' }}>
-      <div onClick={() => setExpanded(!expanded)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', userSelect: 'none' }}>
-        <div style={{ color: '#fff', fontSize: '14px', fontWeight: 600 }}><Calendar size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />{yearData.year}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '12px', color: '#8892b0' }}>{monthKeys.filter(m => months[m]?.fileReceived).length} / {monthKeys.length} months received</span>
-          {expanded ? <ChevronUp size={14} color="#8892b0" /> : <ChevronDown size={14} color="#8892b0" />}
-        </div>
-      </div>
-
-      {expanded && (
-        <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-          {monthKeys.map((mon) => {
-            const md = months[mon] || {};
-            return (
-              <div key={mon} style={{ padding: '10px', background: '#1a1f2e', borderRadius: '8px', borderLeft: `3px solid ${md.fileReceived ? '#22c55e' : '#374151'}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '6px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{mon}</div>
-                  <DocLinkBtn url={md.fileUrl} title={md.fileName ? `Open ${md.fileName}` : `Open ${mon} file`} compact />
-                </div>
-                <div style={{ fontSize: '11px', color: md.fileReceived ? '#34d399' : '#6b7280' }}>{md.fileReceived ? '✓ Received' : '○ Pending'}</div>
-                {(md.totalSongs > 0 || md.totalBGMMovies > 0 || md.totalTVBGM > 0) && (
-                  <div style={{ marginTop: '4px', fontSize: '10px', color: '#8892b0' }}>
-                    {md.totalSongs > 0 && <div>Songs: {md.totalSongs}</div>}
-                    {md.totalBGMMovies > 0 && <div>BGM Movies: {md.totalBGMMovies}</div>}
-                    {md.totalTVBGM > 0 && <div>TV BGM: {md.totalTVBGM}</div>}
-                    {md.totalTVBGMEpisode > 0 && <div>TV Episodes: {md.totalTVBGMEpisode}</div>}
-                  </div>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '5px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: T.heading }}>{mon}</span>
+                <DocLink url={md.fileUrl} name={md.fileName} />
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+              <div style={{ fontSize: '11.5px', fontWeight: 600, color: md.fileReceived ? TONES.green.fg : T.faint }}>
+                {md.fileReceived ? 'Received' : 'Pending'}
+              </div>
+              {(md.totalSongs > 0 || md.totalBGMMovies > 0 || md.totalTVBGM > 0 || md.totalTVBGMEpisode > 0) && (
+                <div style={{ marginTop: '6px', fontSize: '11px', color: T.muted, lineHeight: 1.5 }}>
+                  {md.totalSongs > 0 && <div>Songs: {md.totalSongs}</div>}
+                  {md.totalBGMMovies > 0 && <div>BGM films: {md.totalBGMMovies}</div>}
+                  {md.totalTVBGM > 0 && <div>TV BGM: {md.totalTVBGM}</div>}
+                  {md.totalTVBGMEpisode > 0 && <div>TV episodes: {md.totalTVBGMEpisode}</div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Collapsible>
   );
 };
 

@@ -6,24 +6,24 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const cardStyle = {
-  background: '#141720',
-  border: '1px solid #1e2540',
+  background: '#FFFFFF',
+  border: '1px solid rgba(165, 214, 167, 0.55)',
   borderRadius: '12px',
   padding: '20px',
 };
 // 
 const labelStyle = {
   fontSize: '12px',
-  color: '#9ca3af',
+  color: '#4A6851',
   marginBottom: '6px',
   display: 'block',
   fontWeight: 600,
 };
 
 const selectStyle = {
-  background: '#1a1f2e',
-  border: '1px solid #2a3050',
-  color: '#fff',
+  background: '#FFFFFF',
+  border: '1px solid rgba(165, 214, 167, 0.55)',
+  color: '#1B5E20',
   borderRadius: '8px',
   padding: '9px 12px',
   fontSize: '13px',
@@ -86,8 +86,8 @@ const downloadPdf = (title, rows, headers, meta = {}) => {
 };
 
 const MetricRow = ({ label, value, color }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid #1e2540' }}>
-    <span style={{ color: '#d1d5db', fontSize: '13px', fontWeight: 600 }}>{label}</span>
+  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
+    <span style={{ color: '#2F4A36', fontSize: '13px', fontWeight: 600 }}>{label}</span>
     <span style={{ color, fontSize: '16px', fontWeight: 800, textAlign: 'right' }}>{value}</span>
   </div>
 );
@@ -95,30 +95,30 @@ const MetricRow = ({ label, value, color }) => (
 const ReportCard = ({ title, rows, headers, meta }) => (
   <div style={cardStyle}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
+      <h3 style={{ margin: 0, color: '#1B5E20', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
       <div style={{ display: 'flex', gap: '8px' }}>
         <button
           onClick={() => downloadExcel(title, rows, headers, meta)}
-          style={{ background: '#1e2540', border: '1px solid #334155', color: '#c7d2fe', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          style={{ background: '#F1F6F1', border: '1px solid rgba(165, 214, 167, 0.55)', color: '#256B29', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Download size={13} /> Excel
         </button>
         <button
           onClick={() => downloadPdf(title, rows, headers, meta)}
-          style={{ background: '#1e2540', border: '1px solid #334155', color: '#c7d2fe', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          style={{ background: '#F1F6F1', border: '1px solid rgba(165, 214, 167, 0.55)', color: '#256B29', padding: '7px 10px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
         >
           <Download size={13} /> PDF
         </button>
       </div>
     </div>
 
-    <div style={{ borderTop: '1px solid #1e2540' }}>
+    <div style={{ borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
       {rows.map((row, idx) => (
         <MetricRow
           key={row[headers[0].key]}
           label={row[headers[0].key]}
           value={row[headers[1].key]}
-          color={idx === 0 ? '#93c5fd' : idx === 1 ? '#86efac' : idx === 2 ? '#fde047' : '#fca5a5'}
+          color={idx === 0 ? '#BBDEFB' : idx === 1 ? '#66BB6A' : idx === 2 ? '#7A4400' : '#B71C1C'}
         />
       ))}
     </div>
@@ -128,13 +128,13 @@ const ReportCard = ({ title, rows, headers, meta }) => (
 const SkeletonCard = ({ title }) => (
   <div style={cardStyle}>
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-      <h3 style={{ margin: 0, color: '#fff', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
+      <h3 style={{ margin: 0, color: '#1B5E20', fontSize: '16px', fontWeight: 700 }}>{title}</h3>
     </div>
-    <div style={{ borderTop: '1px solid #1e2540' }}>
+    <div style={{ borderTop: '1px solid rgba(165, 214, 167, 0.55)' }}>
       {[1, 2, 3, 4].map((n) => (
-        <div key={n} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid #1e2540' }}>
-          <div style={{ height: '16px', width: '60%', borderRadius: '6px', background: '#1e2540' }} />
-          <div style={{ height: '16px', width: '32px', justifySelf: 'end', borderRadius: '6px', background: '#1e2540' }} />
+        <div key={n} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px', padding: '10px 0', borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }}>
+          <div style={{ height: '16px', width: '60%', borderRadius: '6px', background: '#F1F6F1' }} />
+          <div style={{ height: '16px', width: '32px', justifySelf: 'end', borderRadius: '6px', background: '#F1F6F1' }} />
         </div>
       ))}
     </div>
@@ -235,19 +235,19 @@ const Analytics = () => {
   return (
     <div style={{ padding: '28px 32px', minHeight: '100%' }}>
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{ color: '#fff', fontSize: '22px', fontWeight: 700, margin: 0 }}>Reports</h1>
-        <p style={{ color: '#9ca3af', fontSize: '14px', margin: '4px 0 0' }}>Monthly or all-time downloadable reports (Excel / PDF)</p>
+        <h1 style={{ color: '#1B5E20', fontSize: '22px', fontWeight: 700, margin: 0 }}>Reports</h1>
+        <p style={{ color: '#4A6851', fontSize: '14px', margin: '4px 0 0' }}>Monthly or all-time downloadable reports (Excel / PDF)</p>
       </div>
 
       <div style={{ ...cardStyle, marginBottom: '18px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'end' }}>
         <div>
           <label style={labelStyle}>Start Date</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'dark' }} />
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'light' }} />
         </div>
 
         <div>
           <label style={labelStyle}>End Date</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'dark' }} />
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ ...dateInputStyle, colorScheme: 'light' }} />
         </div>
 
         <div>
@@ -261,7 +261,7 @@ const Analytics = () => {
       </div>
 
       {loading ? (
-        <div style={{ ...cardStyle, color: '#9ca3af', fontSize: '14px', textAlign: 'center' }}>Loading reports...</div>
+        <div style={{ ...cardStyle, color: '#4A6851', fontSize: '14px', textAlign: 'center' }}>Loading reports...</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
           {societyLoading ? <SkeletonCard title={`${society} Society Report`} /> : <ReportCard title={`${societyReport.society} Society Report`} rows={societyRows} headers={[{ key: 'status', label: 'Status' }, { key: 'count', label: 'Count' }]} meta={{ Range: selectedRangeLabel, Society: societyReport.society, Generated: new Date().toLocaleDateString() }} />}

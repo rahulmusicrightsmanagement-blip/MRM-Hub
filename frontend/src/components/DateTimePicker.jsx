@@ -195,10 +195,10 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
   const showError = error || typedError;
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', minWidth: 0 }}>
       {label && (
-        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
-          {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
+          {label} {required && <span style={{ color: '#B71C1C' }}>*</span>}
         </label>
       )}
 
@@ -209,15 +209,15 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
           display: 'flex',
           alignItems: 'center',
           borderRadius: '10px',
-          border: `1px solid ${showError ? '#ef4444' : open ? '#6366f1' : '#2d3348'}`,
-          backgroundColor: '#0f1117',
+          border: `1px solid ${showError ? '#FFCDD2' : open ? 'rgba(165, 214, 167, 0.75)' : '#A5D6A7'}`,
+          backgroundColor: '#E8F5E9',
           transition: 'all 0.15s',
-          boxShadow: open ? '0 0 0 3px rgba(99,102,241,0.15)' : 'none',
+          boxShadow: open ? '0 0 0 3px rgba(46, 125, 50, 0.15)' : 'none',
           boxSizing: 'border-box',
           overflow: 'hidden',
         }}
       >
-        <Calendar size={15} style={{ color: selected ? '#8b5cf6' : '#6b7280', flexShrink: 0, marginLeft: '12px' }} />
+        <Calendar size={15} style={{ color: selected ? '#1B5E20' : '#5B7362', flexShrink: 0, marginLeft: '12px' }} />
         <input
           type="text"
           value={typed}
@@ -231,7 +231,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
             border: 'none',
             outline: 'none',
             background: 'transparent',
-            color: '#e5e7eb',
+            color: '#1B5E20',
             fontSize: '13px',
             fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
             letterSpacing: '0.3px',
@@ -242,7 +242,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
           <button
             type="button"
             onClick={clear}
-            style={{ background: 'none', border: 'none', padding: '4px 8px', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', padding: '4px 8px', cursor: 'pointer', color: '#5B7362', display: 'flex', alignItems: 'center' }}
           >
             <X size={13} />
           </button>
@@ -251,14 +251,14 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
           type="button"
           onClick={() => setOpen((o) => !o)}
           style={{
-            background: open ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+            background: open ? 'linear-gradient(135deg, #256B29, #1B5E20)' : 'transparent',
             border: 'none',
             padding: '10px 12px',
             cursor: 'pointer',
-            color: open ? 'white' : '#9ca3af',
+            color: open ? 'white' : '#4A6851',
             display: 'flex',
             alignItems: 'center',
-            borderLeft: '1px solid #2d3348',
+            borderLeft: '1px solid #A5D6A7',
             transition: 'all 0.15s',
           }}
           aria-label="Open calendar"
@@ -268,7 +268,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
       </div>
 
       {showError && (
-        <div style={{ color: '#f87171', fontSize: '12px', marginTop: '4px' }}>{showError}</div>
+        <div style={{ color: '#B71C1C', fontSize: '12px', marginTop: '4px' }}>{showError}</div>
       )}
 
       {open && (
@@ -280,10 +280,10 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
             left: popoverPos.left,
             width: popoverPos.width,
             zIndex: 10000,
-            background: 'linear-gradient(180deg, #191d2b 0%, #141720 100%)',
-            border: '1px solid #2d3348',
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #FFFFFF 100%)',
+            border: '1px solid #A5D6A7',
             borderRadius: '14px',
-            boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.08)',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(46, 125, 50, 0.08)',
             padding: '14px',
           }}
         >
@@ -318,7 +318,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
             {DAYS.map((d) => (
-              <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#6b7280', letterSpacing: '0.5px', padding: '4px 0' }}>
+              <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: 600, color: '#5B7362', letterSpacing: '0.5px', padding: '4px 0' }}>
                 {d}
               </div>
             ))}
@@ -342,15 +342,15 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
                     fontSize: '12px',
                     fontWeight: isSel ? 700 : 500,
                     cursor: disabled ? 'not-allowed' : 'pointer',
-                    background: isSel ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
-                    color: disabled ? '#3f4558' : cell.muted ? '#4b5266' : isSel ? 'white' : isToday ? '#a78bfa' : '#d1d5db',
-                    outline: isToday && !isSel ? '1px solid rgba(167,139,250,0.4)' : 'none',
+                    background: isSel ? 'linear-gradient(135deg, #256B29, #1B5E20)' : 'transparent',
+                    color: disabled ? '#5B7362' : cell.muted ? '#5B7362' : isSel ? 'white' : isToday ? '#256B29' : '#2F4A36',
+                    outline: isToday && !isSel ? '1px solid rgba(46, 125, 50, 0.4)' : 'none',
                     outlineOffset: '-1px',
                     transition: 'all 0.12s',
                     opacity: disabled ? 0.4 : 1,
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSel && !disabled) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.15)';
+                    if (!isSel && !disabled) e.currentTarget.style.backgroundColor = 'rgba(46, 125, 50, 0.15)';
                   }}
                   onMouseLeave={(e) => {
                     if (!isSel) e.currentTarget.style.backgroundColor = 'transparent';
@@ -364,7 +364,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
 
           <div style={{ display: 'flex', gap: '6px' }}>
             <button type="button" onClick={setToday} style={quickBtn}>Today</button>
-            <button type="button" onClick={() => setOpen(false)} style={{ ...quickBtn, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: 'white', border: 'none' }}>
+            <button type="button" onClick={() => setOpen(false)} style={{ ...quickBtn, background: 'linear-gradient(135deg, #256B29, #1B5E20)', color: 'white', border: 'none' }}>
               Done
             </button>
           </div>
@@ -382,9 +382,9 @@ const NavBtn = ({ children, onClick }) => (
       width: '26px',
       height: '26px',
       borderRadius: '7px',
-      border: '1px solid #2d3348',
-      background: '#0f1117',
-      color: '#9ca3af',
+      border: '1px solid #A5D6A7',
+      background: '#E8F5E9',
+      color: '#4A6851',
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
@@ -397,9 +397,9 @@ const NavBtn = ({ children, onClick }) => (
 );
 
 const selectStyle = {
-  background: '#0f1117',
-  border: '1px solid #2d3348',
-  color: '#e5e7eb',
+  background: '#E8F5E9',
+  border: '1px solid #A5D6A7',
+  color: '#1B5E20',
   padding: '4px 6px',
   borderRadius: '7px',
   fontSize: '12px',
@@ -412,9 +412,9 @@ const quickBtn = {
   flex: 1,
   padding: '7px 12px',
   borderRadius: '8px',
-  border: '1px solid #2d3348',
-  background: '#0f1117',
-  color: '#9ca3af',
+  border: '1px solid #A5D6A7',
+  background: '#E8F5E9',
+  color: '#4A6851',
   fontSize: '12px',
   fontWeight: 600,
   cursor: 'pointer',

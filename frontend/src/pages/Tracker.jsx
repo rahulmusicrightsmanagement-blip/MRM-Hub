@@ -18,28 +18,28 @@ const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
 
 const CATEGORY_COLORS = {
-  Pipeline: { bg: 'rgba(99,102,241,0.18)', border: '#6366f1', text: '#a5b4fc' },
-  Onboarding: { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b', text: '#fcd34d' },
-  Registration: { bg: 'rgba(236,72,153,0.18)', border: '#ec4899', text: '#f9a8d4' },
-  Internal: { bg: 'rgba(168,85,247,0.18)', border: '#a855f7', text: '#d8b4fe' },
-  Members: { bg: 'rgba(251,146,60,0.18)', border: '#fb923c', text: '#fdba74' },
+  Pipeline: { bg: 'rgba(46, 125, 50, 0.18)', border: 'rgba(165, 214, 167, 0.75)', text: '#256B29' },
+  Onboarding: { bg: 'rgba(249, 168, 37, 0.18)', border: '#FFE082', text: '#7A4400' },
+  Registration: { bg: 'rgba(216, 27, 96, 0.18)', border: '#F8BBD0', text: '#AD1457' },
+  Internal: { bg: 'rgba(46, 125, 50, 0.18)', border: 'rgba(165, 214, 167, 0.75)', text: '#256B29' },
+  Members: { bg: 'rgba(239, 108, 0, 0.18)', border: '#FFCCBC', text: '#BF360C' },
 };
 const FALLBACK_CAT_COLORS = [
-  { bg: 'rgba(99,102,241,0.18)', border: '#6366f1', text: '#a5b4fc' },
-  { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b', text: '#fcd34d' },
-  { bg: 'rgba(16,185,129,0.18)', border: '#10b981', text: '#6ee7b7' },
-  { bg: 'rgba(236,72,153,0.18)', border: '#ec4899', text: '#f9a8d4' },
-  { bg: 'rgba(6,182,212,0.18)', border: '#06b6d4', text: '#67e8f9' },
+  { bg: 'rgba(46, 125, 50, 0.18)', border: 'rgba(165, 214, 167, 0.75)', text: '#256B29' },
+  { bg: 'rgba(249, 168, 37, 0.18)', border: '#FFE082', text: '#7A4400' },
+  { bg: 'rgba(67, 160, 71, 0.18)', border: '#66BB6A', text: '#2E7D32' },
+  { bg: 'rgba(216, 27, 96, 0.18)', border: '#F8BBD0', text: '#AD1457' },
+  { bg: 'rgba(0, 172, 193, 0.18)', border: '#B2DFDB', text: '#004D40' },
 ];
 const getCategoryColor = (cat, allCats) => CATEGORY_COLORS[cat] || FALLBACK_CAT_COLORS[allCats.indexOf(cat) % FALLBACK_CAT_COLORS.length] || FALLBACK_CAT_COLORS[0];
 
 const PRIORITY_COLORS = {
-  High: { bg: '#991b1b', color: '#fca5a5', label: 'HIGH' },
-  Medium: { bg: '#854d0e', color: '#fde047', label: 'MED' },
-  Low: { bg: '#166534', color: '#86efac', label: 'LOW' },
+  High: { bg: '#FFEBEE', color: '#B71C1C', label: 'HIGH' },
+  Medium: { bg: '#FFF8E1', color: '#7A4400', label: 'MED' },
+  Low: { bg: '#E8F5E9', color: '#2E7D32', label: 'LOW' },
 };
 
-const SPOC_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#3b82f6', '#f97316', '#14b8a6', '#a855f7', '#ef4444', '#06b6d4'];
+const SPOC_COLORS = ['#256B29', '#2E7D32', '#7A4400', '#AD1457', '#0D47A1', '#BF360C', '#004D40', '#256B29', '#B71C1C', '#004D40'];
 
 const getMonday = (d) => {
   const date = new Date(d);
@@ -113,9 +113,9 @@ const getDeadlineStatus = (deadline, assignedDate) => {
 };
 
 const DEADLINE_COLORS = {
-  green: { bg: '#166534', color: '#86efac', border: '#22c55e', label: 'On Track', cardBg: 'rgba(34,197,94,0.18)', cardText: '#86efac' },
-  yellow: { bg: '#854d0e', color: '#fde047', border: '#f59e0b', label: 'Near Deadline', cardBg: 'rgba(245,158,11,0.18)', cardText: '#fcd34d' },
-  red: { bg: '#991b1b', color: '#fca5a5', border: '#ef4444', label: 'Overdue', cardBg: 'rgba(239,68,68,0.18)', cardText: '#fca5a5' },
+  green: { bg: '#E8F5E9', color: '#2E7D32', border: '#66BB6A', label: 'On Track', cardBg: 'rgba(67, 160, 71, 0.18)', cardText: '#2E7D32' },
+  yellow: { bg: '#FFF8E1', color: '#7A4400', border: '#FFE082', label: 'Near Deadline', cardBg: 'rgba(249, 168, 37, 0.18)', cardText: '#7A4400' },
+  red: { bg: '#FFEBEE', color: '#B71C1C', border: '#FFCDD2', label: 'Overdue', cardBg: 'rgba(229, 57, 53, 0.18)', cardText: '#B71C1C' },
 };
 
 /* ═══════════════════════════════════════════
@@ -123,11 +123,11 @@ const DEADLINE_COLORS = {
    ═══════════════════════════════════════════ */
 const INPUT = {
   width: '100%', padding: '10px 14px', borderRadius: '8px',
-  border: '1px solid #2d3348', backgroundColor: '#1a1e2e',
-  color: '#e5e7eb', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
+  border: '1px solid #A5D6A7', backgroundColor: '#FFFFFF',
+  color: '#1B5E20', fontSize: '14px', outline: 'none', boxSizing: 'border-box',
 };
 const LABEL = {
-  fontSize: '11px', fontWeight: 600, color: '#9ca3af',
+  fontSize: '11px', fontWeight: 600, color: '#4A6851',
   letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block',
 };
 const SELECT = {
@@ -141,13 +141,13 @@ const SELECT = {
    ═══════════════════════════════════════════ */
 const StatCard = ({ label, value, color }) => (
   <div style={{
-    backgroundColor: '#1a1e2e', border: '1px solid #2d3348', borderRadius: '12px',
+    backgroundColor: '#FFFFFF', border: '1px solid #A5D6A7', borderRadius: '12px',
     padding: '16px 20px', minWidth: '120px', flex: 1,
   }}>
-    <div style={{ fontSize: '12px', fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+    <div style={{ fontSize: '12px', fontWeight: 600, color: '#4A6851', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
       {label}
     </div>
-    <div style={{ fontSize: '28px', fontWeight: 700, color: color || '#e5e7eb' }}>{value}</div>
+    <div style={{ fontSize: '28px', fontWeight: 700, color: color || '#1B5E20' }}>{value}</div>
   </div>
 );
 
@@ -162,20 +162,20 @@ const FilterDropdown = ({ value, options, onChange, width = 170 }) => {
         onClick={() => setOpen(!open)}
         style={{
           display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '8px 14px', borderRadius: '8px', border: '1px solid #2d3348',
-          backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px',
+          padding: '8px 14px', borderRadius: '8px', border: '1px solid #A5D6A7',
+          backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px',
           cursor: 'pointer', minWidth: `${width}px`, justifyContent: 'space-between',
         }}
       >
         <span>{value}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4A6851" strokeWidth="2"><polyline points="6 9 12 15 18 9" /></svg>
       </button>
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setOpen(false)} />
           <div style={{
             position: 'absolute', top: '100%', left: 0, marginTop: '4px', zIndex: 50,
-            backgroundColor: '#1e2235', border: '1px solid #2d3348', borderRadius: '10px',
+            backgroundColor: '#FFFFFF', border: '1px solid #A5D6A7', borderRadius: '10px',
             padding: '6px', minWidth: `${width}px`, boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>
             {options.map((opt) => (
@@ -184,10 +184,10 @@ const FilterDropdown = ({ value, options, onChange, width = 170 }) => {
                 onClick={() => { onChange(opt); setOpen(false); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '8px 12px', border: 'none',
-                  borderRadius: '6px', backgroundColor: value === opt ? '#6366f1' : 'transparent',
-                  color: value === opt ? 'white' : '#d1d5db', fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                  borderRadius: '6px', backgroundColor: value === opt ? '#256B29' : 'transparent',
+                  color: value === opt ? 'white' : '#fff', fontSize: '13px', cursor: 'pointer', textAlign: 'left',
                 }}
-                onMouseEnter={(e) => { if (value !== opt) e.target.style.backgroundColor = '#252a3d'; }}
+                onMouseEnter={(e) => { if (value !== opt) e.target.style.backgroundColor = '#1B5E20'; }}
                 onMouseLeave={(e) => { if (value !== opt) e.target.style.backgroundColor = 'transparent'; }}
               >
                 {value === opt && <Check style={{ width: 14, height: 14 }} />}
@@ -210,8 +210,8 @@ const TaskCard = ({ task, onClick }) => {
   const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
   const dlColor = dlStatus ? DEADLINE_COLORS[dlStatus] : null;
   const cardBg = task.completed ? 'rgba(100,100,100,0.15)' : (dlColor ? dlColor.cardBg : cat.bg);
-  const cardBorder = task.completed ? '#4b5563' : (dlColor ? dlColor.border : cat.border);
-  const cardTextColor = task.completed ? '#6b7280' : (dlColor ? dlColor.cardText : cat.text);
+  const cardBorder = task.completed ? '#F1F6F1' : (dlColor ? dlColor.border : cat.border);
+  const cardTextColor = task.completed ? 'rgba(165, 214, 167, 0.55)' : (dlColor ? dlColor.cardText : cat.text);
 
   return (
     <div
@@ -231,7 +231,7 @@ const TaskCard = ({ task, onClick }) => {
       <div style={{ fontSize: '12px', fontWeight: 600, color: cardTextColor, lineHeight: '1.3', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
         {task.title}
       </div>
-      <div style={{ fontSize: '11px', color: task.completed ? '#6b7280' : '#9ca3af', textDecoration: task.completed ? 'line-through' : 'none' }}>{to12h(task.startTime)}</div>
+      <div style={{ fontSize: '11px', color: task.completed ? '#5B7362' : '#4A6851', textDecoration: task.completed ? 'line-through' : 'none' }}>{to12h(task.startTime)}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
         {task.priority === 'High' && (
           <div style={{
@@ -253,7 +253,7 @@ const TaskCard = ({ task, onClick }) => {
       {task.spoc && (
         <div style={{
           position: 'absolute', top: '8px', right: '8px', width: '22px', height: '22px',
-          borderRadius: '50%', backgroundColor: task.spocColor || '#6366f1',
+          borderRadius: '50%', backgroundColor: task.spocColor || '#256B29',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '9px', fontWeight: 700, color: 'white',
         }}>
@@ -262,7 +262,7 @@ const TaskCard = ({ task, onClick }) => {
       )}
       {task.completed && (
         <div style={{ position: 'absolute', top: '6px', right: task.spoc ? '34px' : '8px' }}>
-          <CheckCircle style={{ width: 14, height: 14, color: '#22c55e' }} />
+          <CheckCircle style={{ width: 14, height: 14, color: '#2E7D32' }} />
         </div>
       )}
     </div>
@@ -308,7 +308,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
       ...form,
       date: form.day,
       deadline: form.deadline || null,
-      spocColor: spocObj?.color || '#6366f1',
+      spocColor: spocObj?.color || '#256B29',
       ...(isEdit && initialData?._id ? { _id: initialData._id } : {}),
     });
     onClose();
@@ -326,14 +326,14 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
     >
       <div
         style={{
-          backgroundColor: '#1e2235', borderRadius: '16px', padding: '32px', width: '520px',
-          maxHeight: '90vh', overflowY: 'auto', border: '1px solid #2d3348',
+          backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '32px', width: '520px',
+          maxHeight: '90vh', overflowY: 'auto', border: '1px solid #A5D6A7',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'white' }}>{isEdit ? 'Edit Task' : 'Schedule New Task'}</h2>
-          <X style={{ width: '20px', height: '20px', color: '#9ca3af', cursor: 'pointer' }} onClick={onClose} />
+          <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1B5E20' }}>{isEdit ? 'Edit Task' : 'Schedule New Task'}</h2>
+          <X style={{ width: '20px', height: '20px', color: '#4A6851', cursor: 'pointer' }} onClick={onClose} />
         </div>
 
         {/* Title */}
@@ -396,7 +396,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
         <div style={{ marginBottom: '20px' }}>
           <label style={LABEL}>Deadline</label>
           <input
-            style={{ ...INPUT, colorScheme: 'dark' }}
+            style={{ ...INPUT, colorScheme: 'light' }}
             type="date"
             value={form.deadline}
             onChange={(e) => set('deadline', e.target.value)}
@@ -417,13 +417,13 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
         {/* Buttons */}
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: '12px',
-          borderTop: '1px solid #2d3348', paddingTop: '20px',
+          borderTop: '1px solid #A5D6A7', paddingTop: '20px',
         }}>
           <button
             onClick={onClose}
             style={{
-              padding: '10px 24px', borderRadius: '10px', border: '1px solid #2d3348',
-              backgroundColor: 'transparent', color: '#9ca3af', fontSize: '14px', cursor: 'pointer',
+              padding: '10px 24px', borderRadius: '10px', border: '1px solid #A5D6A7',
+              backgroundColor: 'transparent', color: '#4A6851', fontSize: '14px', cursor: 'pointer',
             }}
           >
             Cancel
@@ -432,7 +432,7 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
             onClick={handleSubmit}
             style={{
               padding: '10px 24px', borderRadius: '10px', border: 'none',
-              backgroundColor: '#6366f1', color: 'white', fontSize: '14px',
+              backgroundColor: '#256B29', color: 'white', fontSize: '14px',
               fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
             }}
           >
@@ -462,8 +462,8 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
     >
       <div
         style={{
-          backgroundColor: '#1e2235', borderRadius: '16px', padding: '28px', width: '420px',
-          border: '1px solid #2d3348',
+          backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '28px', width: '420px',
+          border: '1px solid #A5D6A7',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -475,27 +475,27 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
             }}>
               {task.category}
             </span>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'white', marginTop: '10px' }}>{task.title}</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#1B5E20', marginTop: '10px' }}>{task.title}</h2>
           </div>
-          <X style={{ width: 18, height: 18, color: '#9ca3af', cursor: 'pointer', flexShrink: 0 }} onClick={onClose} />
+          <X style={{ width: 18, height: 18, color: '#4A6851', cursor: 'pointer', flexShrink: 0 }} onClick={onClose} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Date</div>
-            <div style={{ fontSize: '13px', color: '#e5e7eb' }}>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+            <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Date</div>
+            <div style={{ fontSize: '13px', color: '#1B5E20' }}>
               {new Date(task.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
             </div>
           </div>
-          <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Time</div>
-            <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{to12h(task.startTime)} · {task.duration} min</div>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+            <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Time</div>
+            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{to12h(task.startTime)} · {task.duration} min</div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Priority</div>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+            <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Priority</div>
             <span style={{
               fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px',
               backgroundColor: pri.bg, color: pri.color,
@@ -503,11 +503,11 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
               {task.priority}
             </span>
           </div>
-          <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-            <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Assigned To</div>
-            <div style={{ fontSize: '13px', color: '#e5e7eb' }}>{task.spoc || 'Unassigned'}</div>
+          <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+            <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Assigned To</div>
+            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{task.spoc || 'Unassigned'}</div>
             {task.assignedDate && (
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '4px' }}>
                 on {new Date(task.assignedDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
               </div>
             )}
@@ -516,14 +516,14 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
 
         {task.deadline && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-              <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Deadline</div>
-              <div style={{ fontSize: '13px', color: '#e5e7eb' }}>
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Deadline</div>
+              <div style={{ fontSize: '13px', color: '#1B5E20' }}>
                 {new Date(task.deadline).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
               </div>
             </div>
-            <div style={{ backgroundColor: '#161b2e', borderRadius: '8px', padding: '10px 14px' }}>
-              <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>Status</div>
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Status</div>
               {dlColor ? (
                 <span style={{
                   fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '6px',
@@ -532,24 +532,24 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
                   {dlColor.label}
                 </span>
               ) : (
-                <span style={{ fontSize: '13px', color: '#22c55e' }}>Completed</span>
+                <span style={{ fontSize: '13px', color: '#2E7D32' }}>Completed</span>
               )}
             </div>
           </div>
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-          <span style={{ fontSize: '13px', color: task.completed ? '#22c55e' : '#9ca3af' }}>
+          <span style={{ fontSize: '13px', color: task.completed ? '#2E7D32' : '#4A6851' }}>
             {task.completed ? '✓ Completed' : '○ Pending'}
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #2d3348', paddingTop: '16px' }}>
+        <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #A5D6A7', paddingTop: '16px' }}>
           <button
             onClick={() => onToggle(task._id)}
             style={{
-              flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #2d3348',
-              backgroundColor: task.completed ? '#1a1e2e' : '#166534', color: task.completed ? '#9ca3af' : '#86efac',
+              flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #A5D6A7',
+              backgroundColor: task.completed ? '#FFFFFF' : '#E8F5E9', color: task.completed ? '#4A6851' : '#2E7D32',
               fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
             }}
           >
@@ -559,8 +559,8 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           <button
             onClick={() => onEdit(task)}
             style={{
-              flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #2d3348',
-              backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', fontWeight: 600,
+              flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #A5D6A7',
+              backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
               cursor: 'pointer',
             }}
           >
@@ -569,8 +569,8 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           <button
             onClick={() => onDelete(task._id)}
             style={{
-              padding: '10px 16px', borderRadius: '10px', border: '1px solid #991b1b',
-              backgroundColor: '#1a1e2e', color: '#fca5a5', fontSize: '13px',
+              padding: '10px 16px', borderRadius: '10px', border: '1px solid #FFCDD2',
+              backgroundColor: '#FFFFFF', color: '#B71C1C', fontSize: '13px',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -605,15 +605,15 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
         return (
           <div key={key}>
             <div style={{
-              fontSize: '13px', fontWeight: 700, color: today ? '#6366f1' : '#9ca3af',
+              fontSize: '13px', fontWeight: 700, color: today ? '#256B29' : '#4A6851',
               marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px',
             }}>
               <span>{fmtDay(day)} {day.getDate()} {day.toLocaleDateString('en-GB', { month: 'short' })}</span>
-              {today && <span style={{ fontSize: '10px', backgroundColor: '#6366f1', color: 'white', padding: '1px 8px', borderRadius: '10px' }}>TODAY</span>}
-              <span style={{ fontSize: '11px', color: '#6b7280' }}>({dayTasks.length} tasks)</span>
+              {today && <span style={{ fontSize: '10px', backgroundColor: '#256B29', color: 'white', padding: '1px 8px', borderRadius: '10px' }}>TODAY</span>}
+              <span style={{ fontSize: '11px', color: '#5B7362' }}>({dayTasks.length} tasks)</span>
             </div>
             {dayTasks.length === 0 ? (
-              <div style={{ fontSize: '12px', color: '#4b5563', padding: '8px 16px', backgroundColor: '#161b2e', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#5B7362', padding: '8px 16px', backgroundColor: '#FFFFFF', borderRadius: '8px' }}>
                 No tasks scheduled
               </div>
             ) : (
@@ -629,18 +629,18 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                       onClick={() => onTaskClick(t)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
-                        backgroundColor: t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#161b2e'),
-                        borderRadius: '10px', borderLeft: `3px solid ${t.completed ? '#4b5563' : (tdlColor ? tdlColor.border : cat.border)}`,
+                        backgroundColor: t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#FFFFFF'),
+                        borderRadius: '10px', borderLeft: `3px solid ${t.completed ? 'rgba(165, 214, 167, 0.55)' : (tdlColor ? tdlColor.border : cat.border)}`,
                         cursor: 'pointer', transition: 'background-color 0.15s',
                         opacity: t.completed ? 0.6 : 1,
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1e2235'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#161b2e'); }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1B5E20'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#FFFFFF'); }}
                     >
-                      <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#6b7280' : '#9ca3af', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
+                      <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#5B7362' : '#4A6851', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#6b7280' : (tdlColor ? tdlColor.cardText : '#e5e7eb'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
-                        <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category} · {t.duration} min</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#5B7362' : (tdlColor ? tdlColor.cardText : '#1B5E20'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
+                        <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category} · {t.duration} min</div>
                       </div>
                       {tdlColor && (
                         <span style={{
@@ -661,14 +661,14 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                       {t.spoc && (
                         <div style={{
                           width: '26px', height: '26px', borderRadius: '50%',
-                          backgroundColor: t.spocColor || '#6366f1',
+                          backgroundColor: t.spocColor || '#256B29',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '10px', fontWeight: 700, color: 'white',
                         }}>
                           {getInitials(t.spoc)}
                         </div>
                       )}
-                      {t.completed && <CheckCircle style={{ width: 16, height: 16, color: '#22c55e' }} />}
+                      {t.completed && <CheckCircle style={{ width: 16, height: 16, color: '#2E7D32' }} />}
                     </div>
                   );
                 })}
@@ -954,15 +954,15 @@ const Tracker = () => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'white', margin: 0 }}>Productivity Tracker</h1>
-          <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>Weekly calendar view of all tasks and scheduled activities</p>
+          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1B5E20', margin: 0 }}>Productivity Tracker</h1>
+          <p style={{ fontSize: '13px', color: '#5B7362', marginTop: '4px' }}>Weekly calendar view of all tasks and scheduled activities</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={goToday}
             style={{
-              padding: '8px 18px', borderRadius: '10px', border: '1px solid #2d3348',
-              backgroundColor: '#1a1e2e', color: '#e5e7eb', fontSize: '13px', fontWeight: 600,
+              padding: '8px 18px', borderRadius: '10px', border: '1px solid #A5D6A7',
+              backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
               cursor: 'pointer',
             }}
           >
@@ -972,7 +972,7 @@ const Tracker = () => {
             onClick={() => guardAction(() => { setEditingTask(null); setShowScheduleModal(true); })}
             style={{
               padding: '8px 18px', borderRadius: '10px', border: 'none',
-              backgroundColor: '#6366f1', color: 'white', fontSize: '13px', fontWeight: 600,
+              backgroundColor: '#256B29', color: 'white', fontSize: '13px', fontWeight: 600,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
             }}
           >
@@ -985,22 +985,22 @@ const Tracker = () => {
       {/* Stats */}
       <div style={{ display: 'flex', gap: '14px', marginBottom: '20px' }}>
         <StatCard label="This Week" value={stats.thisWeek} />
-        <StatCard label="Today" value={stats.today} color="#6366f1" />
-        <StatCard label="High Priority" value={stats.highPriority} color="#f59e0b" />
-        <StatCard label="Completed" value={stats.completed} color="#22c55e" />
+        <StatCard label="Today" value={stats.today} color="#256B29" />
+        <StatCard label="High Priority" value={stats.highPriority} color="#7A4400" />
+        <StatCard label="Completed" value={stats.completed} color="#2E7D32" />
       </div>
 
       {/* Controls Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         {/* Week navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <button onClick={prevWeek} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}>
+          <button onClick={prevWeek} style={{ background: 'none', border: 'none', color: '#4A6851', cursor: 'pointer', padding: '4px' }}>
             <ChevronLeft style={{ width: 20, height: 20 }} />
           </button>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#e5e7eb', minWidth: '220px', textAlign: 'center' }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: '#1B5E20', minWidth: '220px', textAlign: 'center' }}>
             {fmtMonthRange(weekStart, weekEnd)}
           </span>
-          <button onClick={nextWeek} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px' }}>
+          <button onClick={nextWeek} style={{ background: 'none', border: 'none', color: '#4A6851', cursor: 'pointer', padding: '4px' }}>
             <ChevronRight style={{ width: 20, height: 20 }} />
           </button>
         </div>
@@ -1008,18 +1008,18 @@ const Tracker = () => {
         {/* Search + Filters + View toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#5B7362' }} />
             <input
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ width: '180px', padding: '8px 12px 8px 32px', background: '#141720', border: '1px solid #2d3348', borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none' }}
+              style={{ width: '180px', padding: '8px 12px 8px 32px', background: '#FFFFFF', border: '1px solid #A5D6A7', borderRadius: '8px', color: '#1B5E20', fontSize: '13px', outline: 'none' }}
             />
           </div>
           <FilterDropdown value={categoryFilter} options={CATEGORIES} onChange={setCategoryFilter} width={160} />
           <FilterDropdown value={spocFilter} options={spocOptions} onChange={setSpocFilter} width={150} />
           <div style={{
-            display: 'flex', borderRadius: '8px', border: '1px solid #2d3348', overflow: 'hidden', marginLeft: '8px',
+            display: 'flex', borderRadius: '8px', border: '1px solid #A5D6A7', overflow: 'hidden', marginLeft: '8px',
           }}>
             {['Week', 'Agenda'].map((mode) => (
               <button
@@ -1027,8 +1027,8 @@ const Tracker = () => {
                 onClick={() => setViewMode(mode)}
                 style={{
                   padding: '8px 16px', border: 'none', fontSize: '13px', fontWeight: 600,
-                  backgroundColor: viewMode === mode ? '#6366f1' : '#1a1e2e',
-                  color: viewMode === mode ? 'white' : '#9ca3af',
+                  backgroundColor: viewMode === mode ? '#256B29' : '#FFFFFF',
+                  color: viewMode === mode ? 'white' : '#4A6851',
                   cursor: 'pointer',
                 }}
               >
@@ -1041,8 +1041,8 @@ const Tracker = () => {
 
       {/* Calendar / Agenda */}
       <div style={{
-        flex: 1, overflow: 'auto', borderRadius: '12px', border: '1px solid #2d3348',
-        backgroundColor: '#13161f',
+        flex: 1, overflow: 'auto', borderRadius: '12px', border: '1px solid #A5D6A7',
+        backgroundColor: '#E8F5E9',
       }}>
         {viewMode === 'Agenda' ? (
           <div style={{ padding: '20px' }}>
@@ -1093,13 +1093,13 @@ const Tracker = () => {
             return (
           <div style={{ display: 'flex', minHeight: `${totalHeight}px` }}>
             {/* Time gutter */}
-            <div style={{ width: '60px', flexShrink: 0, borderRight: '1px solid #1e2235' }}>
-              <div style={{ height: '52px', borderBottom: '1px solid #1e2235' }} />
+            <div style={{ width: '60px', flexShrink: 0, borderRight: '1px solid rgba(165, 214, 167, 0.55)' }}>
+              <div style={{ height: '52px', borderBottom: '1px solid rgba(165, 214, 167, 0.55)' }} />
               {HOURS.map((h) => (
                 <div key={h} style={{
                   height: `${slotHeight(h)}px`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-                  paddingTop: '4px', fontSize: '11px', color: '#6b7280', fontWeight: 500,
-                  borderBottom: '1px solid #1a1d28',
+                  paddingTop: '4px', fontSize: '11px', color: '#5B7362', fontWeight: 500,
+                  borderBottom: '1px solid rgba(165, 214, 167, 0.55)',
                 }}>
                   {h > 12 ? `${h - 12} PM` : h === 12 ? '12 PM' : `${h} AM`}
                 </div>
@@ -1115,26 +1115,26 @@ const Tracker = () => {
                 <div
                   key={dayKey}
                   style={{
-                    flex: 1, borderRight: dayIdx < 6 ? '1px solid #1e2235' : 'none',
-                    backgroundColor: today ? 'rgba(99,102,241,0.04)' : 'transparent',
+                    flex: 1, borderRight: dayIdx < 6 ? '1px solid rgba(165, 214, 167, 0.55)' : 'none',
+                    backgroundColor: today ? 'rgba(46, 125, 50, 0.04)' : 'transparent',
                   }}
                 >
                   {/* Day header */}
                   <div style={{
                     height: '52px', display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
-                    borderBottom: '1px solid #1e2235', position: 'sticky', top: 0,
-                    backgroundColor: today ? 'rgba(99,102,241,0.08)' : '#13161f', zIndex: 2,
+                    borderBottom: '1px solid rgba(165, 214, 167, 0.55)', position: 'sticky', top: 0,
+                    backgroundColor: today ? 'rgba(46, 125, 50, 0.08)' : '#E8F5E9', zIndex: 2,
                   }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: today ? '#818cf8' : '#6b7280', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: today ? '#256B29' : '#5B7362', letterSpacing: '0.5px' }}>
                       {fmtDay(day)}
                     </div>
                     <div style={{
                       fontSize: '18px', fontWeight: 700,
                       width: today ? '32px' : 'auto', height: today ? '32px' : 'auto',
                       borderRadius: today ? '50%' : '0',
-                      backgroundColor: today ? '#6366f1' : 'transparent',
-                      color: today ? 'white' : '#e5e7eb',
+                      backgroundColor: today ? '#256B29' : 'transparent',
+                      color: today ? '#fff' : '#1B5E20',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       {fmtDate(day)}
@@ -1147,7 +1147,7 @@ const Tracker = () => {
                     return (
                       <div key={h} style={{
                         height: `${slotHeight(h)}px`,
-                        borderBottom: '1px solid #1a1d28',
+                        borderBottom: '1px solid rgba(165, 214, 167, 0.55)',
                         padding: slotTasks.length ? '4px 4px 0' : 0,
                         display: 'flex', flexDirection: 'column', gap: `${CARD_GAP}px`,
                         boxSizing: 'border-box',

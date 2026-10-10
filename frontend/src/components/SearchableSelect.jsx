@@ -36,11 +36,11 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
     setQuery('');
   };
 
-  const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#9ca3af', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' };
+  const labelStyle = { fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' };
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      {label && <label style={labelStyle}>{label} {required && <span style={{ color: '#ef4444' }}>*</span>}</label>}
+      {label && <label style={labelStyle}>{label} {required && <span style={{ color: '#B71C1C' }}>*</span>}</label>}
 
       {/* Trigger */}
       <div
@@ -48,9 +48,9 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
         title={disabled ? 'Edit from the Members page' : undefined}
         style={{
           width: '100%', padding: '10px 14px', borderRadius: '8px',
-          border: `1px solid ${isOpen && !disabled ? '#6366f1' : '#2d3348'}`,
-          backgroundColor: disabled ? '#141823' : '#1a1e2e',
-          color: selected ? '#e5e7eb' : '#6b7280',
+          border: `1px solid ${isOpen && !disabled ? 'rgba(165, 214, 167, 0.75)' : '#A5D6A7'}`,
+          backgroundColor: disabled ? '#E8F5E9' : '#FFFFFF',
+          color: selected ? '#1B5E20' : '#5B7362',
           opacity: disabled ? 0.75 : 1,
           fontSize: '14px', cursor: disabled ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -62,10 +62,10 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           {selected && !disabled && (
-            <X size={14} style={{ color: '#9ca3af', cursor: 'pointer' }} onClick={handleClear} />
+            <X size={14} style={{ color: '#4A6851', cursor: 'pointer' }} onClick={handleClear} />
           )}
           {!disabled && (
-            <ChevronDown size={16} style={{ color: '#9ca3af', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+            <ChevronDown size={16} style={{ color: '#4A6851', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
           )}
         </div>
       </div>
@@ -74,13 +74,13 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
       {isOpen && !disabled && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
-          backgroundColor: '#1e2235', border: '1px solid #2d3348', borderRadius: '10px',
+          backgroundColor: '#FFFFFF', border: '1px solid #A5D6A7', borderRadius: '10px',
           boxShadow: '0 12px 32px rgba(0,0,0,0.4)', zIndex: 100, overflow: 'hidden',
         }}>
           {/* Search input */}
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid #2d3348' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', backgroundColor: '#141720', border: '1px solid #2d3348' }}>
-              <Search size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid #A5D6A7' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '6px', backgroundColor: '#FFFFFF', border: '1px solid #A5D6A7' }}>
+              <Search size={14} style={{ color: '#5B7362', flexShrink: 0 }} />
               <input
                 ref={inputRef}
                 value={query}
@@ -88,7 +88,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
                 placeholder="Type to search..."
                 style={{
                   width: '100%', border: 'none', outline: 'none', backgroundColor: 'transparent',
-                  color: '#e5e7eb', fontSize: '13px',
+                  color: '#1B5E20', fontSize: '13px',
                 }}
               />
             </div>
@@ -97,7 +97,7 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
           {/* Options list */}
           <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>{emptyMessage}</div>
+              <div style={{ padding: '16px', textAlign: 'center', color: '#5B7362', fontSize: '13px' }}>{emptyMessage}</div>
             ) : (
               filtered.map((o) => (
                 <div
@@ -105,25 +105,25 @@ const SearchableSelect = ({ options = [], value, onChange, placeholder = 'Search
                   onClick={() => handleSelect(o.name)}
                   style={{
                     padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
-                    backgroundColor: o.name === value ? '#252b45' : 'transparent',
+                    backgroundColor: o.name === value ? '#F1F6F1' : 'transparent',
                     transition: 'background-color 0.1s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#252b45'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = o.name === value ? '#252b45' : 'transparent'; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#5B7362'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = o.name === value ? '#5B7362' : 'transparent'; }}
                 >
                   {o.initials && (
                     <div style={{
                       width: '28px', height: '28px', borderRadius: '50%',
-                      backgroundColor: o.color || '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: o.color || '#256B29', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '11px', fontWeight: 700, color: '#fff', flexShrink: 0,
                     }}>
                       {o.initials}
                     </div>
                   )}
                   <div>
-                    <div style={{ color: '#e5e7eb', fontSize: '13px', fontWeight: 500 }}>{o.name}</div>
+                    <div style={{ color: '#1B5E20', fontSize: '13px', fontWeight: 500 }}>{o.name}</div>
                     {(o.role || o.email) && (
-                      <div style={{ color: '#6b7280', fontSize: '11px', marginTop: '1px' }}>
+                      <div style={{ color: '#5B7362', fontSize: '11px', marginTop: '1px' }}>
                         {o.role}{o.role && o.email ? ' · ' : ''}{o.email}
                       </div>
                     )}
