@@ -195,7 +195,7 @@ const DateTimePicker = ({ value, onChange, placeholder = 'DD-MM-YYYY', minDate, 
   const showError = error || typedError;
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', minWidth: 0 }}>
       {label && (
         <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#4A6851', letterSpacing: '0.5px', textTransform: 'uppercase', marginBottom: '6px' }}>
           {label} {required && <span style={{ color: '#B71C1C' }}>*</span>}
