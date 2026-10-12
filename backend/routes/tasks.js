@@ -4,6 +4,7 @@ const User = require('../models/User');
 const SocietyRegistration = require('../models/SocietyRegistration');
 const { auth, denyGuest, isGuestUser } = require('../middleware/auth');
 const notify = require('../utils/notify');
+const { SOURCE_TYPE: SPOC_SOURCE, backfillSpocTasks, pushCompletion } = require('../utils/spocTrackerSync');
 
 const router = express.Router();
 
@@ -86,6 +87,7 @@ router.get('/', auth, async (req, res) => {
       filter.spoc = req.user.name;
     }
 
+    await backfillSpocTasks();
     const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 }).lean();
     await reconcileSocietyTasks(tasks, { persist: !isGuestUser(req.user) });
     res.json({ tasks });
@@ -98,10 +100,13 @@ router.get('/', auth, async (req, res) => {
 // GET /api/tasks/stats — weekly stats
 router.get('/stats', auth, async (req, res) => {
   try {
-    const { start, end } = req.query;
+    const { start, end, spoc } = req.query;
     const filter = {};
     if (start && end) {
       filter.date = { $gte: new Date(start), $lte: new Date(end) };
+    }
+    if (spoc && spoc !== 'All SPOCs') {
+      filter.spoc = spoc;
     }
 
     // RBAC: non-full-access users see only their stats
@@ -109,6 +114,7 @@ router.get('/stats', auth, async (req, res) => {
       filter.spoc = req.user.name;
     }
 
+    await backfillSpocTasks();
     const tasks = await Task.find(filter).lean();
     await reconcileSocietyTasks(tasks, { persist: !isGuestUser(req.user) });
 
@@ -231,6 +237,7 @@ router.put('/:id', auth, denyGuest, async (req, res) => {
     if (req.body.deadline) task.deadline = new Date(req.body.deadline);
 
     await task.save();
+    if (task.completed !== wasCompleted) await pushCompletion(task);
 
     // Notify when task is marked completed (and it wasn't before)
     if (task.completed && !wasCompleted && task.spoc) {
@@ -256,8 +263,13 @@ router.put('/:id', auth, denyGuest, async (req, res) => {
 // DELETE /api/tasks/:id
 router.delete('/:id', auth, denyGuest, async (req, res) => {
   try {
-    const task = await Task.findByIdAndDelete(req.params.id);
-    if (!task) return res.status(404).json({ message: 'Task not found' });
+    const existing = await Task.findById(req.params.id, { sourceType: 1 }).lean();
+    if (!existing) return res.status(404).json({ message: 'Task not found' });
+    // The Client Task page owns these; a delete here would come straight back.
+    if (existing.sourceType === SPOC_SOURCE) {
+      return res.status(400).json({ message: 'This is a SPOC task — delete it from the Client Task page.' });
+    }
+    await Task.deleteOne({ _id: req.params.id });
     res.json({ message: 'Task deleted' });
   } catch (err) {
     console.error('Delete task error:', err);
@@ -272,6 +284,7 @@ router.patch('/:id/toggle', auth, denyGuest, async (req, res) => {
     if (!task) return res.status(404).json({ message: 'Task not found' });
     task.completed = !task.completed;
     await task.save();
+    await pushCompletion(task);
     res.json({ task });
   } catch (err) {
     console.error('Toggle task error:', err);
