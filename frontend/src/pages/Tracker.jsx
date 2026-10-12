@@ -14,7 +14,6 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
    ═══════════════════════════════════════════ */
 const API = '/api';
 const PRIORITIES = ['High', 'Medium', 'Low'];
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
 
 const CATEGORY_COLORS = {
@@ -348,8 +347,8 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           />
         </div>
 
-        {/* Day / Start Time / Duration */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+        {/* Day / Start Time */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
           <div>
             <label style={LABEL}>Day</label>
             <select style={SELECT} value={form.day} onChange={(e) => set('day', e.target.value)}>
@@ -361,14 +360,6 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           <div>
             <label style={LABEL}>Start Time</label>
             <input style={INPUT} type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
-          </div>
-          <div>
-            <label style={LABEL}>Duration (min)</label>
-            <select style={SELECT} value={form.duration} onChange={(e) => set('duration', Number(e.target.value))}>
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>{d} min</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -489,7 +480,7 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           </div>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
             <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Time</div>
-            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{to12h(task.startTime)} · {task.duration} min</div>
+            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{to12h(task.startTime)}</div>
           </div>
         </div>
 
@@ -640,7 +631,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                       <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#5B7362' : '#4A6851', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#5B7362' : (tdlColor ? tdlColor.cardText : '#1B5E20'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
-                        <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category} · {t.duration} min</div>
+                        <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category}</div>
                       </div>
                       {tdlColor && (
                         <span style={{
