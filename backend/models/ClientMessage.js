@@ -57,6 +57,14 @@ clientMessageSchema.pre('save', async function () {
   }
 });
 
+// Keep the Tracker's copy of a SPOC task in step with every save and delete.
+clientMessageSchema.post('save', function (doc) {
+  require('../utils/spocTrackerSync').syncSpocTask(doc);
+});
+clientMessageSchema.post('deleteOne', { document: true, query: false }, function (doc) {
+  require('../utils/spocTrackerSync').removeSpocTask(doc._id);
+});
+
 clientMessageSchema.index({ receivedAt: -1 });
 clientMessageSchema.index({ status: 1 });
 clientMessageSchema.index({ clientId: 1 });

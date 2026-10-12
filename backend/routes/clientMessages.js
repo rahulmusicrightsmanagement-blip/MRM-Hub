@@ -2,6 +2,7 @@ const express = require('express');
 const ClientMessage = require('../models/ClientMessage');
 const User = require('../models/User');
 const { auth, denyGuest } = require('../middleware/auth');
+const notify = require('../utils/notify');
 const { sendTaskEmail } = require('../utils/mailer');
 const { ADMIN_EMAILS, resolveSpocEmail } = require('../utils/taskEmailConfig');
 
@@ -23,6 +24,27 @@ const serializeMessage = async (doc) => {
   obj.createdById = obj.createdBy?._id || null;
   obj.createdBy = obj.createdBy?.name || '';
   return obj;
+};
+
+// Tell the assignee a task is now theirs. notify() resolves the name and
+// skips it when people assign a task to themselves.
+const notifyAssignee = (doc, user, reassigned = false) => {
+  if (!doc.assignedTo && !doc.assignedToId) return;
+  const isSpoc = doc.taskType === 'spoc';
+  const text = String(doc.message || '');
+  notify({
+    recipientId: doc.assignedToId || undefined,
+    recipientName: doc.assignedTo,
+    type: 'task_assigned',
+    title: isSpoc
+      ? `${reassigned ? 'SPOC task reassigned' : 'New SPOC task'} assigned to you`
+      : `${reassigned ? 'Client task reassigned' : 'New client task'} for ${doc.clientName} assigned to you`,
+    message: text.length > 140 ? `${text.slice(0, 137)}…` : text,
+    relatedType: 'client',
+    relatedId: doc._id.toString(),
+    triggeredBy: user.name,
+    triggeredById: user._id,
+  });
 };
 
 // GET /api/client-messages — list, optional ?status=
@@ -79,6 +101,7 @@ router.post('/', auth, denyGuest, async (req, res) => {
       priority: priority || 'Medium',
     });
     await doc.save();
+    notifyAssignee(doc, req.user);
     res.status(201).json({ message: await serializeMessage(doc) });
   } catch (err) {
     console.error('Create client message error:', err.stack || err);
@@ -96,6 +119,7 @@ router.put('/:id', auth, denyGuest, async (req, res) => {
       return res.status(403).json({ message: 'Only the task creator can edit this task' });
     }
 
+    const prevAssignee = `${doc.assignedToId || ''}|${(doc.assignedTo || '').toLowerCase()}`;
     const allowed = ['clientName', 'clientId', 'message', 'status', 'assignedTo', 'assignedToId', 'taskType', 'priority'];
     allowed.forEach((f) => {
       if (req.body[f] !== undefined) doc[f] = req.body[f];
@@ -108,6 +132,9 @@ router.put('/:id', auth, denyGuest, async (req, res) => {
     }
 
     await doc.save();
+    if (`${doc.assignedToId || ''}|${(doc.assignedTo || '').toLowerCase()}` !== prevAssignee) {
+      notifyAssignee(doc, req.user, true);
+    }
     res.json({ message: await serializeMessage(doc) });
   } catch (err) {
     console.error('Update client message error:', err);

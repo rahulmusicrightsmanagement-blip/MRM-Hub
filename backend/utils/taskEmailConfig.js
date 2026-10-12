@@ -6,7 +6,6 @@
 const ADMIN_EMAILS = [
   'rahul.musicrightsmanagement@gmail.com',
   'devi@musicrightsmanagementindia.com',
-  'sherley@musicrightsmanagementindia.com',
 ];
 
 // SPOC overrides → map of lower-cased User.name → email to use
@@ -16,10 +15,17 @@ const SPOC_EMAIL_OVERRIDES = {
   'rahul jadhav': 'rahuljadhav0417@gmail.com',
 };
 
+// Never email these addresses, even as a SPOC with tasks assigned to them.
+const MUTED_EMAILS = [
+  'sherley@musicrightsmanagementindia.com',
+];
+
 const resolveSpocEmail = (user) => {
   if (!user) return null;
   const key = (user.name || '').trim().toLowerCase();
-  return SPOC_EMAIL_OVERRIDES[key] || user.email || null;
+  const email = SPOC_EMAIL_OVERRIDES[key] || user.email || null;
+  if (email && MUTED_EMAILS.includes(email.trim().toLowerCase())) return null;
+  return email;
 };
 
-module.exports = { ADMIN_EMAILS, SPOC_EMAIL_OVERRIDES, resolveSpocEmail };
+module.exports = { ADMIN_EMAILS, SPOC_EMAIL_OVERRIDES, MUTED_EMAILS, resolveSpocEmail };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, ChevronLeft, ChevronRight, Clock, X, Calendar, CheckCircle,
-  AlertTriangle, Zap, ListTodo, Trash2, Check, Search,
+  AlertTriangle, Zap, ListTodo, Trash2, Check, Search, ExternalLink, User, Users,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -14,7 +14,6 @@ import { useGuestGuard } from '../hooks/useGuestGuard';
    ═══════════════════════════════════════════ */
 const API = '/api';
 const PRIORITIES = ['High', 'Medium', 'Low'];
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180];
 const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
 
 const CATEGORY_COLORS = {
@@ -348,8 +347,8 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           />
         </div>
 
-        {/* Day / Start Time / Duration */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+        {/* Day / Start Time */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
           <div>
             <label style={LABEL}>Day</label>
             <select style={SELECT} value={form.day} onChange={(e) => set('day', e.target.value)}>
@@ -361,14 +360,6 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
           <div>
             <label style={LABEL}>Start Time</label>
             <input style={INPUT} type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
-          </div>
-          <div>
-            <label style={LABEL}>Duration (min)</label>
-            <select style={SELECT} value={form.duration} onChange={(e) => set('duration', Number(e.target.value))}>
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>{d} min</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -448,8 +439,10 @@ const ScheduleModal = ({ onClose, onSubmit, weekDays, teamMembers, initialData }
 /* ═══════════════════════════════════════════
    TASK DETAIL MODAL
    ═══════════════════════════════════════════ */
-const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
+const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit, onOpenSource }) => {
   if (!task) return null;
+  // Mirrored from Client Task's "Task for SPOC" — edited and deleted there.
+  const fromSpocTask = task.sourceType === 'spoctask';
   const cat = getCategoryColor(task.category, []);
   const pri = PRIORITY_COLORS[task.priority];
   const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
@@ -489,7 +482,7 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           </div>
           <div style={{ backgroundColor: '#FFFFFF', borderRadius: '8px', padding: '10px 14px' }}>
             <div style={{ fontSize: '11px', color: '#5B7362', marginBottom: '4px' }}>Time</div>
-            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{to12h(task.startTime)} · {task.duration} min</div>
+            <div style={{ fontSize: '13px', color: '#1B5E20' }}>{to12h(task.startTime)}</div>
           </div>
         </div>
 
@@ -538,6 +531,17 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
           </div>
         )}
 
+        {fromSpocTask && (
+          <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', backgroundColor: '#E8F5E9', border: '1px solid #CFE5D1' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.6px', textTransform: 'uppercase', color: '#4A6851', marginBottom: '6px' }}>
+              SPOC task · from Client Task
+            </div>
+            <div style={{ fontSize: '13px', color: '#2F4A36', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: '160px', overflowY: 'auto' }}>
+              {task.notes || task.title}
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
           <span style={{ fontSize: '13px', color: task.completed ? '#2E7D32' : '#4A6851' }}>
             {task.completed ? '✓ Completed' : '○ Pending'}
@@ -556,26 +560,42 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit }) => {
             <CheckCircle style={{ width: 14, height: 14 }} />
             {task.completed ? 'Mark Pending' : 'Mark Done'}
           </button>
-          <button
-            onClick={() => onEdit(task)}
-            style={{
-              flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #A5D6A7',
-              backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Edit
-          </button>
-          <button
-            onClick={() => onDelete(task._id)}
-            style={{
-              padding: '10px 16px', borderRadius: '10px', border: '1px solid #FFCDD2',
-              backgroundColor: '#FFFFFF', color: '#B71C1C', fontSize: '13px',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Trash2 style={{ width: 14, height: 14 }} />
-          </button>
+          {fromSpocTask ? (
+            <button
+              onClick={onOpenSource}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #A5D6A7',
+                backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+              }}
+            >
+              <ExternalLink style={{ width: 14, height: 14 }} />
+              Open in Client Task
+            </button>
+          ) : (
+            <>
+            <button
+              onClick={() => onEdit(task)}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #A5D6A7',
+                backgroundColor: '#FFFFFF', color: '#1B5E20', fontSize: '13px', fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(task._id)}
+              style={{
+                padding: '10px 16px', borderRadius: '10px', border: '1px solid #FFCDD2',
+                backgroundColor: '#FFFFFF', color: '#B71C1C', fontSize: '13px',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Trash2 style={{ width: 14, height: 14 }} />
+            </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -640,7 +660,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                       <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#5B7362' : '#4A6851', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#5B7362' : (tdlColor ? tdlColor.cardText : '#1B5E20'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
-                        <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category} · {t.duration} min</div>
+                        <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category}</div>
                       </div>
                       {tdlColor && (
                         <span style={{
@@ -684,8 +704,14 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
 /* ═══════════════════════════════════════════
    MAIN TRACKER COMPONENT
    ═══════════════════════════════════════════ */
+// Remembered per browser, like the sidebar's collapsed state.
+const MINE_KEY = 'mrm.tracker.mine';
+const readMine = () => {
+  try { return globalThis.localStorage?.getItem(MINE_KEY) === '1'; } catch { return false; }
+};
+
 const Tracker = () => {
-  const { authFetch } = useAuth();
+  const { authFetch, user, isFullAccess } = useAuth();
   const { addToast } = useToast();
   const { isGuest, guardAction, blockGuestAction } = useGuestGuard();
   const { getOptions } = usePicklist();
@@ -697,6 +723,15 @@ const Tracker = () => {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [spocFilter, setSpocFilter] = useState('All SPOCs');
+  // "My calendar": only the signed-in user's work. Non-full-access users only
+  // ever get their own tasks from the API, so for them it is always on.
+  const [mineOnly, setMineOnly] = useState(readMine);
+  const showMine = !isFullAccess || mineOnly;
+  const effectiveSpoc = showMine ? (user?.name || '') : spocFilter;
+  const toggleMine = (next) => {
+    setMineOnly(next);
+    try { globalThis.localStorage?.setItem(MINE_KEY, next ? '1' : '0'); } catch { /* not worth recovering from */ }
+  };
   const [viewMode, setViewMode] = useState('Week'); // 'Week' | 'Agenda'
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -743,7 +778,7 @@ const Tracker = () => {
         end: fmtDateISO(weekEnd),
       });
       if (categoryFilter !== 'All Categories') params.set('category', categoryFilter);
-      if (spocFilter !== 'All SPOCs') params.set('spoc', spocFilter);
+      if (effectiveSpoc && effectiveSpoc !== 'All SPOCs') params.set('spoc', effectiveSpoc);
 
       const res = await authFetch(`${API}/tasks?${params}`);
       if (res.ok) {
@@ -753,7 +788,7 @@ const Tracker = () => {
     } catch (err) {
       console.error('Fetch tasks error:', err);
     }
-  }, [authFetch, weekStart, weekEnd, categoryFilter, spocFilter]);
+  }, [authFetch, weekStart, weekEnd, categoryFilter, effectiveSpoc]);
 
   /* ── Fetch stats ── */
   const fetchStats = useCallback(async () => {
@@ -762,13 +797,14 @@ const Tracker = () => {
         start: fmtDateISO(weekStart),
         end: fmtDateISO(weekEnd),
       });
+      if (effectiveSpoc && effectiveSpoc !== 'All SPOCs') params.set('spoc', effectiveSpoc);
       const res = await authFetch(`${API}/tasks/stats?${params}`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);
       }
     } catch { /* ignore */ }
-  }, [authFetch, weekStart, weekEnd]);
+  }, [authFetch, weekStart, weekEnd, effectiveSpoc]);
 
   useEffect(() => {
     const load = async () => {
@@ -892,7 +928,7 @@ const Tracker = () => {
     if (blockGuestAction()) return;
     try {
       const res = await authFetch(`${API}/tasks/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed');
       setSelectedTask(null);
       fetchTasks();
       fetchStats();
@@ -955,7 +991,7 @@ const Tracker = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1B5E20', margin: 0 }}>Productivity Tracker</h1>
-          <p style={{ fontSize: '13px', color: '#5B7362', marginTop: '4px' }}>Weekly calendar view of all tasks and scheduled activities</p>
+          <p style={{ fontSize: '13px', color: '#5B7362', marginTop: '4px' }}>{showMine ? 'Your tasks and scheduled activities for the week' : 'Weekly calendar view of all tasks and scheduled activities'}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
@@ -1007,6 +1043,27 @@ const Tracker = () => {
 
         {/* Search + Filters + View toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isFullAccess && (
+            <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #A5D6A7', overflow: 'hidden', marginRight: '8px' }}>
+              {[['Everyone', false], ['My calendar', true]].map(([label, val]) => (
+                <button
+                  key={label}
+                  onClick={() => toggleMine(val)}
+                  aria-pressed={mineOnly === val}
+                  style={{
+                    padding: '8px 14px', border: 'none', fontSize: '13px', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    backgroundColor: mineOnly === val ? '#256B29' : '#FFFFFF',
+                    color: mineOnly === val ? 'white' : '#4A6851',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {val ? <User size={14} /> : <Users size={14} />}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <div style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#5B7362' }} />
             <input
@@ -1017,7 +1074,9 @@ const Tracker = () => {
             />
           </div>
           <FilterDropdown value={categoryFilter} options={CATEGORIES} onChange={setCategoryFilter} width={160} />
-          <FilterDropdown value={spocFilter} options={spocOptions} onChange={setSpocFilter} width={150} />
+          {!showMine && (
+            <FilterDropdown value={spocFilter} options={spocOptions} onChange={setSpocFilter} width={150} />
+          )}
           <div style={{
             display: 'flex', borderRadius: '8px', border: '1px solid #A5D6A7', overflow: 'hidden', marginLeft: '8px',
           }}>
@@ -1184,6 +1243,7 @@ const Tracker = () => {
           onToggle={handleToggle}
           onDelete={handleDelete}
           onEdit={handleEdit}
+          onOpenSource={() => navigate('/client-chat')}
         />
       )}
     </div>
