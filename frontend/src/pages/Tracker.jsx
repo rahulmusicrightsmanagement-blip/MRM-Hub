@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus, ChevronLeft, ChevronRight, Clock, X, Calendar, CheckCircle,
-  AlertTriangle, Zap, ListTodo, Trash2, Check, Search, ExternalLink, User, Users,
+  AlertTriangle, Zap, ListTodo, Trash2, Check, Search, ExternalLink, User, Users, AlarmClock,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -69,6 +69,11 @@ const fmtDateISO = (d) => {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 };
+/* The date a task sits on: when it was assigned (task.date) or when it is due
+   (task.deadline). Only placement changes — the task itself is untouched. */
+const placeDateOf = (task, dateMode) => (dateMode === 'deadline' ? task.deadline : task.date);
+const fmtShort = (d) => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
 const parseTime = (t) => {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
@@ -203,7 +208,7 @@ const FilterDropdown = ({ value, options, onChange, width = 170 }) => {
 /* ═══════════════════════════════════════════
    TASK CARD (on calendar)
    ═══════════════════════════════════════════ */
-const TaskCard = ({ task, onClick }) => {
+const TaskCard = ({ task, onClick, dateMode }) => {
   const cat = getCategoryColor(task.category, []);
   const pri = PRIORITY_COLORS[task.priority];
   const dlStatus = task.completed ? null : getDeadlineStatus(task.deadline, task.assignedDate);
@@ -230,7 +235,9 @@ const TaskCard = ({ task, onClick }) => {
       <div style={{ fontSize: '12px', fontWeight: 600, color: cardTextColor, lineHeight: '1.3', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: task.completed ? 'line-through' : 'none' }}>
         {task.title}
       </div>
-      <div style={{ fontSize: '11px', color: task.completed ? '#5B7362' : '#4A6851', textDecoration: task.completed ? 'line-through' : 'none' }}>{to12h(task.startTime)}</div>
+      <div style={{ fontSize: '11px', color: task.completed ? '#5B7362' : '#4A6851', textDecoration: task.completed ? 'line-through' : 'none' }}>
+        {dateMode === 'deadline' ? `Due · assigned ${fmtShort(task.date)}` : to12h(task.startTime)}
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px', flexWrap: 'wrap' }}>
         {task.priority === 'High' && (
           <div style={{
@@ -605,16 +612,18 @@ const TaskDetailModal = ({ task, onClose, onToggle, onDelete, onEdit, onOpenSour
 /* ═══════════════════════════════════════════
    AGENDA VIEW
    ═══════════════════════════════════════════ */
-const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
+const AgendaView = ({ tasks, weekDays, onTaskClick, dateMode }) => {
   const grouped = useMemo(() => {
     const map = {};
     weekDays.forEach((d) => { map[fmtDateISO(d)] = []; });
     tasks.forEach((t) => {
-      const key = fmtDateISO(new Date(t.date));
+      const placed = placeDateOf(t, dateMode);
+      if (!placed) return;
+      const key = fmtDateISO(new Date(placed));
       if (map[key]) map[key].push(t);
     });
     return map;
-  }, [tasks, weekDays]);
+  }, [tasks, weekDays, dateMode]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -657,7 +666,7 @@ const AgendaView = ({ tasks, weekDays, onTaskClick }) => {
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1B5E20'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = t.completed ? 'rgba(100,100,100,0.1)' : (tdlColor ? tdlColor.cardBg : '#FFFFFF'); }}
                     >
-                      <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#5B7362' : '#4A6851', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{to12h(t.startTime)}</div>
+                      <div style={{ width: '60px', fontSize: '12px', color: t.completed ? '#5B7362' : '#4A6851', fontWeight: 600, textDecoration: t.completed ? 'line-through' : 'none' }}>{dateMode === 'deadline' ? 'Due' : to12h(t.startTime)}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '13px', fontWeight: 600, color: t.completed ? '#5B7362' : (tdlColor ? tdlColor.cardText : '#1B5E20'), textDecoration: t.completed ? 'line-through' : 'none' }}>{t.title}</div>
                         <div style={{ fontSize: '11px', color: '#5B7362', marginTop: '2px', textDecoration: t.completed ? 'line-through' : 'none' }}>{t.category}</div>
@@ -709,6 +718,10 @@ const MINE_KEY = 'mrm.tracker.mine';
 const readMine = () => {
   try { return globalThis.localStorage?.getItem(MINE_KEY) === '1'; } catch { return false; }
 };
+const DATE_MODE_KEY = 'mrm.tracker.dateMode';
+const readDateMode = () => {
+  try { return globalThis.localStorage?.getItem(DATE_MODE_KEY) === 'deadline' ? 'deadline' : 'assigned'; } catch { return 'assigned'; }
+};
 
 const Tracker = () => {
   const { authFetch, user, isFullAccess } = useAuth();
@@ -728,6 +741,13 @@ const Tracker = () => {
   const [mineOnly, setMineOnly] = useState(readMine);
   const showMine = !isFullAccess || mineOnly;
   const effectiveSpoc = showMine ? (user?.name || '') : spocFilter;
+  // 'assigned' places tasks on the day they were assigned, 'deadline' on the
+  // day they are due. Tasks with no deadline have no place in deadline view.
+  const [dateMode, setDateModeState] = useState(readDateMode);
+  const setDateMode = (next) => {
+    setDateModeState(next);
+    try { globalThis.localStorage?.setItem(DATE_MODE_KEY, next); } catch { /* not worth recovering from */ }
+  };
   const toggleMine = (next) => {
     setMineOnly(next);
     try { globalThis.localStorage?.setItem(MINE_KEY, next ? '1' : '0'); } catch { /* not worth recovering from */ }
@@ -773,10 +793,10 @@ const Tracker = () => {
   /* ── Fetch tasks for current week ── */
   const fetchTasks = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        start: fmtDateISO(weekStart),
-        end: fmtDateISO(weekEnd),
-      });
+      const params = dateMode === 'deadline'
+        // Deadlines carry a time of day, so the week is sent as exact local bounds.
+        ? new URLSearchParams({ dateField: 'deadline', start: weekStart.toISOString(), end: weekEnd.toISOString() })
+        : new URLSearchParams({ start: fmtDateISO(weekStart), end: fmtDateISO(weekEnd) });
       if (categoryFilter !== 'All Categories') params.set('category', categoryFilter);
       if (effectiveSpoc && effectiveSpoc !== 'All SPOCs') params.set('spoc', effectiveSpoc);
 
@@ -788,15 +808,15 @@ const Tracker = () => {
     } catch (err) {
       console.error('Fetch tasks error:', err);
     }
-  }, [authFetch, weekStart, weekEnd, categoryFilter, effectiveSpoc]);
+  }, [authFetch, weekStart, weekEnd, categoryFilter, effectiveSpoc, dateMode]);
 
   /* ── Fetch stats ── */
   const fetchStats = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        start: fmtDateISO(weekStart),
-        end: fmtDateISO(weekEnd),
-      });
+      const params = dateMode === 'deadline'
+        // Deadlines carry a time of day, so the week is sent as exact local bounds.
+        ? new URLSearchParams({ dateField: 'deadline', start: weekStart.toISOString(), end: weekEnd.toISOString() })
+        : new URLSearchParams({ start: fmtDateISO(weekStart), end: fmtDateISO(weekEnd) });
       if (effectiveSpoc && effectiveSpoc !== 'All SPOCs') params.set('spoc', effectiveSpoc);
       const res = await authFetch(`${API}/tasks/stats?${params}`);
       if (res.ok) {
@@ -804,7 +824,7 @@ const Tracker = () => {
         setStats(data);
       }
     } catch { /* ignore */ }
-  }, [authFetch, weekStart, weekEnd, effectiveSpoc]);
+  }, [authFetch, weekStart, weekEnd, effectiveSpoc, dateMode]);
 
   useEffect(() => {
     const load = async () => {
@@ -977,11 +997,13 @@ const Tracker = () => {
     const map = {};
     weekDays.forEach((d) => { map[fmtDateISO(d)] = []; });
     searchedTasks.forEach((t) => {
-      const key = fmtDateISO(new Date(t.date));
+      const placed = placeDateOf(t, dateMode);
+      if (!placed) return;
+      const key = fmtDateISO(new Date(placed));
       if (map[key]) map[key].push(t);
     });
     return map;
-  }, [searchedTasks, weekDays]);
+  }, [searchedTasks, weekDays, dateMode]);
 
   const todayStr = fmtDateISO(new Date());
 
@@ -991,7 +1013,9 @@ const Tracker = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#1B5E20', margin: 0 }}>Productivity Tracker</h1>
-          <p style={{ fontSize: '13px', color: '#5B7362', marginTop: '4px' }}>{showMine ? 'Your tasks and scheduled activities for the week' : 'Weekly calendar view of all tasks and scheduled activities'}</p>
+          <p style={{ fontSize: '13px', color: '#5B7362', marginTop: '4px' }}>{dateMode === 'deadline'
+            ? (showMine ? 'Your tasks, placed on the day they are due' : 'All tasks, placed on the day they are due')
+            : (showMine ? 'Your tasks and scheduled activities for the week' : 'Weekly calendar view of all tasks and scheduled activities')}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
@@ -1020,8 +1044,8 @@ const Tracker = () => {
 
       {/* Stats */}
       <div style={{ display: 'flex', gap: '14px', marginBottom: '20px' }}>
-        <StatCard label="This Week" value={stats.thisWeek} />
-        <StatCard label="Today" value={stats.today} color="#256B29" />
+        <StatCard label={dateMode === 'deadline' ? 'Due This Week' : 'This Week'} value={stats.thisWeek} />
+        <StatCard label={dateMode === 'deadline' ? 'Due Today' : 'Today'} value={stats.today} color="#256B29" />
         <StatCard label="High Priority" value={stats.highPriority} color="#7A4400" />
         <StatCard label="Completed" value={stats.completed} color="#2E7D32" />
       </div>
@@ -1043,6 +1067,26 @@ const Tracker = () => {
 
         {/* Search + Filters + View toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #A5D6A7', overflow: 'hidden', marginRight: '8px' }}>
+            {[['assigned', 'Assigned on'], ['deadline', 'Deadline']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setDateMode(val)}
+                aria-pressed={dateMode === val}
+                title={val === 'deadline' ? 'Show each task on its deadline date' : 'Show each task on the date it was assigned'}
+                style={{
+                  padding: '8px 14px', border: 'none', fontSize: '13px', fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: dateMode === val ? '#256B29' : '#FFFFFF',
+                  color: dateMode === val ? 'white' : '#4A6851',
+                  cursor: 'pointer',
+                }}
+              >
+                {val === 'deadline' ? <AlarmClock size={14} /> : <Calendar size={14} />}
+                {label}
+              </button>
+            ))}
+          </div>
           {isFullAccess && (
             <div style={{ display: 'flex', borderRadius: '8px', border: '1px solid #A5D6A7', overflow: 'hidden', marginRight: '8px' }}>
               {[['Everyone', false], ['My calendar', true]].map(([label, val]) => (
@@ -1105,7 +1149,7 @@ const Tracker = () => {
       }}>
         {viewMode === 'Agenda' ? (
           <div style={{ padding: '20px' }}>
-            <AgendaView tasks={searchedTasks} weekDays={weekDays} onTaskClick={setSelectedTask} />
+            <AgendaView tasks={searchedTasks} weekDays={weekDays} onTaskClick={setSelectedTask} dateMode={dateMode} />
           </div>
         ) : (
           /* Week Calendar View */
@@ -1212,7 +1256,7 @@ const Tracker = () => {
                         boxSizing: 'border-box',
                       }}>
                         {slotTasks.map((task) => (
-                          <TaskCard key={task._id} task={task} onClick={setSelectedTask} />
+                          <TaskCard key={task._id} task={task} onClick={setSelectedTask} dateMode={dateMode} />
                         ))}
                       </div>
                     );
