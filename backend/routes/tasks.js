@@ -66,14 +66,21 @@ const reconcileSocietyTasks = async (tasks, { persist = true } = {}) => {
   } catch (err) { console.error('reconcileSocietyTasks error:', err); }
 };
 
+// Which date a task is placed by: when it was scheduled/assigned ('date', the
+// default) or when it is due ('deadline'). Only these two are accepted.
+const dateFieldOf = (query) => (query.dateField === 'deadline' ? 'deadline' : 'date');
+
 // GET /api/tasks — list tasks with optional date range & filters
 router.get('/', auth, async (req, res) => {
   try {
     const { start, end, category, spoc } = req.query;
     const filter = {};
+    const field = dateFieldOf(req.query);
 
     if (start && end) {
-      filter.date = { $gte: new Date(start), $lte: new Date(end) };
+      filter[field] = { $gte: new Date(start), $lte: new Date(end) };
+    } else if (field === 'deadline') {
+      filter.deadline = { $ne: null };
     }
     if (category && category !== 'All Categories') {
       filter.category = category;
@@ -88,7 +95,7 @@ router.get('/', auth, async (req, res) => {
     }
 
     await backfillSpocTasks();
-    const tasks = await Task.find(filter).sort({ date: 1, startTime: 1 }).lean();
+    const tasks = await Task.find(filter).sort({ [field]: 1, startTime: 1 }).lean();
     await reconcileSocietyTasks(tasks, { persist: !isGuestUser(req.user) });
     res.json({ tasks });
   } catch (err) {
@@ -102,8 +109,11 @@ router.get('/stats', auth, async (req, res) => {
   try {
     const { start, end, spoc } = req.query;
     const filter = {};
+    const field = dateFieldOf(req.query);
     if (start && end) {
-      filter.date = { $gte: new Date(start), $lte: new Date(end) };
+      filter[field] = { $gte: new Date(start), $lte: new Date(end) };
+    } else if (field === 'deadline') {
+      filter.deadline = { $ne: null };
     }
     if (spoc && spoc !== 'All SPOCs') {
       filter.spoc = spoc;
@@ -125,7 +135,7 @@ router.get('/stats', auth, async (req, res) => {
 
     const thisWeek = tasks.length;
     const todayCount = tasks.filter((t) => {
-      const d = new Date(t.date);
+      const d = new Date(t[field]);
       d.setHours(0, 0, 0, 0);
       return d.getTime() === today.getTime();
     }).length;
